@@ -323,11 +323,12 @@ describe('purity', () => {
       (m) => m[1],
     )
     expect(specs).toEqual([
-      'zod',
+      'effect',
       '../attributes/options',
       '../attributes/registry',
       '../attributes/relationship',
       '../attributes/registry',
+      './decode',
     ])
   })
 })

@@ -1,6 +1,6 @@
-import { z } from 'zod'
 import { DOCUMENT_KINDS } from '../documents'
 import type { DocumentKind } from '../documents'
+import { object, oneOf, readFirst, text } from './decode'
 
 /**
  * The `suggestion(kind: 'supersedes')` payload: a document filed on a record
@@ -10,18 +10,22 @@ import type { DocumentKind } from '../documents'
  * - The names are as filed when proposed; the ids are what accept writes.
  */
 
-export const supersedesPayloadSchema = z
-  .object({
-    newerId: z.string().uuid(),
-    olderId: z.string().uuid(),
-    newerName: z.string().min(1),
-    olderName: z.string().min(1),
-    documentKind: z.enum(DOCUMENT_KINDS),
-  })
-  .strict()
-  .refine((p) => p.newerId !== p.olderId, {
-    message: 'a document is never a newer version of itself',
-  })
+export const supersedesPayloadSchema = object(
+  {
+    newerId: text({ format: 'uuid' }),
+    olderId: text({ format: 'uuid' }),
+    newerName: text({ min: 1 }),
+    olderName: text({ min: 1 }),
+    documentKind: oneOf(DOCUMENT_KINDS),
+  },
+  {
+    strict: true,
+    rule: {
+      holds: (p) => p.newerId !== p.olderId,
+      words: 'a document is never a newer version of itself',
+    },
+  },
+)
 
 export type SupersedesPayload = {
   newerId: string
@@ -33,6 +37,6 @@ export type SupersedesPayload = {
 
 /** A stored payload read as a supersedes proposal, or null when it is not one. */
 export function readSupersedesPayload(raw: unknown): SupersedesPayload | null {
-  const parsed = supersedesPayloadSchema.safeParse(raw)
+  const parsed = readFirst(supersedesPayloadSchema, raw)
   return parsed.success ? parsed.data : null
 }

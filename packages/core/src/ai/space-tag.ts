@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { number, object, readFirst, text } from './decode'
 
 /**
  * The `suggestion(kind: 'space_tag')` payload: one space a record
@@ -15,17 +16,18 @@ import { z } from 'zod'
  * `proposeProgram` holds a new row to it, the accept path reads it back
  * before tagging, and the inbox card draws it.
  */
-export const spaceTagPayloadSchema = z
-  .object({
-    spaceId: z.string().uuid(),
-    label: z.string().trim().min(1).max(1000),
-    confidence: z.number().min(0).max(1).optional(),
-  })
-  .strict()
+export const spaceTagPayloadSchema = object(
+  {
+    spaceId: text({ format: 'uuid' }),
+    label: text({ trim: true, min: 1, max: 1000 }),
+    confidence: Schema.optional(number({ min: 0, max: 1 })),
+  },
+  { strict: true },
+)
 
 /**
- * Spelled out rather than `z.infer`: an absent key is absent, so the payload
- * is JSON by type.
+ * Spelled out rather than the schema's type: an absent key is absent, so
+ * the payload is JSON by type.
  */
 export type SpaceTagPayload = {
   spaceId: string
@@ -35,7 +37,7 @@ export type SpaceTagPayload = {
 
 /** A stored payload read as a space tag, or null when it is not one. */
 export function readSpaceTagPayload(raw: unknown): SpaceTagPayload | null {
-  const parsed = spaceTagPayloadSchema.safeParse(raw)
+  const parsed = readFirst(spaceTagPayloadSchema, raw)
   if (!parsed.success) return null
   const { spaceId, label, confidence } = parsed.data
   return confidence === undefined

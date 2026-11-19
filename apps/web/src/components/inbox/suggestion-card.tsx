@@ -13,7 +13,7 @@ import type { IdentityPayload } from '@spaces/core/ai/identity'
 import { readNotePayload } from '@spaces/core/ai/note'
 import type { NotePayload } from '@spaces/core/ai/note'
 import { readSpaceTagPayload } from '@spaces/core/ai/space-tag'
-import { taskPayloadSchema } from '@spaces/core/ai/task'
+import { readTaskPayload } from '@spaces/core/ai/task'
 import type { SpaceTagPayload } from '@spaces/core/ai/space-tag'
 import {
   readAddRecordPayload,
@@ -144,9 +144,9 @@ const SUGGESTION_BODIES: Partial<Record<SuggestionKind, SuggestionBody>> = {
     )
   },
   task: ({ item, actions }) => {
-    const proposed = taskPayloadSchema.safeParse(item.payload)
-    return proposed.success ? (
-      <TaskBody title={proposed.data.title} due={proposed.data.due} />
+    const proposed = readTaskPayload(item.payload)
+    return proposed ? (
+      <TaskBody title={proposed.title} due={proposed.due} />
     ) : (
       <PayloadBody item={item} actions={actions} />
     )

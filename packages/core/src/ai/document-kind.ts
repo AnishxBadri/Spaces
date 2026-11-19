@@ -1,6 +1,7 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { DOCUMENT_KINDS } from '../documents'
 import type { DocumentKind } from '../documents'
+import { holding, number, object, oneOf, readFirst } from './decode'
 
 /**
  * The `suggestion(kind: 'document_kind')` payload: the kind the
@@ -18,18 +19,21 @@ export type ProposedDocumentKind = Exclude<DocumentKind, 'other'>
 const isProposable = (k: DocumentKind): k is ProposedDocumentKind =>
   k !== 'other'
 
-export const documentKindPayloadSchema = z
-  .object({
-    kind: z
-      .enum(DOCUMENT_KINDS)
-      .refine(isProposable, { message: 'other is never proposed' }),
-    confidence: z.number().min(0).max(1).optional(),
-  })
-  .strict()
+export const documentKindPayloadSchema = object(
+  {
+    kind: holding(
+      oneOf(DOCUMENT_KINDS),
+      isProposable,
+      'other is never proposed',
+    ),
+    confidence: Schema.optional(number({ min: 0, max: 1 })),
+  },
+  { strict: true },
+)
 
 /**
- * Spelled out rather than `z.infer`, as `IdentityPayload` is: an absent key
- * is absent, so the payload is JSON by type.
+ * Spelled out rather than the schema's type, as `IdentityPayload` is: an
+ * absent key is absent, so the payload is JSON by type.
  */
 export type DocumentKindPayload = {
   kind: ProposedDocumentKind
@@ -40,7 +44,7 @@ export type DocumentKindPayload = {
 export function readDocumentKindPayload(
   raw: unknown,
 ): DocumentKindPayload | null {
-  const parsed = documentKindPayloadSchema.safeParse(raw)
+  const parsed = readFirst(documentKindPayloadSchema, raw)
   if (!parsed.success) return null
   const kind = parsed.data.kind
   if (!isProposable(kind)) return null

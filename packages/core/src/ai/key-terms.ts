@@ -1,5 +1,5 @@
-import { z } from 'zod'
 import type { DocumentKind } from '../documents'
+import { list, object, plainRecord, readFirst, text } from './decode'
 import { JSON_SCHEMA_DRAFT } from './schema'
 import type { JsonSchema } from './schema'
 
@@ -187,10 +187,7 @@ export type KeyTerm = {
 const ABSENT =
   /^(?:not\s+(?:found|stated|mentioned|specified|provided|addressed|disclosed|applicable)|n\/?a|unknown|none\s+(?:stated|mentioned|found)|-+|—)\.?$/i
 
-const answered = z.object({
-  value: z.string(),
-  refs: z.array(z.string()),
-})
+const answered = object({ value: text(), refs: list(text()) })
 
 /**
  * A provider's answer, held to the schema it was handed, in vocabulary
@@ -202,7 +199,7 @@ export function readKeyTerms(
   kind: KeyTermKind,
   raw: unknown,
 ): { terms: Array<KeyTerm>; dropped: Array<string> } {
-  const top = z.record(z.string(), z.unknown()).safeParse(raw)
+  const top = readFirst(plainRecord, raw)
   if (!top.success) return { terms: [], dropped: [] }
   const defs = KEY_TERMS[kind]
   const terms: Array<KeyTerm> = []
@@ -212,7 +209,7 @@ export function readKeyTerms(
   for (const def of defs) {
     const entry = top.data[def.slug]
     if (entry === undefined || entry === null) continue
-    const parsed = answered.safeParse(entry)
+    const parsed = readFirst(answered, entry)
     if (!parsed.success) {
       dropped.push(def.slug)
       continue

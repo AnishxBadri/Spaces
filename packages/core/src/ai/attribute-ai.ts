@@ -1,10 +1,10 @@
 import { Schema } from 'effect'
-import { z } from 'zod'
 import type {
   AiAttributeConfig,
   AiAttributeMode,
 } from '@spaces/db/schema/attributes'
 import type { AttributeType } from '../attributes/registry'
+import { list, object, oneOf, readFirst, text } from './decode'
 
 /**
  * AI attributes, the pure half: the mode × type matrix, the mode → lane map,
@@ -104,19 +104,21 @@ export type AiConfigInput = typeof aiConfigInput.Type
  * The stored shape, read leniently: a row written before a mode was
  * renamed, or by hand, decodes to null rather than to a half-config.
  */
-const storedConfig = z.object({
-  mode: z.enum(AI_ATTRIBUTE_MODES),
-  prompt: z.string(),
-  variables: z.array(z.string()).optional(),
-  lane: z.enum(['classify', 'synthesize', 'research']),
+const storedConfig = object({
+  mode: oneOf(AI_ATTRIBUTE_MODES),
+  prompt: text(),
+  variables: Schema.optional(list(text())),
+  lane: oneOf(['classify', 'synthesize', 'research']),
 })
+
+const isString = Schema.is(Schema.String)
 
 /** The attribute's AI config, or null when it has none it can run. */
 export function readAiConfig(def: {
   type: string
   options: { ai?: unknown } | null
 }): AiAttributeConfig | null {
-  const parsed = storedConfig.safeParse(def.options?.ai)
+  const parsed = readFirst(storedConfig, def.options?.ai)
   if (!parsed.success) return null
   if (!aiModeFits(parsed.data.mode, def.type)) return null
   const { mode, prompt, variables } = parsed.data
@@ -192,15 +194,15 @@ export function readOptionProposals(
   if (rationale === null) return []
   const out: Array<OptionProposal> = []
   for (const m of rationale.matchAll(LINE)) {
-    const label = z.string().safeParse(safeJson(m[1]))
-    if (label.success) out.push({ label: label.data, name: m[2], slug: m[3] })
+    const label = safeJson(m[1])
+    if (isString(label)) out.push({ label, name: m[2], slug: m[3] })
   }
   return out
 }
 
-function safeJson(text: string): unknown {
+function safeJson(json: string): unknown {
   try {
-    return JSON.parse(text)
+    return JSON.parse(json)
   } catch {
     return null
   }

@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { object, readFirst, text } from './decode'
 
 /**
  * The `suggestion(kind: 'note')` payload: a note a model drafted, not yet a
@@ -17,17 +17,18 @@ import { z } from 'zod'
  * holds a new row to it, the accept path reads it back, and the inbox card
  * draws it.
  */
-export const notePayloadSchema = z
-  .object({
-    title: z.string().trim().min(1).max(300),
-    markdown: z.string().trim().min(1).max(200_000),
+export const notePayloadSchema = object(
+  {
+    title: text({ trim: true, min: 1, max: 300 }),
+    markdown: text({ trim: true, min: 1, max: 200_000 }),
     /**
      * What the note was drafted from: a document, or the record itself.
      * Accepting links the note `derived_from` it.
      */
-    sourceId: z.string().uuid(),
-  })
-  .strict()
+    sourceId: text({ format: 'uuid' }),
+  },
+  { strict: true },
+)
 
 export type NotePayload = {
   title: string
@@ -37,7 +38,7 @@ export type NotePayload = {
 
 /** A stored payload read as a note, or null when it is not one. */
 export function readNotePayload(raw: unknown): NotePayload | null {
-  const parsed = notePayloadSchema.safeParse(raw)
+  const parsed = readFirst(notePayloadSchema, raw)
   return parsed.success
     ? {
         title: parsed.data.title,

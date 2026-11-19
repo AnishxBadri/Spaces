@@ -1,0 +1,459 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`readAiConfig, characterised > a class instance 1`] = `
+{
+  "lane": "classify",
+  "mode": "classify",
+  "prompt": "Which sector?",
+}
+`;
+
+exports[`readAiConfig, characterised > a classify config 1`] = `
+{
+  "lane": "classify",
+  "mode": "classify",
+  "prompt": "Which sector?",
+}
+`;
+
+exports[`readAiConfig, characterised > a classify config on text 1`] = `null`;
+
+exports[`readAiConfig, characterised > a date 1`] = `null`;
+
+exports[`readAiConfig, characterised > a string 1`] = `null`;
+
+exports[`readAiConfig, characterised > an array 1`] = `null`;
+
+exports[`readAiConfig, characterised > inherited fields 1`] = `
+{
+  "lane": "classify",
+  "mode": "classify",
+  "prompt": "Which sector?",
+}
+`;
+
+exports[`readAiConfig, characterised > null 1`] = `null`;
+
+exports[`readAiConfig, characterised > with a numeric prompt 1`] = `null`;
+
+exports[`readAiConfig, characterised > with a numeric variable 1`] = `null`;
+
+exports[`readAiConfig, characterised > with an empty prompt 1`] = `
+{
+  "lane": "classify",
+  "mode": "classify",
+  "prompt": "",
+}
+`;
+
+exports[`readAiConfig, characterised > with an extra key 1`] = `
+{
+  "lane": "classify",
+  "mode": "classify",
+  "prompt": "Which sector?",
+}
+`;
+
+exports[`readAiConfig, characterised > with an unknown lane 1`] = `null`;
+
+exports[`readAiConfig, characterised > with an unknown mode 1`] = `null`;
+
+exports[`readAiConfig, characterised > with null variables 1`] = `null`;
+
+exports[`readAiConfig, characterised > with the lane of another mode 1`] = `
+{
+  "lane": "synthesize",
+  "mode": "summarize",
+  "prompt": "Which sector?",
+}
+`;
+
+exports[`readAiConfig, characterised > with undefined variables 1`] = `
+{
+  "lane": "synthesize",
+  "mode": "summarize",
+  "prompt": "x",
+}
+`;
+
+exports[`readAiConfig, characterised > with variables 1`] = `
+{
+  "lane": "synthesize",
+  "mode": "prompt",
+  "prompt": "Read {{a}}",
+  "variables": [
+    "a",
+  ],
+}
+`;
+
+exports[`readAiConfig, characterised > without a prompt 1`] = `null`;
+
+exports[`readKeyTerms, characterised > a __proto__ key 1`] = `
+{
+  "dropped": [],
+  "terms": [
+    {
+      "refs": [
+        "a",
+      ],
+      "slug": "pro_rata",
+      "term": "Pro-rata",
+      "value": "Yes",
+    },
+  ],
+}
+`;
+
+exports[`readKeyTerms, characterised > a bare string term 1`] = `
+{
+  "dropped": [
+    "pro_rata",
+  ],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a class instance 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a date 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a full answer 1`] = `
+{
+  "dropped": [],
+  "terms": [
+    {
+      "refs": [
+        "doc:1#p2",
+      ],
+      "slug": "liquidation_preference",
+      "term": "Liquidation preference",
+      "value": "1x non-participating",
+    },
+    {
+      "refs": [
+        "a",
+        "b",
+      ],
+      "slug": "pro_rata",
+      "term": "Pro-rata",
+      "value": "Yes, for Series A",
+    },
+    {
+      "refs": [
+        "doc:1#p2",
+      ],
+      "slug": "governing_law",
+      "term": "Governing law",
+      "value": "Delaware",
+    },
+  ],
+}
+`;
+
+exports[`readKeyTerms, characterised > a map 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a null term 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a null-prototype answer 1`] = `
+{
+  "dropped": [],
+  "terms": [
+    {
+      "refs": [
+        "doc:1#p2",
+      ],
+      "slug": "pro_rata",
+      "term": "Pro-rata",
+      "value": "Yes",
+    },
+  ],
+}
+`;
+
+exports[`readKeyTerms, characterised > a string 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a symbol key 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term from the other kind 1`] = `
+{
+  "dropped": [
+    "litigation",
+  ],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term saying n/a 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term saying not found 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term that is a class instance 1`] = `
+{
+  "dropped": [],
+  "terms": [
+    {
+      "refs": [
+        "doc:1#p2",
+      ],
+      "slug": "pro_rata",
+      "term": "Pro-rata",
+      "value": "Yes",
+    },
+  ],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term that is a date 1`] = `
+{
+  "dropped": [
+    "pro_rata",
+  ],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term that is an array 1`] = `
+{
+  "dropped": [
+    "pro_rata",
+  ],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term with a numeric ref 1`] = `
+{
+  "dropped": [
+    "pro_rata",
+  ],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term with a numeric value 1`] = `
+{
+  "dropped": [
+    "pro_rata",
+  ],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term with an empty value 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term with an extra key 1`] = `
+{
+  "dropped": [],
+  "terms": [
+    {
+      "refs": [
+        "doc:1#p2",
+      ],
+      "slug": "pro_rata",
+      "term": "Pro-rata",
+      "value": "Yes",
+    },
+  ],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term with blank refs 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term with empty refs 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term with inherited fields 1`] = `
+{
+  "dropped": [],
+  "terms": [
+    {
+      "refs": [
+        "doc:1#p2",
+      ],
+      "slug": "pro_rata",
+      "term": "Pro-rata",
+      "value": "Yes",
+    },
+  ],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term with null refs 1`] = `
+{
+  "dropped": [
+    "pro_rata",
+  ],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > a term without refs 1`] = `
+{
+  "dropped": [
+    "pro_rata",
+  ],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > an array 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > an inherited term 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > an undefined term 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readKeyTerms, characterised > an unknown term 1`] = `
+{
+  "dropped": [
+    "carry",
+  ],
+  "terms": [
+    {
+      "refs": [
+        "doc:1#p2",
+      ],
+      "slug": "pro_rata",
+      "term": "Pro-rata",
+      "value": "Yes",
+    },
+  ],
+}
+`;
+
+exports[`readKeyTerms, characterised > null 1`] = `
+{
+  "dropped": [],
+  "terms": [],
+}
+`;
+
+exports[`readOptionProposals, characterised > a bad escape 1`] = `[]`;
+
+exports[`readOptionProposals, characterised > a unicode escape 1`] = `
+[
+  {
+    "label": "été",
+    "name": "Season",
+    "slug": "season",
+  },
+]
+`;
+
+exports[`readOptionProposals, characterised > an empty label 1`] = `
+[
+  {
+    "label": "",
+    "name": "Sector",
+    "slug": "sector",
+  },
+]
+`;
+
+exports[`readOptionProposals, characterised > an escaped quote 1`] = `
+[
+  {
+    "label": "SPV "B"",
+    "name": "Type",
+    "slug": "fund_type",
+  },
+]
+`;
+
+exports[`readOptionProposals, characterised > an unquoted label 1`] = `[]`;
+
+exports[`readOptionProposals, characterised > null 1`] = `[]`;
+
+exports[`readOptionProposals, characterised > one line 1`] = `
+[
+  {
+    "label": "Fintech",
+    "name": "Sector",
+    "slug": "sector",
+  },
+]
+`;
+
+exports[`readOptionProposals, characterised > two lines among prose 1`] = `
+[
+  {
+    "label": "A",
+    "name": "X",
+    "slug": "x",
+  },
+  {
+    "label": "B",
+    "name": "Y",
+    "slug": "y",
+  },
+]
+`;

@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { object, readFirst, text } from './decode'
 
 /**
  * The `suggestion(kind: 'identity')` payload: a person a document names, as
@@ -9,12 +10,12 @@ import { z } from 'zod'
  * One decoder, three readers: `proposeProgram` holds a new row to it, the
  * accept path reads it back before resolving, and the inbox card draws it.
  */
-export const identityPayloadSchema = z
-  .object({
-    name: z.string().trim().min(1).max(500),
-    role: z.string().trim().min(1).max(200).optional(),
-    email: z.string().trim().email().max(255).optional(),
-    linkedin: z.string().trim().min(1).max(500).optional(),
+export const identityPayloadSchema = object(
+  {
+    name: text({ trim: true, min: 1, max: 500 }),
+    role: Schema.optional(text({ trim: true, min: 1, max: 200 })),
+    email: Schema.optional(text({ trim: true, format: 'email', max: 255 })),
+    linkedin: Schema.optional(text({ trim: true, min: 1, max: 500 })),
     /**
      * The slug of the person-reference attribute the claim was read off:
      * `founders` on a company, `people` or `referred_by` on a deal.
@@ -22,14 +23,15 @@ export const identityPayloadSchema = z
      * rows carry none — those accept with the person alone (a company record
      * also joins the person's `companies`).
      */
-    attribute: z.string().trim().min(1).max(100).optional(),
-  })
-  .strict()
+    attribute: Schema.optional(text({ trim: true, min: 1, max: 100 })),
+  },
+  { strict: true },
+)
 
 /**
- * Spelled out rather than `z.infer`: an absent key is absent, never an
- * `undefined` value, so the payload is JSON by type and lands in the jsonb
- * column without a second decode.
+ * Spelled out rather than the schema's type: an absent key is absent,
+ * never an `undefined` value, so the payload is JSON by type and lands in
+ * the jsonb column without a second decode.
  */
 export type IdentityPayload = {
   name: string
@@ -41,7 +43,7 @@ export type IdentityPayload = {
 
 /** A stored payload read as an identity, or null when it is not one. */
 export function readIdentityPayload(raw: unknown): IdentityPayload | null {
-  const parsed = identityPayloadSchema.safeParse(raw)
+  const parsed = readFirst(identityPayloadSchema, raw)
   return parsed.success
     ? identityPayloadOf(parsed.data, parsed.data.attribute)
     : null

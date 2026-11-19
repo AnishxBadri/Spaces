@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { list, nullable, object, readFirst, text } from './decode'
 
 /**
  * The two discovery cards a space's watch hands back: `add_record`
@@ -18,39 +19,44 @@ import { z } from 'zod'
 export const MAX_EVIDENCE = 50
 export const MAX_WATCHES = 50
 
-const evidenceSchema = z
-  .object({
-    url: z.string().url().max(2000),
-    title: z.string().trim().min(1).max(500).optional(),
-  })
-  .strict()
+const evidenceSchema = object(
+  {
+    url: text({ format: 'url', max: 2000 }),
+    title: Schema.optional(text({ trim: true, min: 1, max: 500 })),
+  },
+  { strict: true },
+)
+
+const uuid = text({ format: 'uuid' })
 
 const common = {
-  spaceId: z.string().uuid(),
-  domain: z.string().trim().min(1).max(253),
-  name: z.string().trim().min(1).max(300),
-  evidence: z.array(evidenceSchema).max(MAX_EVIDENCE),
-  watchIds: z.array(z.string().uuid()).max(MAX_WATCHES).default([]),
+  spaceId: uuid,
+  domain: text({ trim: true, min: 1, max: 253 }),
+  name: text({ trim: true, min: 1, max: 300 }),
+  evidence: list(evidenceSchema, { max: MAX_EVIDENCE }),
+  watchIds: list(uuid, { max: MAX_WATCHES, fallback: () => [] }),
 }
 
-export const addRecordPayloadSchema = z
-  .object({
+export const addRecordPayloadSchema = object(
+  {
     ...common,
-    aliases: z.array(z.string().trim().min(1).max(300)).max(20),
+    aliases: list(text({ trim: true, min: 1, max: 300 }), { max: 20 }),
     /** A subspace's name or slug under `spaceId`; ignored when none matches. */
-    subspaceHint: z.string().trim().min(1).max(300).nullable(),
-  })
-  .strict()
+    subspaceHint: nullable(text({ trim: true, min: 1, max: 300 })),
+  },
+  { strict: true },
+)
 
-export const fileRecordPayloadSchema = z
-  .object({
+export const fileRecordPayloadSchema = object(
+  {
     ...common,
     /** The record held elsewhere, to be filed in `spaceId`. */
-    entityId: z.string().uuid(),
-  })
-  .strict()
+    entityId: uuid,
+  },
+  { strict: true },
+)
 
-/** Spelled out rather than `z.infer`: an absent key is absent, so JSON by type. */
+/** Spelled out rather than the schema's type: an absent key is absent, so JSON by type. */
 export type DiscoveryEvidence = { url: string; title?: string }
 
 export type AddRecordPayload = {
@@ -81,14 +87,14 @@ export const evidenceOf = (
 
 /** A stored payload read as an `add_record` card, or null when it is not one. */
 export function readAddRecordPayload(raw: unknown): AddRecordPayload | null {
-  const parsed = addRecordPayloadSchema.safeParse(raw)
+  const parsed = readFirst(addRecordPayloadSchema, raw)
   if (!parsed.success) return null
   return { ...parsed.data, evidence: evidenceOf(parsed.data.evidence) }
 }
 
 /** A stored payload read as a `file_record` card, or null when it is not one. */
 export function readFileRecordPayload(raw: unknown): FileRecordPayload | null {
-  const parsed = fileRecordPayloadSchema.safeParse(raw)
+  const parsed = readFirst(fileRecordPayloadSchema, raw)
   if (!parsed.success) return null
   return { ...parsed.data, evidence: evidenceOf(parsed.data.evidence) }
 }

@@ -11,7 +11,7 @@ import type { LedgerEventPayload } from '@spaces/core/ai/ledger-event'
 import { readNotePayload } from '@spaces/core/ai/note'
 import { readSpaceTagPayload } from '@spaces/core/ai/space-tag'
 import { readSupersedesPayload } from '@spaces/core/ai/supersedes'
-import { taskPayloadSchema } from '@spaces/core/ai/task'
+import { readTaskPayload } from '@spaces/core/ai/task'
 import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
 import { readRefileDocumentPayload } from '@spaces/core/documents/refile'
 import { formatDay, formatNumber } from '@spaces/core/format'
@@ -306,8 +306,7 @@ function subjectOf(item: SuggestionItem, record: SuggestionRecord): string {
     case 'note':
       return readNotePayload(item.payload)?.title ?? record.name
     case 'task': {
-      const task = taskPayloadSchema.safeParse(item.payload)
-      return task.success ? task.data.title : record.name
+      return readTaskPayload(item.payload)?.title ?? record.name
     }
     case 'ledger_event':
       return readLedgerEventPayload(item.payload)?.companyName ?? record.name

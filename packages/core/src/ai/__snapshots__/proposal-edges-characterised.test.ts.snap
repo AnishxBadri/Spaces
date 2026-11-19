@@ -1,0 +1,3582 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`toPatch, characterised > a claim list 1`] = `
+{
+  "claims": {
+    "investors": [
+      {
+        "name": "A",
+      },
+      {
+        "name": "B",
+      },
+    ],
+  },
+  "patch": {},
+}
+`;
+
+exports[`toPatch, characterised > a claim with an extra key 1`] = `
+{
+  "claims": {},
+  "patch": {},
+}
+`;
+
+exports[`toPatch, characterised > a class instance claim 1`] = `
+{
+  "claims": {
+    "company": [
+      {
+        "name": "Acme",
+      },
+    ],
+  },
+  "patch": {},
+}
+`;
+
+exports[`toPatch, characterised > a list of 101 on a list 1`] = `
+{
+  "claims": {
+    "investors": [
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+      {
+        "name": "A",
+      },
+    ],
+  },
+  "patch": {},
+}
+`;
+
+exports[`toPatch, characterised > a list on a single reference 1`] = `
+{
+  "claims": {
+    "company": [
+      {
+        "name": "A",
+      },
+    ],
+  },
+  "patch": {},
+}
+`;
+
+exports[`toPatch, characterised > a list with one invalid claim 1`] = `
+{
+  "claims": {},
+  "patch": {},
+}
+`;
+
+exports[`toPatch, characterised > a null claim 1`] = `
+{
+  "claims": {},
+  "patch": {},
+}
+`;
+
+exports[`toPatch, characterised > a single claim on a list 1`] = `
+{
+  "claims": {
+    "investors": [
+      {
+        "name": "A",
+      },
+    ],
+  },
+  "patch": {},
+}
+`;
+
+exports[`toPatch, characterised > a text value 1`] = `
+{
+  "claims": {},
+  "patch": {
+    "summary": " as is ",
+  },
+}
+`;
+
+exports[`toPatch, characterised > a valid claim 1`] = `
+{
+  "claims": {
+    "company": [
+      {
+        "domain": "acme.io",
+        "name": "Acme",
+      },
+    ],
+  },
+  "patch": {},
+}
+`;
+
+exports[`toPatch, characterised > an invalid claim 1`] = `
+{
+  "claims": {},
+  "patch": {},
+}
+`;
+
+exports[`toPatch, characterised > an unknown slug 1`] = `
+{
+  "claims": {},
+  "patch": {},
+}
+`;
+
+exports[`toPatch, characterised > undefined keys dropped 1`] = `
+{
+  "claims": {
+    "company": [
+      {
+        "name": "A",
+      },
+    ],
+  },
+  "patch": {},
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a bad email before a missing name 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected string, received undefined",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a bad name and a bad domain 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Too small: expected string to have >=1 characters",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a bad role and a bad linkedin 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "ceo: Too small: expected string to have >=1 characters",
+        "slug": "ceo",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a blank linkedin 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Too small: expected string to have >=1 characters",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a claim that is a class instance 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a claim that is a function 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected object, received function",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a claim that is a map 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected string, received undefined",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a claim that is a number 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected object, received number",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a claim that is undefined 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected object, received undefined",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a claim with a __proto__ key 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a claim with a constructor key 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Unrecognized key: "constructor"",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a claim with a symbol key 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a claim with an inherited name 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a claim with an undefined extra key 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Unrecognized key: "id"",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a class instance 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "A proposal is an object keyed by slug",
+        "slug": "",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a domain of 255 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "domain": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "domain": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a function 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "A proposal is an object keyed by slug",
+        "slug": "",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a linkedin of 501 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Too big: expected string to have <=500 characters",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a list holding null 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "investors: Invalid input: expected object, received null",
+        "slug": "investors",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a list of 100 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "investors": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": [
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+          {
+            "name": "A",
+          },
+        ],
+      },
+    },
+  },
+  "keys": {
+    "investors": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "investors": [
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+        {
+          "name": "A",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "investors": {
+      "field": "plain",
+      "value": "array of plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain, plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a list of 101 with one bad claim at the end 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "investors: Too small: expected string to have >=1 characters",
+        "slug": "investors",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a list of class instances 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "investors": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": [
+          {
+            "name": "Acme",
+          },
+          {
+            "name": "Acme",
+          },
+        ],
+      },
+    },
+  },
+  "keys": {
+    "investors": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "investors": [
+        {
+          "name": "Acme",
+        },
+        {
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "investors": {
+      "field": "plain",
+      "value": "array of plain, plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a list that is a date 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "investors: Invalid input: expected array, received Date",
+        "slug": "investors",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a list that is a map 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "investors: Invalid input: expected array, received Map",
+        "slug": "investors",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a list with an extra key in its second claim 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "investors: Unrecognized key: "id"",
+        "slug": "investors",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a long blank name 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Too small: expected string to have >=1 characters",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a long invalid email 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid email address",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a map 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "A proposal is an object keyed by slug",
+        "slug": "",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a mixed-case email 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "email": "Bo@Acme.IO",
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "email": "Bo@Acme.IO",
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a name of 500 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a name of 500 padded 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a nested list 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "investors: Invalid input: expected object, received array",
+        "slug": "investors",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a non-enumerable extra key 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "name": "A",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "name": "A",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a null domain 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected string, received null",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a null name 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected string, received null",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a null-prototype answer 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": "x",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "x",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a null-prototype claim 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a null-prototype envelope 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": "x",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "x",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a number 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "A proposal is an object keyed by slug",
+        "slug": "",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a numeric name 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected string, received number",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a padded domain 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "domain": " acme.io ",
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "domain": " acme.io ",
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a padded email 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid email address",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a padded linkedin 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "linkedin": "linkedin.com/x",
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "linkedin": "linkedin.com/x",
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a person claim with a domain 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "ceo": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "domain": "x",
+          "name": "Ana",
+        },
+      },
+    },
+  },
+  "keys": {
+    "ceo": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "ceo": [
+        {
+          "domain": "x",
+          "name": "Ana",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "ceo": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a role of 201 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Too big: expected string to have <=200 characters",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a role on a company 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "name": "Acme",
+          "role": "CFO",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "name": "Acme",
+          "role": "CFO",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > a sparse list 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "investors: Invalid input: expected object, received undefined",
+        "slug": "investors",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an answer with a __proto__ key 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 1,
+        "refs": [],
+        "value": "y",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "y",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an answer with a constructor key 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "constructor: Unknown attribute",
+        "slug": "constructor",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an answer with a non-enumerable symbol key 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": "x",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "x",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an answer with a null field 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an answer with a numeric key 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "1: Unknown attribute",
+        "slug": "1",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an answer with a symbol key 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "A proposal is an object keyed by slug",
+        "slug": "",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an answer with an inherited field 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {},
+  },
+  "keys": {},
+  "patch": {
+    "claims": {},
+    "patch": {},
+  },
+  "protos": {},
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an answer with an undefined field 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an email of 255 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "email": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@acme.io",
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "email": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa@acme.io",
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an email of 256 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Too big: expected string to have <=255 characters",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an email of 256 without a dot 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid email address",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an email with a non-ascii letter 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid email address",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an email with a plus 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "email": "bo+x@acme.io",
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "email": "bo+x@acme.io",
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an email with two dots 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid email address",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an email without a dot 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid email address",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an empty domain 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "domain": "",
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "domain": "",
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an empty email 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid email address",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an empty list 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "investors": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": [],
+      },
+    },
+  },
+  "keys": {
+    "investors": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "investors": [],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "investors": {
+      "field": "plain",
+      "value": "array of ",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an empty name 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Too small: expected string to have >=1 characters",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope that is a class instance 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 0.5,
+        "refs": [
+          "doc:1",
+        ],
+        "value": "x",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "x",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope that is a date 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope that is a map 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope that is an array 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope whose value is null 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: Invalid input: expected string, received null",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope whose value is undefined 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: Invalid input: expected string, received undefined",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope with a __proto__ key 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 1,
+        "refs": [],
+        "value": "x",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "x",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope with a string ref 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope with a symbol key 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": "x",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "x",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope with an inherited extra key 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope with an undefined extra key 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope with empty refs 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 0.8,
+        "refs": [],
+        "value": "x",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "x",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope with inherited fields 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": "x",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "x",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope with nested refs 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope with null refs 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope with repeated and blank refs 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 0.8,
+        "refs": [
+          "a",
+          "a",
+          "",
+        ],
+        "value": "x",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "x",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope without confidence 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an envelope without refs 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an extra key that is an attribute key 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Unrecognized key: "value"",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an extra key, a bad role and a bad linkedin 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "ceo: Too small: expected string to have >=1 characters",
+        "slug": "ceo",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an extra key, a missing name and a bad email 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected string, received undefined",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an inherited extra key 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Unrecognized key: "id"",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an undefined domain 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "company": {
+        "confidence": 0.8,
+        "refs": [
+          "doc:1",
+        ],
+        "value": {
+          "domain": undefined,
+          "name": "Acme",
+        },
+      },
+    },
+  },
+  "keys": {
+    "company": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {
+      "company": [
+        {
+          "name": "Acme",
+        },
+      ],
+    },
+    "patch": {},
+  },
+  "protos": {
+    "company": {
+      "field": "plain",
+      "value": "plain",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an undefined name 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Invalid input: expected string, received undefined",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > an unknown slug and a bad claim, in input order 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Too small: expected string to have >=1 characters",
+        "slug": "company",
+      },
+      {
+        "message": "nope: Unknown attribute",
+        "slug": "nope",
+      },
+      {
+        "message": "summary: Invalid input: expected string, received number",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > confidence -0 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": -0,
+        "refs": [
+          "doc:1",
+        ],
+        "value": "x",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "x",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > confidence -Infinity 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > confidence 0 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 0,
+        "refs": [
+          "doc:1",
+        ],
+        "value": "x",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "x",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > confidence 1 1`] = `
+{
+  "check": {
+    "ok": true,
+    "proposal": {
+      "summary": {
+        "confidence": 1,
+        "refs": [
+          "doc:1",
+        ],
+        "value": "x",
+      },
+    },
+  },
+  "keys": {
+    "summary": [
+      "value",
+      "refs",
+      "confidence",
+    ],
+  },
+  "patch": {
+    "claims": {},
+    "patch": {
+      "summary": "x",
+    },
+  },
+  "protos": {
+    "summary": {
+      "field": "plain",
+      "value": "string",
+    },
+  },
+}
+`;
+
+exports[`validateProposal at the edges, characterised > confidence Infinity 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > confidence as a boolean 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > confidence as a string 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > confidence just over 1 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > confidence just under 0 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > confidence null 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "summary: expected {value, refs, confidence}",
+        "slug": "summary",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > two extra keys and nothing else wrong 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "company: Unrecognized keys: "b", "a"",
+        "slug": "company",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;
+
+exports[`validateProposal at the edges, characterised > undefined 1`] = `
+{
+  "check": {
+    "issues": [
+      {
+        "message": "A proposal is an object keyed by slug",
+        "slug": "",
+      },
+    ],
+    "ok": false,
+  },
+  "keys": null,
+  "patch": null,
+  "protos": null,
+}
+`;

@@ -38,7 +38,7 @@ import type {
 import { readNotePayload } from '@spaces/core/ai/note'
 import { jsonRecord, jsonString } from '@spaces/core/json'
 import { sinceRemoved } from '@spaces/core/plugins/registry'
-import { taskPayloadSchema } from '@spaces/core/ai/task'
+import { readTaskPayload } from '@spaces/core/ai/task'
 import { ref } from '@spaces/core/context/ref'
 import { canRead } from '@spaces/core/read-policy'
 import { recomputeInteractionStats } from '@spaces/core/writes/interactions/stats'
@@ -690,8 +690,8 @@ const SUGGESTION_WORD: Record<string, string> = {
 /** A suggestion's one line, read from its payload. */
 export function suggestionSummary(kind: string, payload: unknown): string {
   if (kind === 'task') {
-    const task = taskPayloadSchema.safeParse(payload)
-    if (task.success) return task.data.title
+    const task = readTaskPayload(payload)
+    if (task) return task.title
   }
   if (kind === 'note') {
     const n = readNotePayload(payload)
@@ -854,9 +854,7 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
         kind: s.kind,
         summary: suggestionSummary(s.kind, s.payload),
         due:
-          s.kind === 'task'
-            ? (taskPayloadSchema.safeParse(s.payload).data?.due ?? null)
-            : null,
+          s.kind === 'task' ? (readTaskPayload(s.payload)?.due ?? null) : null,
       })),
     }
   },

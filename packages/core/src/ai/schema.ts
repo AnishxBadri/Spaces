@@ -1,8 +1,9 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { liveOptions } from '../attributes/options'
 import { decodeValue, valueValidator } from '../attributes/registry'
 import { isDerived } from '../attributes/relationship'
 import type { AttributeDef } from '../attributes/registry'
+import { list, number, object, plainRecord, readFirst, text } from './decode'
 
 /**
  * The attribute registry is the AI output type system.
@@ -227,40 +228,40 @@ export function schemaFor(
   }
 }
 
-const claimValidator = z
-  .object({
-    name: z.string().trim().min(1).max(500),
-    domain: z.string().max(255).optional(),
-    email: z.string().email().max(255).optional(),
-    linkedin: z.string().trim().min(1).max(500).optional(),
-    role: z.string().trim().min(1).max(200).optional(),
-  })
-  .strict()
+/**
+ * One identity claim. Any object reads as one, a class instance included,
+ * and decodes to a plain copy; an unrecognised key is refused after the
+ * fields, so a bad name is the refusal a reviewer reads before a stray key.
+ */
+const claimValidator = object(
+  {
+    name: text({ trim: true, min: 1, max: 500 }),
+    domain: Schema.optional(text({ max: 255 })),
+    email: Schema.optional(text({ format: 'email', max: 255 })),
+    linkedin: Schema.optional(text({ trim: true, min: 1, max: 500 })),
+    role: Schema.optional(text({ trim: true, min: 1, max: 200 })),
+  },
+  { strict: true },
+)
 
-const fieldValidator = z
-  .object({
-    value: z.unknown(),
-    refs: z.array(z.string()),
-    confidence: z.number().min(0).max(1),
-  })
-  .strict()
+const fieldValidator = object(
+  {
+    value: Schema.Unknown,
+    refs: list(text()),
+    confidence: number({ min: 0, max: 1 }),
+  },
+  { strict: true },
+)
 
 /** One answer's value, refused with the first issue's message. */
 function validateValue(
   def: SchemaAttribute,
   value: unknown,
 ): { success: true; data: unknown } | { success: false; message: string } {
-  if (def.type === 'record_reference') {
-    const claims = def.options.multi
-      ? z.array(claimValidator).max(100).safeParse(value)
-      : claimValidator.safeParse(value)
-    return claims.success
-      ? { success: true, data: claims.data }
-      : {
-          success: false,
-          message: claims.error.issues[0]?.message ?? 'Invalid value',
-        }
-  }
+  if (def.type === 'record_reference')
+    return def.options.multi
+      ? readFirst(list(claimValidator, { max: 100 }), value)
+      : readFirst(claimValidator, value)
   // No `held`: a proposal is always a fresh assertion. A record keeping an
   // archived option it already holds is the write path's allowance for a
   // human editing around history; a model naming that option is asserting
@@ -277,7 +278,7 @@ export function validateProposal(
   registry: ReadonlyArray<SchemaAttribute>,
   raw: unknown,
 ): ProposalCheck {
-  const top = z.record(z.string(), z.unknown()).safeParse(raw)
+  const top = readFirst(plainRecord, raw)
   if (!top.success)
     return {
       ok: false,
@@ -300,7 +301,7 @@ export function validateProposal(
       })
       continue
     }
-    const field = fieldValidator.safeParse(entry)
+    const field = readFirst(fieldValidator, entry)
     if (!field.success) {
       issues.push({
         slug,
@@ -345,9 +346,10 @@ export function toPatch(
     const def = bySlug.get(slug)
     if (!def) continue
     if (def.type === 'record_reference') {
-      const parsed = z
-        .array(claimValidator)
-        .safeParse(Array.isArray(field.value) ? field.value : [field.value])
+      const parsed = readFirst(
+        list(claimValidator),
+        Array.isArray(field.value) ? field.value : [field.value],
+      )
       if (parsed.success) claims[slug] = parsed.data.map(stripClaim)
       continue
     }
@@ -356,7 +358,7 @@ export function toPatch(
   return { patch, claims }
 }
 
-const stripClaim = (c: z.infer<typeof claimValidator>): IdentityClaim => ({
+const stripClaim = (c: typeof claimValidator.Type): IdentityClaim => ({
   name: c.name,
   ...(c.domain === undefined ? {} : { domain: c.domain }),
   ...(c.email === undefined ? {} : { email: c.email }),

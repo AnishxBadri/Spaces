@@ -12,6 +12,7 @@ import type { suggestionKind } from '@spaces/db/schema'
 import type { Json } from '../../json'
 import { proposalRefs, validateProposal } from '../../ai/schema'
 import type { ProposalIssue } from '../../ai/schema'
+import { readPayload } from '../../ai/decode'
 import { identityPayloadSchema } from '../../ai/identity'
 import { documentKindPayloadSchema } from '../../ai/document-kind'
 import { notePayloadSchema } from '../../ai/note'
@@ -198,11 +199,11 @@ export async function patchAnchor(
 
 /** An identity payload, decoded — or the validator's refusal, by field. */
 export function identityOf(payload: Json) {
-  const parsed = identityPayloadSchema.safeParse(payload)
+  const parsed = readPayload(identityPayloadSchema, payload)
   if (parsed.success) return parsed.data
   throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'identity'
+    parsed.issues.map((i) => {
+      const slug = i.path || 'identity'
       return { slug, message: `${slug}: ${i.message}` }
     }),
   )
@@ -210,11 +211,11 @@ export function identityOf(payload: Json) {
 
 /** A document-kind payload, decoded — or the validator's refusal. */
 export function documentKindOf(payload: Json) {
-  const parsed = documentKindPayloadSchema.safeParse(payload)
+  const parsed = readPayload(documentKindPayloadSchema, payload)
   if (parsed.success) return parsed.data
   throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'document_kind'
+    parsed.issues.map((i) => {
+      const slug = i.path || 'document_kind'
       return { slug, message: `${slug}: ${i.message}` }
     }),
   )
@@ -222,11 +223,11 @@ export function documentKindOf(payload: Json) {
 
 /** A note payload, decoded — or the validator's refusal, by field. */
 export function noteOf(payload: Json) {
-  const parsed = notePayloadSchema.safeParse(payload)
+  const parsed = readPayload(notePayloadSchema, payload)
   if (parsed.success) return parsed.data
   throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'note'
+    parsed.issues.map((i) => {
+      const slug = i.path || 'note'
       return { slug, message: `${slug}: ${i.message}` }
     }),
   )
@@ -234,11 +235,11 @@ export function noteOf(payload: Json) {
 
 /** A space-tag payload, decoded — or the validator's refusal. */
 export function spaceTagOf(payload: Json) {
-  const parsed = spaceTagPayloadSchema.safeParse(payload)
+  const parsed = readPayload(spaceTagPayloadSchema, payload)
   if (parsed.success) return parsed.data
   throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'space_tag'
+    parsed.issues.map((i) => {
+      const slug = i.path || 'space_tag'
       return { slug, message: `${slug}: ${i.message}` }
     }),
   )
@@ -246,12 +247,12 @@ export function spaceTagOf(payload: Json) {
 
 /** An `add_record` payload, decoded — or the validator's refusal, by field. */
 export function addRecordOf(payload: Json): AddRecordPayload {
-  const parsed = addRecordPayloadSchema.safeParse(payload)
+  const parsed = readPayload(addRecordPayloadSchema, payload)
   if (parsed.success)
     return { ...parsed.data, evidence: evidenceOf(parsed.data.evidence) }
   throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'add_record'
+    parsed.issues.map((i) => {
+      const slug = i.path || 'add_record'
       return { slug, message: `${slug}: ${i.message}` }
     }),
   )
@@ -259,12 +260,12 @@ export function addRecordOf(payload: Json): AddRecordPayload {
 
 /** A `file_record` payload, decoded — or the validator's refusal, by field. */
 export function fileRecordOf(payload: Json): FileRecordPayload {
-  const parsed = fileRecordPayloadSchema.safeParse(payload)
+  const parsed = readPayload(fileRecordPayloadSchema, payload)
   if (parsed.success)
     return { ...parsed.data, evidence: evidenceOf(parsed.data.evidence) }
   throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'file_record'
+    parsed.issues.map((i) => {
+      const slug = i.path || 'file_record'
       return { slug, message: `${slug}: ${i.message}` }
     }),
   )
@@ -272,11 +273,11 @@ export function fileRecordOf(payload: Json): FileRecordPayload {
 
 /** A task payload, decoded — or the validator's refusal, by field. */
 export function taskOf(payload: Json): TaskPayload {
-  const parsed = taskPayloadSchema.safeParse(payload)
+  const parsed = readPayload(taskPayloadSchema, payload)
   if (parsed.success) return parsed.data
   throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'task'
+    parsed.issues.map((i) => {
+      const slug = i.path || 'task'
       return { slug, message: `${slug}: ${i.message}` }
     }),
   )
@@ -284,11 +285,11 @@ export function taskOf(payload: Json): TaskPayload {
 
 /** A supersedes payload, decoded — or the validator's refusal, by field. */
 export function supersedesOf(payload: Json): SupersedesPayload {
-  const parsed = supersedesPayloadSchema.safeParse(payload)
+  const parsed = readPayload(supersedesPayloadSchema, payload)
   if (parsed.success) return parsed.data
   throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'supersedes'
+    parsed.issues.map((i) => {
+      const slug = i.path || 'supersedes'
       return { slug, message: `${slug}: ${i.message}` }
     }),
   )
@@ -308,11 +309,11 @@ export function refileDocumentOf(payload: Json): RefileDocumentPayload {
 
 /** A ledger-event payload, decoded — or the validator's refusal, by field. */
 export function ledgerEventOf(payload: Json): LedgerEventPayload {
-  const parsed = ledgerEventPayloadSchema.safeParse(payload)
+  const parsed = readPayload(ledgerEventPayloadSchema, payload)
   if (parsed.success) return parsed.data
   throw invalid(
-    parsed.error.issues.map((i) => {
-      const slug = i.path.map(String).join('.') || 'ledger_event'
+    parsed.issues.map((i) => {
+      const slug = i.path || 'ledger_event'
       return { slug, message: `${slug}: ${i.message}` }
     }),
   )

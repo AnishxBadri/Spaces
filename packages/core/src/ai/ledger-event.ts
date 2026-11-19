@@ -1,4 +1,13 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
+import {
+  nullable,
+  number,
+  object,
+  oneOf,
+  readFirst,
+  tagged,
+  text,
+} from './decode'
 
 /**
  * The `suggestion(kind: 'ledger_event')` payload: a new revision of a bound
@@ -14,77 +23,76 @@ import { z } from 'zod'
  *   accept-time validators' refusal, so the person sees it and why.
  */
 
-const amount = z.number().finite()
+const amount = number()
 
-export const roundProposalSchema = z
-  .object({
-    date: z.string().min(1),
-    kind: z.string().min(1),
-    raised: amount.optional(),
-    currency: z.string().optional(),
-    preMoney: amount.optional(),
-    postMoney: amount.optional(),
-    pricePerShare: amount.optional(),
-    sharesOutstanding: amount.optional(),
-  })
-  .strict()
+const nonEmpty = text({ min: 1 })
 
-export const markProposalSchema = z
-  .object({
-    holdingId: z.string().uuid(),
-    date: z.string().min(1),
+export const roundProposalSchema = object(
+  {
+    date: nonEmpty,
+    kind: nonEmpty,
+    raised: Schema.optional(amount),
+    currency: Schema.optional(text()),
+    preMoney: Schema.optional(amount),
+    postMoney: Schema.optional(amount),
+    pricePerShare: Schema.optional(amount),
+    sharesOutstanding: Schema.optional(amount),
+  },
+  { strict: true },
+)
+
+export const markProposalSchema = object(
+  {
+    holdingId: text({ format: 'uuid' }),
+    date: nonEmpty,
     fairValue: amount,
-    currency: z.string().min(1),
-    basis: z.enum(['round_price', 'manual', '409a']),
-  })
-  .strict()
+    currency: nonEmpty,
+    basis: oneOf(['round_price', 'manual', '409a']),
+  },
+  { strict: true },
+)
 
-const beforeSchema = z
-  .object({
-    ownershipPct: amount.nullable(),
-    fairValue: amount.nullable(),
-    currency: z.string().nullable(),
-    roundKind: z.string().nullable(),
-    roundDate: z.string().nullable(),
-  })
-  .strict()
+const beforeSchema = object(
+  {
+    ownershipPct: nullable(amount),
+    fairValue: nullable(amount),
+    currency: nullable(text()),
+    roundKind: nullable(text()),
+    roundDate: nullable(text()),
+  },
+  { strict: true },
+)
 
 const common = {
-  companyId: z.string().uuid(),
-  companyName: z.string().min(1),
-  documentId: z.string().uuid(),
-  documentName: z.string().min(1),
-  revisionId: z.string().min(1),
+  companyId: text({ format: 'uuid' }),
+  companyName: nonEmpty,
+  documentId: text({ format: 'uuid' }),
+  documentName: nonEmpty,
+  revisionId: nonEmpty,
   before: beforeSchema,
-  after: z.object({ ownershipPct: amount.nullable() }).strict(),
+  after: object({ ownershipPct: nullable(amount) }, { strict: true }),
 }
 
-export const ledgerEventPayloadSchema = z.discriminatedUnion('event', [
-  z
-    .object({
-      ...common,
-      event: z.literal('round'),
-      proposed: roundProposalSchema,
-    })
-    .strict(),
-  z
-    .object({
-      ...common,
-      event: z.literal('mark'),
-      proposed: markProposalSchema,
-    })
-    .strict(),
-])
+export const ledgerEventPayloadSchema = tagged('event', {
+  round: object(
+    { ...common, event: oneOf(['round']), proposed: roundProposalSchema },
+    { strict: true },
+  ),
+  mark: object(
+    { ...common, event: oneOf(['mark']), proposed: markProposalSchema },
+    { strict: true },
+  ),
+})
 
-export type RoundProposal = z.infer<typeof roundProposalSchema>
-export type MarkProposal = z.infer<typeof markProposalSchema>
-export type LedgerBefore = z.infer<typeof beforeSchema>
-export type LedgerEventPayload = z.infer<typeof ledgerEventPayloadSchema>
+export type RoundProposal = typeof roundProposalSchema.Type
+export type MarkProposal = typeof markProposalSchema.Type
+export type LedgerBefore = typeof beforeSchema.Type
+export type LedgerEventPayload = typeof ledgerEventPayloadSchema.Type
 
 /** A stored payload read as a ledger event, or null when it is not one. */
 export function readLedgerEventPayload(
   raw: unknown,
 ): LedgerEventPayload | null {
-  const parsed = ledgerEventPayloadSchema.safeParse(raw)
+  const parsed = readFirst(ledgerEventPayloadSchema, raw)
   return parsed.success ? parsed.data : null
 }
