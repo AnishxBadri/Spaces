@@ -729,7 +729,7 @@ pg-boss stays the queue (paradigm decision 6). The worker is a plain Node
 process; handlers become Effect programs run by one wrapper:
 
 ```ts
-JobDef { name, schema: zod, run: (data) → Effect<void, JobError, Ports>, retry, timeout, concurrency }
+JobDef { name, schema: Schema, run: (data) → Effect<void, JobError, Ports>, retry, timeout, concurrency }
 runJob = parse job.data → provide Layer → Effect.runPromise → map typed failure to complete | retry | fail
 ```
 

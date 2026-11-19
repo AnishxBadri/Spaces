@@ -3,12 +3,12 @@ import { Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
 
 /**
- * The zod boundary of the attribute-update server fn (`updateAttributeInput`):
+ * The input boundary of the attribute-update server fn (`updateAttributeInput`):
  * it strips the immutable fields and carries the option archive flag and the
  * `ai` config. Kept in apps/web because it imports a server-fn module.
  */
 
-describe('updateAttributeInput (zod boundary)', () => {
+describe('updateAttributeInput (input boundary)', () => {
   it('strips type, slug, targetKind and config.multi rather than carrying them', async () => {
     const { updateAttributeInput } = await import('./attributes')
     const parsed = Schema.decodeUnknownSync(updateAttributeInput)({
@@ -47,7 +47,7 @@ describe('updateAttributeInput (zod boundary)', () => {
 })
 
 describe('updateAttributeInput (ai config)', () => {
-  it('the zod boundary carries ai and its null', async () => {
+  it('the input boundary carries ai and its null', async () => {
     const { updateAttributeInput } = await import('./attributes')
     const id = randomUUID()
     expect(

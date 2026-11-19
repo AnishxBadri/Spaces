@@ -38,7 +38,7 @@ Worker ── jobs · plugins ─────┘
 | Storage    | local FS or S3                      | content-addressed sha256 blobs; presigned PUTs; the worker re-verifies digests                                     |
 | Extraction | unpdf · mammoth · fflate            | in-process on the worker                                                                                           |
 | UI         | Tailwind 4 + Radix                  | the Instrument design system (`docs/design-contract.md`)                                                           |
-| Validation | Effect Schema at boundaries         | hand-written, so validators carry business rules; zod is leaving                                                   |
+| Validation | Effect Schema at boundaries         | hand-written, so validators carry business rules; nothing imports zod                                              |
 | Backend    | Effect v4                           | typed errors; Layers are the plugin port model and per-job privilege; never crosses into React                     |
 | AI         | core substrate over AI SDK adapters | `complete` and `embed`, lanes routed by sensitivity, propose-only writes, embeddings pinned at one dimension       |
 
@@ -91,7 +91,7 @@ Page data is a keyed query (D104), and Portfolio (`/portfolio` and the holding p
 A typed effect-system backend over one relational coordinator.
 
 1. **I/O is Effect** (D84). A module that queries, writes, fetches or enqueues is built from `Effect.fn` programs; pure helpers, type modules, validator shapes and client code stay plain. Effect never crosses into React: the seam is `effectFn()` for server functions and HttpApi handlers for the external door.
-2. **Effect Schema is the schema language** (D85). Server-fn inputs go through `input(schema)`; zod leaves file by file.
+2. **Effect Schema is the schema language** (D85). Server-fn inputs go through `input(schema)`; nothing imports zod, and lint refuses it in every package.
 3. **The external door is `effect/unstable/httpapi`** (D8): one definition, OpenAPI out, at `/api/v1` (D27, `docs/api-versioning.md`). `effect/unstable/rpc` is the native answer if a typed client from one definition is ever wanted internally. No oRPC, tRPC or GraphQL.
 4. **The internal interactive path is server functions**: in-process and typed end to end. An operation that must be callable from outside is born on `/api/v1`.
 5. **Seam rules.** A server function never does slow work (more than ~200 ms, or any external API): it enqueues and returns. Workers write through the same one-write paths (`setValues`, `resolveEntity`, suggestions) as the typed actor `integration`. UI freshness comes from invalidation; the one push channel is the job-status stream (D64).

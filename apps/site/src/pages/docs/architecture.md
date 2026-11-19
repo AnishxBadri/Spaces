@@ -53,7 +53,7 @@ The dependency rules:
 - `web` imports `core` and `sdk`, never a plugin and never the worker.
 - `worker` imports `core` and `sdk`. It loads plugins at runtime, never at compile time.
 - `core` imports `db` and `sdk`, never `web`.
-- `sdk` imports `effect` and `zod`, nothing internal. If the SDK ever needs core, the contract leaked.
+- `sdk` imports `effect` and `tldts`, nothing internal. If the SDK ever needs core, the contract leaked.
 - `plugins/*` import `sdk` only, never `core` or `db`.
 - `db` imports nothing internal.
 

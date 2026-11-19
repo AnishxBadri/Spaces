@@ -49,7 +49,7 @@ export function jsonRecord(v: Json | undefined): { [k: string]: Json } {
 }
 
 /**
- * Zod's plain object: `Object.prototype` or no prototype at all, never a
+ * A plain object: `Object.prototype` or no prototype at all, never a
  * class instance, a date or a map, and no symbol key.
  */
 function isPlainJsonObject(u: unknown): u is { readonly [k: string]: unknown } {

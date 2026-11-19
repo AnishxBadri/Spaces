@@ -130,7 +130,7 @@ const DB_IMPORTS_NOTHING_INTERNAL = {
     climbsInto(['apps', 'plugins', 'packages/(core|sdk)', 'core', 'sdk']),
   ].join('|'),
   message:
-    '@spaces/db imports nothing internal — the schema, the journal, ENTITY_REFS and the migrator depend on drizzle, pg and zod and on no package in this repo (docs/spec-plugin-sdk.md §2: "db → nothing internal").',
+    '@spaces/db imports nothing internal — the schema, the journal, ENTITY_REFS and the migrator depend on drizzle, pg and effect and on no package in this repo (docs/spec-plugin-sdk.md §2: "db → nothing internal").',
 }
 const CORE_IMPORTS_DB_AND_SDK_ONLY = {
   regex: [
@@ -228,12 +228,17 @@ const SDK_IMPORTS_NOTHING_INTERNAL = {
   message:
     '@spaces/sdk imports effect and tldts and nothing internal — if sdk ever needs core, the contract leaked (docs/spec-plugin-sdk.md §2: "sdk → effect, tldts. Nothing internal"; D55).',
 }
-// The plugin contract speaks Effect Schema and nothing else, in the sdk and
-// in every plugin. Proved on the real packages by the sdk's fence test.
-const NO_ZOD_IN_THE_CONTRACT = {
+// Nothing imports zod: Effect Schema is the one schema language, in the app,
+// the packages, the sdk and every plugin. The catch-all block below sets it
+// for files no zone names; every zone's `no-restricted-imports` list carries
+// it too, because a later block replaces an earlier block's options for the
+// same rule rather than extending them. A dependency of a dependency may
+// still pull zod in; only a direct import is refused. Proved per zone by
+// apps/web's no-zod test and the sdk's fence test.
+const NO_ZOD = {
   regex: '^zod(/|$)',
   message:
-    'No zod in @spaces/sdk or a plugin — Effect Schema is the one schema language, and the plugin contract is Effect Schema (D85). Import `Schema` from effect.',
+    'Nothing imports zod — Effect Schema is the one schema language (D85). Import `Schema` from effect; a server-fn validator is `input(schema)` (apps/web/src/lib/server/input.ts), and the plugin contract is Effect Schema.',
 }
 // Proved on the echo fixture plugin by the sdk's fence test.
 const PLUGIN_IMPORTS_SDK_ONLY = {
@@ -317,6 +322,11 @@ export default [
       ],
     },
   },
+  // No zod, over every file. Each zone block below sets its own
+  // `no-restricted-imports` options and so lists NO_ZOD again.
+  {
+    rules: { 'no-restricted-imports': ['error', { patterns: [NO_ZOD] }] },
+  },
   // Architecture seams as lint rules (CLAUDE.md traps, mechanically enforced):
   // client code never reaches server internals, Effect never crosses into React.
   {
@@ -355,6 +365,7 @@ export default [
             // block owns `no-restricted-imports` for routes/ and components/
             // and a later block would replace these options, not extend them.
             WEB_NEVER_PLUGINS_NEVER_WORKER,
+            NO_ZOD,
           ],
         },
       ],
@@ -368,7 +379,7 @@ export default [
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [WEB_NEVER_PLUGINS_NEVER_WORKER] },
+        { patterns: [WEB_NEVER_PLUGINS_NEVER_WORKER, NO_ZOD] },
       ],
     },
   },
@@ -398,7 +409,7 @@ export default [
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [DB_IMPORTS_NOTHING_INTERNAL] },
+        { patterns: [DB_IMPORTS_NOTHING_INTERNAL, NO_ZOD] },
       ],
     },
   },
@@ -407,7 +418,7 @@ export default [
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [CORE_IMPORTS_DB_AND_SDK_ONLY] },
+        { patterns: [CORE_IMPORTS_DB_AND_SDK_ONLY, NO_ZOD] },
       ],
     },
   },
@@ -416,7 +427,7 @@ export default [
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [WORKER_NEVER_WEB_NEVER_PLUGINS] },
+        { patterns: [WORKER_NEVER_WEB_NEVER_PLUGINS, NO_ZOD] },
       ],
     },
   },
@@ -425,7 +436,7 @@ export default [
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [E2E_IMPORTS_NOTHING_INTERNAL] },
+        { patterns: [E2E_IMPORTS_NOTHING_INTERNAL, NO_ZOD] },
       ],
     },
   },
@@ -450,7 +461,7 @@ export default [
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [SITE_IMPORTS_NOTHING_INTERNAL] },
+        { patterns: [SITE_IMPORTS_NOTHING_INTERNAL, NO_ZOD] },
       ],
     },
   },
@@ -459,7 +470,7 @@ export default [
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [SDK_IMPORTS_NOTHING_INTERNAL, NO_ZOD_IN_THE_CONTRACT] },
+        { patterns: [SDK_IMPORTS_NOTHING_INTERNAL, NO_ZOD] },
       ],
     },
   },
@@ -468,7 +479,7 @@ export default [
     rules: {
       'no-restricted-imports': [
         'error',
-        { patterns: [PLUGIN_IMPORTS_SDK_ONLY, NO_ZOD_IN_THE_CONTRACT] },
+        { patterns: [PLUGIN_IMPORTS_SDK_ONLY, NO_ZOD] },
       ],
       // Clock is not a port: Effect ships one, and a job that reads the wall
       // clock directly cannot be tested at a fixed time. `Date.now()` and a

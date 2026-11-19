@@ -241,7 +241,7 @@ describe('the bundle runs on the host', () => {
     expect(seen.Effect).toBe(hostEffect.Effect)
     expect(seen.Context).toBe(hostEffect.Context)
 
-    // The hook routes these and nothing else: zod is not one of them.
+    // The hook routes these two and nothing else.
     expect(HOST_PACKAGES).toEqual(['effect', '@spaces/sdk'])
   })
 })

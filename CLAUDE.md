@@ -61,7 +61,7 @@ The package map is in `docs/architecture.md`. What bites when you edit:
 - Portfolio history is append-only; a correction is a compensating event (`apps/web/src/lib/portfolio/reverse.ts`, the `<table>_reverses_unique` partial indexes, `packages/core/src/portfolio/reversal.ts`).
 - Effect never crosses into React; the seam is `effectFn()` (`no-restricted-imports` on `effect` in `apps/web/src/routes/**` and `apps/web/src/components/**`).
 - I/O is an Effect program; pure helpers, type modules and client code stay plain (`effect/io-is-effect`, `packages/config/eslint-rules/io-is-effect.js`; an exempt file says why in an `eslint-disable`).
-- A server-fn `.validator()` is an Effect schema through `input()` (`apps/web/src/lib/server/input.ts`; `lib/server/tasks.ts` is the reference). No new file imports `zod`.
+- A server-fn `.validator()` is an Effect schema through `input()` (`apps/web/src/lib/server/input.ts`; `lib/server/tasks.ts` is the reference). Nothing imports `zod` (`no-restricted-imports` in `packages/config/eslint.base.js`, every package).
 - `noUncheckedIndexedAccess` stays off; production uses `.at(0)`. Don't re-litigate it.
 
 Writing Effect: invoke the `effect-ts` skill (it defers to `node_modules/effect/AGENTS.md`). TanStack packages ship their own `SKILL.md` under `node_modules/@tanstack/*`.

@@ -74,7 +74,7 @@ describe('input — runtime', () => {
     ).resolves.toEqual({ content: 'Call the founder', notify: false })
   })
 
-  it('drops a key the schema does not name, as zod did', async () => {
+  it('drops a key the schema does not name', async () => {
     await expect(
       execValidator(input(NewTask), { content: 'x', role: 'admin' }),
     ).resolves.toEqual({ content: 'x', notify: false })

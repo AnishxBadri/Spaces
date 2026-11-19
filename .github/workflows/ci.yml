@@ -431,7 +431,7 @@ jobs:
       # verdict per plugin, `/api/health` must list the three degraded ones
       # and stay ok, and the `core.mailbox` row must come through untouched.
       # `echo` enabled is the proof that a bundle under /data resolves its
-      # bare effect / zod / @spaces/sdk imports to the image's own copies.
+      # bare effect / @spaces/sdk imports to the image's own copies.
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

@@ -1,5 +1,5 @@
 {
-  "//": "The schema, the journal and the migration runner. Depends on drizzle-orm, pg, effect and zod and on nothing inside this repo — that is the property the package exists to hold, and `src/json.ts`, `src/entity-refs.ts` and the two schema files that declare their own column payload types are where the four former `#/lib/...` imports ended up (SPA-142).",
+  "//": "The schema, the journal and the migration runner. Depends on drizzle-orm, pg and effect and on nothing inside this repo — that is the property the package exists to hold, and `src/json.ts`, `src/entity-refs.ts` and the two schema files that declare their own column payload types are where the four former `#/lib/...` imports ended up (SPA-142).",
   "name": "@spaces/db",
   "version": "0.0.0",
   "private": true,
@@ -36,8 +36,7 @@
   "dependencies": {
     "drizzle-orm": "^0.45.1",
     "effect": "4.0.0-rc.112",
-    "pg": "^8.16.3",
-    "zod": "^4.3.6"
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "@spaces/config": "workspace:*",
