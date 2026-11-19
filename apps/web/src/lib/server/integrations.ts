@@ -1,5 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { plainRecord } from '../plain-record'
+import { input } from './input'
 
 /**
  * Settings → Integrations: the installed plugins, one plugin's settings and
@@ -34,7 +36,9 @@ export type {
   SettingsForm,
 } from '../integrations/settings-form'
 
-const byId = z.object({ id: z.string().uuid() })
+const uuid = Schema.String.check(Schema.isUUID())
+
+const byId = Schema.Struct({ id: uuid })
 
 /** Every installed plugin with its state, last run and today's credits. */
 export const listIntegrations = createServerFn().handler(async () => {
@@ -50,7 +54,7 @@ export const countIntegrations = createServerFn().handler(async () => {
 
 /** One plugin: its row, its settings form prefilled from config, its key fields. */
 export const getIntegration = createServerFn()
-  .validator(byId)
+  .validator(input(byId))
   .handler(async ({ data }) => {
     const { getIntegrationHandler } = await import('../integrations/admin')
     return getIntegrationHandler(data)
@@ -58,7 +62,7 @@ export const getIntegration = createServerFn()
 
 /** One plugin's latest runs, for Usage filtered to it; bundled plugins have no page of their own. */
 export const getIntegrationRuns = createServerFn()
-  .validator(byId)
+  .validator(input(byId))
   .handler(async ({ data }) => {
     const { getIntegrationRunsHandler } = await import('../integrations/admin')
     return getIntegrationRunsHandler(data)
@@ -66,7 +70,7 @@ export const getIntegrationRuns = createServerFn()
 
 /** The operator's switch; the worker registers or unregisters its queues. */
 export const setIntegrationEnabled = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.string().uuid(), enabled: z.boolean() }))
+  .validator(input(Schema.Struct({ id: uuid, enabled: Schema.Boolean })))
   .handler(async ({ data }) => {
     const { setIntegrationEnabledHandler } =
       await import('../integrations/admin')
@@ -75,7 +79,7 @@ export const setIntegrationEnabled = createServerFn({ method: 'POST' })
 
 /** Clears a tripped breaker and reloads the plugin. */
 export const resetIntegration = createServerFn({ method: 'POST' })
-  .validator(byId)
+  .validator(input(byId))
   .handler(async ({ data }) => {
     const { resetIntegrationHandler } = await import('../integrations/admin')
     return resetIntegrationHandler(data)
@@ -84,10 +88,12 @@ export const resetIntegration = createServerFn({ method: 'POST' })
 /** Writes `integration.config`, or returns each failing field's message and writes nothing. */
 export const saveIntegrationSettings = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      id: z.string().uuid(),
-      values: z.record(z.string(), z.union([z.string(), z.boolean()])),
-    }),
+    input(
+      Schema.Struct({
+        id: uuid,
+        values: plainRecord(Schema.Union([Schema.String, Schema.Boolean])),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const { saveIntegrationSettingsHandler } =
@@ -98,11 +104,15 @@ export const saveIntegrationSettings = createServerFn({ method: 'POST' })
 /** Writes the auto-enrich scope: which triggers run the plugin's event jobs. */
 export const saveIntegrationAutoEnrich = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      id: z.string().uuid(),
-      scopes: z.array(z.enum(['deal', 'space', 'meeting'])).max(3),
-      spaces: z.array(z.string().uuid()).max(500),
-    }),
+    input(
+      Schema.Struct({
+        id: uuid,
+        scopes: Schema.Array(
+          Schema.Literals(['deal', 'space', 'meeting']),
+        ).check(Schema.isMaxLength(3)),
+        spaces: Schema.Array(uuid).check(Schema.isMaxLength(500)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const { saveIntegrationAutoEnrichHandler } =
@@ -113,16 +123,21 @@ export const saveIntegrationAutoEnrich = createServerFn({ method: 'POST' })
     })
   })
 
-const secretSlot = z.enum(['credential', 'webhook'])
+const secretSlot = Schema.Literals(['credential', 'webhook'])
 
 /** Stores the pasted key or webhook secret in the vault; returns only its redacted display. */
 export const saveIntegrationSecret = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      id: z.string().uuid(),
-      slot: secretSlot,
-      secret: z.string().min(1).max(4000),
-    }),
+    input(
+      Schema.Struct({
+        id: uuid,
+        slot: secretSlot,
+        secret: Schema.String.check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(4000),
+        ),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const { saveIntegrationSecretHandler } =
@@ -138,7 +153,16 @@ export const listAvailableIntegrations = createServerFn().handler(async () => {
 
 /** Fetches, verifies and unpacks the registry's newest version; the worker enables it. */
 export const installIntegration = createServerFn({ method: 'POST' })
-  .validator(z.object({ pluginId: z.string().min(1).max(64) }))
+  .validator(
+    input(
+      Schema.Struct({
+        pluginId: Schema.String.check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(64),
+        ),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     const { installIntegrationHandler } =
       await import('../integrations/install')
@@ -173,7 +197,7 @@ export const uploadIntegration = createServerFn({ method: 'POST' })
 
 /** Moves an installed plugin to the registry's newest version, keeping one back. */
 export const updateIntegration = createServerFn({ method: 'POST' })
-  .validator(byId)
+  .validator(input(byId))
   .handler(async ({ data }) => {
     const { upgradeIntegrationHandler } =
       await import('../integrations/install')
@@ -182,7 +206,7 @@ export const updateIntegration = createServerFn({ method: 'POST' })
 
 /** Deletes the files and the key; the row stays, soft-deleted, so what it wrote still names it. */
 export const uninstallIntegration = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.string().uuid(), dropData: z.boolean() }))
+  .validator(input(Schema.Struct({ id: uuid, dropData: Schema.Boolean })))
   .handler(async ({ data }) => {
     const { uninstallIntegrationHandler } =
       await import('../integrations/install')
@@ -191,7 +215,7 @@ export const uninstallIntegration = createServerFn({ method: 'POST' })
 
 /** Deletes a slot's secret; without its key the row reads degraded('missing credential'). */
 export const removeIntegrationSecret = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.string().uuid(), slot: secretSlot }))
+  .validator(input(Schema.Struct({ id: uuid, slot: secretSlot })))
   .handler(async ({ data }) => {
     const { removeIntegrationSecretHandler } =
       await import('../integrations/admin')

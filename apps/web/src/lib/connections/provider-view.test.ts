@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import type { ConnectionsListRow, ProviderUse } from './input'
 import { BUNDLED_PLUGINS, isBundledPlugin, providerOfPlugin } from './products'
 import {
@@ -71,13 +71,12 @@ describe('the bundled plugins', () => {
       ...dockerfile.matchAll(/--filter @spaces\/plugin-([a-z-]+)/g),
     ].map((m) => m[1])
     expect(built).toEqual([...BUNDLED_PLUGINS])
-    const script = z
-      .object({ scripts: z.record(z.string(), z.string()) })
-      .parse(
-        JSON.parse(
-          readFileSync(fileURLToPath(new URL('package.json', root)), 'utf8'),
-        ),
-      ).scripts['bundle-plugins']
+    const script = Schema.decodeUnknownSync(
+      Schema.fromJsonString(
+        Schema.Struct({ scripts: Schema.Record(Schema.String, Schema.String) }),
+      ),
+    )(readFileSync(fileURLToPath(new URL('package.json', root)), 'utf8'))
+      .scripts['bundle-plugins']
     // By path, never by package name: core bundles the root manifest into
     // web's build, which must carry no plugin package name.
     for (const id of BUNDLED_PLUGINS) {

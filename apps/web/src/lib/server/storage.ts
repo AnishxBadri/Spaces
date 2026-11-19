@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
 
 /**
  * Attach from a storage source (Drive): a pasted link, the provider's
@@ -22,19 +23,32 @@ export type {
   PickerView,
 } from '../documents/picker'
 
+const uuid = Schema.String.check(Schema.isUUID())
+
 /** A same-origin path, never a URL: where a Connect dance lands. */
-const samePath = z
-  .string()
-  .max(500)
-  .regex(/^\/(?!\/)/, 'A path on this site')
+const samePath = Schema.String.check(
+  Schema.isMaxLength(500),
+  Schema.isPattern(/^\/(?!\/)/, { message: 'A path on this site' }),
+)
+
+/**
+ * A link as a person pastes it: trimmed, then anything `URL` parses — the
+ * scheme is not pinned, so a `mailto:` passes and the program refuses it.
+ */
+const pastedUrl = Schema.Trim.check(
+  Schema.makeFilter((s: string) => URL.canParse(s), { expected: 'a URL' }),
+  Schema.isMaxLength(2000),
+)
 
 export const attachFromLink = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      url: z.string().url().max(2000),
-      attachTo: z.string().uuid(),
-      returnTo: samePath,
-    }),
+    input(
+      Schema.Struct({
+        url: pastedUrl,
+        attachTo: uuid,
+        returnTo: samePath,
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -48,27 +62,26 @@ export const attachFromLink = createServerFn({ method: 'POST' })
     }
   })
 
-const pickerProvider = z.enum(['google'])
+const pickerProvider = Schema.Literals(['google'])
 
 export const attachFromPicker = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      provider: pickerProvider,
-      attachTo: z.string().uuid(),
-      files: z
-        .array(
-          z.object({
-            id: z
-              .string()
-              .regex(/^[\w-]+$/)
-              .max(200),
-            name: z.string().max(500),
+    input(
+      Schema.Struct({
+        provider: pickerProvider,
+        attachTo: uuid,
+        files: Schema.Array(
+          Schema.Struct({
+            id: Schema.String.check(
+              Schema.isPattern(/^[\w-]+$/),
+              Schema.isMaxLength(200),
+            ),
+            name: Schema.String.check(Schema.isMaxLength(500)),
           }),
-        )
-        .min(1)
-        .max(50),
-      returnTo: samePath,
-    }),
+        ).check(Schema.isMinLength(1), Schema.isMaxLength(50)),
+        returnTo: samePath,
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -88,7 +101,9 @@ export const attachFromPicker = createServerFn({ method: 'POST' })
  * or a refusal in words. Mints nothing.
  */
 export const pickerReadiness = createServerFn()
-  .validator(z.object({ provider: pickerProvider, returnTo: samePath }))
+  .validator(
+    input(Schema.Struct({ provider: pickerProvider, returnTo: samePath })),
+  )
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { pickerReadinessProgram, pickerMessage } =
@@ -127,12 +142,16 @@ export const pickerReadiness = createServerFn()
  */
 export const mintPickerToken = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      provider: pickerProvider,
-      returnTo: samePath,
-      /** `folders` opens the picker on folders, for Link a Drive folder. */
-      mode: z.enum(['files', 'folders']).default('files'),
-    }),
+    input(
+      Schema.Struct({
+        provider: pickerProvider,
+        returnTo: samePath,
+        /** `folders` opens the picker on folders, for Link a Drive folder. */
+        mode: Schema.Literals(['files', 'folders']).pipe(
+          Schema.withDecodingDefault(Effect.succeed('files' as const)),
+        ),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -157,7 +176,13 @@ export const mintPickerToken = createServerFn({ method: 'POST' })
   })
 
 export const linkFetchStatus = createServerFn()
-  .validator(z.object({ fetchIds: z.array(z.string().uuid()).max(50) }))
+  .validator(
+    input(
+      Schema.Struct({
+        fetchIds: Schema.Array(uuid).check(Schema.isMaxLength(50)),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { linkFetchStatusProgram } = await import('../documents/attach-link')

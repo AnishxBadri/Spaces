@@ -1,5 +1,4 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { BEAT_EVERY_MS } from '@spaces/db/heartbeat'
 import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 import { auth } from '#/lib/auth'
@@ -108,7 +107,7 @@ export function jobStatusStream(
   })
 }
 
-const entityIdSchema = z.uuid()
+const isEntityId = Schema.is(Schema.String.check(Schema.isUUID()))
 
 /**
  * `/api/job-status/$entityId`: the viewer's session, then the record as the
@@ -121,8 +120,7 @@ export const jobStatusResponseProgram = Effect.fn('jobStatusResponseProgram')(
       auth.api.getSession({ headers: request.headers }),
     )
     if (!session) return new Response('Unauthorized', { status: 401 })
-    if (!entityIdSchema.safeParse(entityId).success)
-      return new Response('Forbidden', { status: 403 })
+    if (!isEntityId(entityId)) return new Response('Forbidden', { status: 403 })
     const readable = yield* recordReadableProgram(session.user, entityId)
     if (!readable) return new Response('Forbidden', { status: 403 })
     const listener = yield* Effect.try(() => jobStatusListener())

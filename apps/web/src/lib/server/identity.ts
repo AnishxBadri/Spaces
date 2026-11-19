@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
 
 /**
  * Whether an identity key typed into a create window already names a
@@ -9,10 +10,15 @@ import { requireUser } from './shared'
  */
 export const findByIdentity = createServerFn()
   .validator(
-    z.object({
-      key: z.enum(['domain', 'email', 'linkedin']),
-      value: z.string().trim().min(1).max(255),
-    }),
+    input(
+      Schema.Struct({
+        key: Schema.Literals(['domain', 'email', 'linkedin']),
+        value: Schema.Trim.check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(255),
+        ),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     await requireUser()

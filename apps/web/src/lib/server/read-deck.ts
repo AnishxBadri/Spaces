@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * The Files tab's Read deck button. Manual and pull-based: pressing it
@@ -10,7 +13,7 @@ import { requireUser } from './shared'
  */
 
 export const readDeck = createServerFn({ method: 'POST' })
-  .validator(z.object({ documentId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ documentId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { enqueueReadDeckProgram, ReadDeckRefused } =
@@ -33,9 +36,7 @@ export const readDeck = createServerFn({ method: 'POST' })
  * key, so it is refused while the deck is already being read either way.
  */
 export const readDeckAndSummarize = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({ documentId: z.string().uuid(), recordId: z.string().uuid() }),
-  )
+  .validator(input(Schema.Struct({ documentId: uuid, recordId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { enqueueReadDeckProgram, ReadDeckRefused } =
@@ -58,7 +59,13 @@ export const readDeckAndSummarize = createServerFn({ method: 'POST' })
 
 /** Where each deck's latest read stands — polled while any is reading. */
 export const readDeckStatus = createServerFn()
-  .validator(z.object({ documentIds: z.array(z.string().uuid()).max(200) }))
+  .validator(
+    input(
+      Schema.Struct({
+        documentIds: Schema.Array(uuid).check(Schema.isMaxLength(200)),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { readDeckStatusProgram } = await import('../ai/read-deck')

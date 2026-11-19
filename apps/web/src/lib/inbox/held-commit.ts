@@ -16,7 +16,7 @@ import {
 } from '#/lib/ai/attribute-run'
 import { applyCardProgram, skipCardProgram } from '#/lib/ask/card-store'
 import { askMessage } from '#/lib/ask/threads'
-import { heldBeaconSchema } from './held'
+import { readHeldBeacon } from './held'
 import type { HeldDecision } from './held'
 
 /**
@@ -159,13 +159,12 @@ export const heldDecisionsResponseProgram = Effect.fn(
       auth.api.getSession({ headers: request.headers }),
     )
     if (!session) return new Response('Unauthorized', { status: 401 })
-    const body = yield* Effect.tryPromise(() => request.json()).pipe(
-      Effect.map((raw) => heldBeaconSchema.safeParse(raw)),
+    const decisions = yield* Effect.tryPromise(() => request.json()).pipe(
+      Effect.map(readHeldBeacon),
       Effect.orElseSucceed(() => null),
     )
-    if (body === null || !body.success)
-      return new Response('Bad request', { status: 400 })
-    const outcomes = yield* Effect.forEach(body.data.decisions, (d) =>
+    if (decisions === null) return new Response('Bad request', { status: 400 })
+    const outcomes = yield* Effect.forEach(decisions, (d) =>
       runHeldDecisionProgram(d, {
         id: session.user.id,
         admin: session.user.role === 'admin',

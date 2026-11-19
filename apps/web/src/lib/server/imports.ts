@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Effect, Option, Schema } from 'effect'
 import { MAX_UPLOAD_BYTES, formatBytes } from '@spaces/core/documents'
 import {
   isCoreIdentityKey,
@@ -7,6 +7,7 @@ import {
 } from '@spaces/core/import/mapping'
 import { isLedgerField } from '@spaces/core/import/ledger'
 import { requireUser } from './shared'
+import { input } from './input'
 import type { ColumnTarget } from '@spaces/core/import/mapping'
 
 /**
@@ -25,7 +26,22 @@ export type StageImportForm = {
   allowDuplicate: boolean
 }
 
-const uuid = z.string().uuid()
+const uuid = Schema.String.check(Schema.isUUID())
+const importMode = Schema.Literals(IMPORT_MODES)
+
+/**
+ * A list filter: one of `filters`, and anything else — a stale link, a
+ * missing key — reads as `all` rather than refusing the page.
+ */
+const orAll = <const TFilters extends readonly ['all', ...Array<string>]>(
+  filters: TFilters,
+) =>
+  Schema.Literals(filters).pipe(
+    Schema.catchDecoding(() => Effect.succeed(Option.some(filters[0]))),
+    Schema.withDecodingDefault(Effect.succeed(filters[0])),
+  )
+
+const batchInput = input(Schema.Struct({ batchId: uuid }))
 
 /**
  * The file is posted to the server and hashed there — the browser never
@@ -35,10 +51,14 @@ const uuid = z.string().uuid()
 function readStageForm(data: FormData): StageImportForm {
   const file = data.get('file')
   if (!(file instanceof File)) throw new Error('Choose a file to import')
-  const mode = z.enum(IMPORT_MODES).parse(data.get('mode') ?? 'records')
+  const mode = Schema.decodeUnknownSync(importMode)(
+    data.get('mode') ?? 'records',
+  )
   const target = data.get('targetObjectId')
   const targetObjectId =
-    typeof target === 'string' && target !== '' ? uuid.parse(target) : null
+    typeof target === 'string' && target !== ''
+      ? Schema.decodeUnknownSync(uuid)(target)
+      : null
   return {
     file,
     mode,
@@ -77,7 +97,7 @@ export const stageImport = createServerFn({ method: 'POST' })
   })
 
 export const getImportBatch = createServerFn()
-  .validator(z.object({ batchId: uuid }))
+  .validator(batchInput)
   .handler(async ({ data }) => {
     await requireUser()
     const { loadImportBatchProgram, importMessage } =
@@ -92,11 +112,13 @@ export const getImportBatch = createServerFn()
 
 export const defineImportBatch = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      batchId: uuid,
-      mode: z.enum(IMPORT_MODES),
-      targetObjectId: uuid.nullable(),
-    }),
+    input(
+      Schema.Struct({
+        batchId: uuid,
+        mode: importMode,
+        targetObjectId: Schema.NullOr(uuid),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     await requireUser()
@@ -111,7 +133,17 @@ export const defineImportBatch = createServerFn({ method: 'POST' })
   })
 
 export const selectImportSheet = createServerFn({ method: 'POST' })
-  .validator(z.object({ batchId: uuid, sheet: z.string().min(1).max(400) }))
+  .validator(
+    input(
+      Schema.Struct({
+        batchId: uuid,
+        sheet: Schema.String.check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(400),
+        ),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { selectImportSheetProgram, importMessage } =
@@ -125,7 +157,7 @@ export const selectImportSheet = createServerFn({ method: 'POST' })
   })
 
 export const discardImportBatch = createServerFn({ method: 'POST' })
-  .validator(z.object({ batchId: uuid }))
+  .validator(batchInput)
   .handler(async ({ data }) => {
     await requireUser()
     const { discardImportBatchProgram, importMessage } =
@@ -142,7 +174,35 @@ export const discardImportBatch = createServerFn({ method: 'POST' })
 // The mapping step
 // ---------------------------------------------------------------------------
 
-const dateOrder = z.enum(['dmy', 'mdy'])
+const dateOrder = Schema.Literals(['dmy', 'mdy'])
+
+/** A column index on the sheet. */
+const columnIndex = Schema.Int.check(
+  Schema.isBetween({ minimum: 0, maximum: 1000 }),
+)
+
+/** A one-based sheet row. */
+const rowNum = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
+
+const newAttributeType = Schema.String.check(
+  Schema.makeFilter(isNewAttributeType, {
+    message: 'Not a type a cell can hold',
+  }),
+)
+
+const ledgerField = Schema.String.check(
+  Schema.makeFilter(isLedgerField, { message: 'Not an event field' }),
+)
+
+const optionLabel = Schema.Trim.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(60),
+)
+
+const attributeName = Schema.Trim.check(
+  Schema.isMinLength(1),
+  Schema.isMaxLength(80),
+)
 
 /**
  * One column's target at the boundary. The identity key and the new
@@ -150,36 +210,42 @@ const dateOrder = z.enum(['dmy', 'mdy'])
  * (`isCoreIdentityKey`, `isNewAttributeType`) rather than spelled here, so
  * the repo keeps one notion of what identifies a record.
  */
-const columnTargetInput = z.discriminatedUnion('target', [
-  z.object({ target: z.literal('name') }),
-  z.object({
-    target: z.literal('attribute'),
+const columnTargetInput = Schema.Union([
+  Schema.Struct({ target: Schema.Literal('name') }),
+  Schema.Struct({
+    target: Schema.Literal('attribute'),
     attributeId: uuid,
-    dateOrder: dateOrder.optional(),
+    dateOrder: Schema.optional(dateOrder),
     /** A record reference column plans what it does not find. */
-    createMissing: z.literal(true).optional(),
+    createMissing: Schema.optional(Schema.Literal(true)),
   }),
-  z.object({
-    target: z.literal('identity'),
-    key: z.string().refine(isCoreIdentityKey, 'Not an identity key'),
+  Schema.Struct({
+    target: Schema.Literal('identity'),
+    key: Schema.String.check(
+      Schema.makeFilter(isCoreIdentityKey, {
+        message: 'Not an identity key',
+      }),
+    ),
   }),
-  z.object({ target: z.literal('ignore') }),
-  z.object({
-    target: z.literal('new'),
-    name: z.string().trim().min(1).max(80),
-    type: z.string().refine(isNewAttributeType, 'Not a type a cell can hold'),
-    options: z.array(z.string().trim().min(1).max(60)).max(50).optional(),
-    dateOrder: dateOrder.optional(),
+  Schema.Struct({ target: Schema.Literal('ignore') }),
+  Schema.Struct({
+    target: Schema.Literal('new'),
+    name: attributeName,
+    type: newAttributeType,
+    options: Schema.optional(
+      Schema.Array(optionLabel).check(Schema.isMaxLength(50)),
+    ),
+    dateOrder: Schema.optional(dateOrder),
   }),
   /** Accepted so the type is whole; a records batch refuses it. */
-  z.object({
-    target: z.literal('ledger'),
-    field: z.string().refine(isLedgerField, 'Not an event field'),
+  Schema.Struct({
+    target: Schema.Literal('ledger'),
+    field: ledgerField,
   }),
 ])
 
 /** The parsed input as the stored shape — optional keys omitted, never `undefined`. */
-function toColumnTarget(t: z.infer<typeof columnTargetInput>): ColumnTarget {
+function toColumnTarget(t: typeof columnTargetInput.Type): ColumnTarget {
   switch (t.target) {
     case 'name':
     case 'ignore':
@@ -204,14 +270,12 @@ function toColumnTarget(t: z.infer<typeof columnTargetInput>): ColumnTarget {
         target: 'new',
         name: t.name,
         type: t.type,
-        ...(t.options ? { options: t.options } : {}),
+        ...(t.options ? { options: [...t.options] } : {}),
         ...(t.dateOrder ? { dateOrder: t.dateOrder } : {}),
       }
     }
   }
 }
-
-const batchInput = z.object({ batchId: uuid })
 
 /** Step 2's data; null while the batch is on step 1. */
 export const getImportMapping = createServerFn()
@@ -246,11 +310,13 @@ export const beginImportMapping = createServerFn({ method: 'POST' })
 /** One column's target, written at once; answers what it replaced. */
 export const mapImportColumn = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      batchId: uuid,
-      column: z.number().int().min(0).max(1000),
-      target: columnTargetInput,
-    }),
+    input(
+      Schema.Struct({
+        batchId: uuid,
+        column: columnIndex,
+        target: columnTargetInput,
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     await requireUser()
@@ -276,14 +342,16 @@ export const mapImportColumn = createServerFn({ method: 'POST' })
  */
 export const createImportAttribute = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      batchId: uuid,
-      column: z.number().int().min(0).max(1000),
-      name: z.string().trim().min(1).max(80),
-      type: z.string().refine(isNewAttributeType, 'Not a type a cell can hold'),
-      options: z.array(z.string().trim().min(1).max(60)).max(50),
-      dateOrder: dateOrder.nullable(),
-    }),
+    input(
+      Schema.Struct({
+        batchId: uuid,
+        column: columnIndex,
+        name: attributeName,
+        type: newAttributeType,
+        options: Schema.Array(optionLabel).check(Schema.isMaxLength(50)),
+        dateOrder: Schema.NullOr(dateOrder),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -298,7 +366,7 @@ export const createImportAttribute = createServerFn({ method: 'POST' })
         column: data.column,
         name: data.name,
         type: data.type,
-        options: data.options,
+        options: [...data.options],
         dateOrder: data.dateOrder,
         userId: u.id,
       })
@@ -332,7 +400,7 @@ export const planImport = createServerFn({ method: 'POST' })
 /** Step 3's data, read off the stored plans; null unless the batch is planned. */
 export const getImportPreview = createServerFn()
   .validator(
-    z.object({ batchId: uuid, filter: z.enum(PREVIEW_FILTERS).catch('all') }),
+    input(Schema.Struct({ batchId: uuid, filter: orAll(PREVIEW_FILTERS) })),
   )
   .handler(async ({ data }) => {
     await requireUser()
@@ -349,11 +417,13 @@ export const getImportPreview = createServerFn()
 /** One in-file collision's decision, stored on every row of it. */
 export const decideImportCollision = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      batchId: uuid,
-      rowNum: z.number().int().min(1),
-      decision: z.enum(['keep-first', 'keep-second', 'skip-both']),
-    }),
+    input(
+      Schema.Struct({
+        batchId: uuid,
+        rowNum,
+        decision: Schema.Literals(['keep-first', 'keep-second', 'skip-both']),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     await requireUser()
@@ -394,28 +464,26 @@ const INSTRUMENT_VALUES = [
   'ccd',
 ] as const
 
-const ledgerDecisionInput = z.discriminatedUnion('kind', [
-  z.object({
-    kind: z.literal('instrument'),
-    value: z.string().max(200),
-    resolution: z.enum([...INSTRUMENT_VALUES, 'per_row']).nullable(),
+const ledgerDecisionInput = Schema.Union([
+  Schema.Struct({
+    kind: Schema.Literal('instrument'),
+    value: Schema.String.check(Schema.isMaxLength(200)),
+    resolution: Schema.NullOr(
+      Schema.Literals([...INSTRUMENT_VALUES, 'per_row']),
+    ),
   }),
-  z.object({
-    kind: z.literal('marksAsOf'),
-    date: z
-      .string()
-      .regex(/^\d{4}-\d{2}-\d{2}$/)
-      .nullable(),
+  Schema.Struct({
+    kind: Schema.Literal('marksAsOf'),
+    date: Schema.NullOr(
+      Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/)),
+    ),
   }),
-  z.object({
-    kind: z.literal('currency'),
-    code: z
-      .string()
-      .regex(/^[A-Z]{3}$/)
-      .nullable(),
+  Schema.Struct({
+    kind: Schema.Literal('currency'),
+    code: Schema.NullOr(Schema.String.check(Schema.isPattern(/^[A-Z]{3}$/))),
   }),
-  z.object({ kind: z.literal('dateOrder'), order: dateOrder }),
-  z.object({ kind: z.literal('createMissing'), on: z.boolean() }),
+  Schema.Struct({ kind: Schema.Literal('dateOrder'), order: dateOrder }),
+  Schema.Struct({ kind: Schema.Literal('createMissing'), on: Schema.Boolean }),
 ])
 
 /** Steps 2 and 3 of a ledger batch; null for a records batch. */
@@ -451,11 +519,13 @@ export const beginLedgerMapping = createServerFn({ method: 'POST' })
 /** One event field onto a sheet column (or off it); answers what it replaced. */
 export const mapLedgerField = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      batchId: uuid,
-      field: z.string().refine(isLedgerField, 'Not an event field'),
-      column: z.number().int().min(0).max(1000).nullable(),
-    }),
+    input(
+      Schema.Struct({
+        batchId: uuid,
+        field: ledgerField,
+        column: Schema.NullOr(columnIndex),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     await requireUser()
@@ -476,7 +546,9 @@ export const mapLedgerField = createServerFn({ method: 'POST' })
 
 /** One decision from the decisions panel, stored on the mapping. */
 export const setLedgerDecision = createServerFn({ method: 'POST' })
-  .validator(z.object({ batchId: uuid, decision: ledgerDecisionInput }))
+  .validator(
+    input(Schema.Struct({ batchId: uuid, decision: ledgerDecisionInput })),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { setLedgerDecisionProgram, ledgerMessage } =
@@ -507,11 +579,13 @@ export const planLedgerImport = createServerFn({ method: 'POST' })
 /** A `per_row` instrument, chosen for one row from the preview. */
 export const decideLedgerRow = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      batchId: uuid,
-      rowNum: z.number().int().min(1),
-      instrument: z.enum(INSTRUMENT_VALUES),
-    }),
+    input(
+      Schema.Struct({
+        batchId: uuid,
+        rowNum,
+        instrument: Schema.Literals(INSTRUMENT_VALUES),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     await requireUser()
@@ -538,7 +612,9 @@ const RECEIPT_FILTERS = ['all', 'failed'] as const
  * batch. `queued: false` means one is already queued or running.
  */
 export const commitImport = createServerFn({ method: 'POST' })
-  .validator(z.object({ batchId: uuid, onlyFailed: z.boolean() }))
+  .validator(
+    input(Schema.Struct({ batchId: uuid, onlyFailed: Schema.Boolean })),
+  )
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { requestCommitProgram, commitMessage } =
@@ -563,7 +639,7 @@ export const commitImport = createServerFn({ method: 'POST' })
  */
 export const getImportReceipt = createServerFn()
   .validator(
-    z.object({ batchId: uuid, filter: z.enum(RECEIPT_FILTERS).catch('all') }),
+    input(Schema.Struct({ batchId: uuid, filter: orAll(RECEIPT_FILTERS) })),
   )
   .handler(async ({ data }) => {
     await requireUser()

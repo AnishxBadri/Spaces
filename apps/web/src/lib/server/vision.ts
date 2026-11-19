@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * The Files tab's Read with vision button. Manual and pull-based, the Read
@@ -12,7 +15,7 @@ import { requireUser } from './shared'
  */
 
 export const readWithVision = createServerFn({ method: 'POST' })
-  .validator(z.object({ documentId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ documentId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { enqueueVisionProgram, VisionRefused } = await import('../ai/vision')
@@ -30,7 +33,13 @@ export const readWithVision = createServerFn({ method: 'POST' })
 
 /** Where each document's latest vision read stands — polled while one runs. */
 export const visionStatus = createServerFn()
-  .validator(z.object({ documentIds: z.array(z.string().uuid()).max(200) }))
+  .validator(
+    input(
+      Schema.Struct({
+        documentIds: Schema.Array(uuid).check(Schema.isMaxLength(200)),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { visionStatusProgram } = await import('../ai/vision')

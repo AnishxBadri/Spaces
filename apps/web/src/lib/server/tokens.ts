@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { API_SCOPES } from '../tokens/scopes'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * Settings → API tokens: the MCP server's per-user credentials. The bodies
@@ -16,11 +19,15 @@ export const listApiTokens = createServerFn().handler(async () => {
 /** Mints a token; the response is the one place its plaintext appears. */
 export const createApiToken = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      name: z.string().max(200),
-      // What the token may do at /api/v1. MCP ignores it.
-      scopes: z.array(z.enum(API_SCOPES)).max(API_SCOPES.length),
-    }),
+    input(
+      Schema.Struct({
+        name: Schema.String.check(Schema.isMaxLength(200)),
+        // What the token may do at /api/v1. MCP ignores it.
+        scopes: Schema.mutable(Schema.Array(Schema.Literals(API_SCOPES))).check(
+          Schema.isMaxLength(API_SCOPES.length),
+        ),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const { createApiTokenHandler } = await import('../tokens/handlers')
@@ -28,7 +35,7 @@ export const createApiToken = createServerFn({ method: 'POST' })
   })
 
 export const revokeApiToken = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.string().uuid() }))
+  .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
     const { revokeApiTokenHandler } = await import('../tokens/handlers')
     return revokeApiTokenHandler(data)

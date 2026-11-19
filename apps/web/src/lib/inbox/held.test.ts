@@ -4,7 +4,7 @@ import type { AskCardView } from '#/lib/ask/cards'
 import {
   NOTHING_HELD,
   hasOpenItems,
-  heldBeaconSchema,
+  readHeldBeacon,
   heldView,
   isAlreadyDecided,
   isHeld,
@@ -178,14 +178,10 @@ describe('the shared spellings', () => {
 
   it('the beacon body is a list of decisions, nothing else', () => {
     const id = '00000000-0000-4000-8000-000000000001'
-    expect(
-      heldBeaconSchema.safeParse({ decisions: [{ verb: 'accept', id }] })
-        .success,
-    ).toBe(true)
-    expect(
-      heldBeaconSchema.safeParse({ decisions: [{ verb: 'merge', id }] })
-        .success,
-    ).toBe(false)
-    expect(heldBeaconSchema.safeParse({ decisions: [] }).success).toBe(false)
+    expect(readHeldBeacon({ decisions: [{ verb: 'accept', id }] })).toEqual([
+      { verb: 'accept', id },
+    ])
+    expect(readHeldBeacon({ decisions: [{ verb: 'merge', id }] })).toBe(null)
+    expect(readHeldBeacon({ decisions: [] })).toBe(null)
   })
 })

@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * Live files: Follow and Unfollow from a file row's `···`, and the
@@ -16,9 +19,7 @@ const COULD_NOT_FOLLOW = 'Could not follow this file'
 
 /** Follow a filed file from the record whose Files tab it was followed on. */
 export const followDocument = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({ documentId: z.string().uuid(), recordId: z.string().uuid() }),
-  )
+  .validator(input(Schema.Struct({ documentId: uuid, recordId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { followDocumentProgram } = await import('../documents/follow')
@@ -32,7 +33,7 @@ export const followDocument = createServerFn({ method: 'POST' })
 
 /** Unfollow: polling stops, the revisions stay. */
 export const unfollowDocument = createServerFn({ method: 'POST' })
-  .validator(z.object({ documentId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ documentId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { unfollowDocumentProgram } = await import('../documents/follow')
@@ -47,7 +48,7 @@ export const unfollowDocument = createServerFn({ method: 'POST' })
 
 /** A document's revisions, newest first; null when it cannot be read. */
 export const listDocumentRevisions = createServerFn()
-  .validator(z.object({ documentId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ documentId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { documentRevisionsForProgram } = await import('../documents/follow')

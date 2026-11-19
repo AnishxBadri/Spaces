@@ -1,7 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
 import { Effect, Schema } from 'effect'
 import { asc, eq, sql } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { attribute, entity, link, objectDef } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
@@ -14,7 +13,10 @@ import {
 import { pagedListShape, pageOptions } from '#/lib/views/page-input'
 import type { IdentityKey } from '@spaces/core/attributes/registry'
 import { recordSpaces } from '#/lib/spaces/filed-in'
+import { plainRecord } from '../plain-record'
 import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * The object registry, read side. One list serves the settings index and the
@@ -77,7 +79,13 @@ const listObjectsProgram = Effect.fn('listObjectsProgram')(function* (
 })
 
 export const listObjects = createServerFn()
-  .validator(z.object({ includeArchived: z.boolean().optional() }).optional())
+  .validator(
+    input(
+      Schema.UndefinedOr(
+        Schema.Struct({ includeArchived: Schema.optional(Schema.Boolean) }),
+      ),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     return Effect.runPromise(listObjectsProgram(data?.includeArchived ?? false))
@@ -133,7 +141,16 @@ const getObjectProgram = Effect.fn('getObjectProgram')(function* (
 })
 
 export const getObject = createServerFn()
-  .validator(z.object({ slug: z.string().min(1).max(80) }))
+  .validator(
+    input(
+      Schema.Struct({
+        slug: Schema.String.check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(80),
+        ),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     return Effect.runPromise(getObjectProgram(data.slug))
@@ -145,18 +162,30 @@ export const getObject = createServerFn()
 
 export const createObject = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      singular: z.string().trim().min(1).max(60),
-      plural: z.string().trim().min(1).max(60),
-      icon: z.string().max(40).optional(),
-      /**
-       * Opt-in identity. The enum is the two keys the dialog offers;
-       * `email` arrives as a free string from anything but the dialog and
-       * is refused *by name* in the program, which is where the reason
-       * lives.
-       */
-      identityKeys: z.array(z.string().max(20)).max(4).optional(),
-    }),
+    input(
+      Schema.Struct({
+        singular: Schema.Trim.check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(60),
+        ),
+        plural: Schema.Trim.check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(60),
+        ),
+        icon: Schema.optional(Schema.String.check(Schema.isMaxLength(40))),
+        /**
+         * Opt-in identity. The enum is the two keys the dialog offers;
+         * `email` arrives as a free string from anything but the dialog and
+         * is refused *by name* in the program, which is where the reason
+         * lives.
+         */
+        identityKeys: Schema.optional(
+          Schema.Array(Schema.String.check(Schema.isMaxLength(20))).check(
+            Schema.isMaxLength(4),
+          ),
+        ),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     // Reshaping the workspace's vocabulary — admin, like attribute edits.
@@ -170,19 +199,31 @@ export const createObject = createServerFn({ method: 'POST' })
 
 export const updateObject = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      id: z.string().uuid(),
-      singular: z.string().trim().min(1).max(60).optional(),
-      plural: z.string().trim().min(1).max(60).optional(),
-      icon: z.string().max(40).nullable().optional(),
-      archived: z.boolean().optional(),
-      /**
-       * The whole declaration, not a delta. Applied
-       * only while the object has no records; the two keys the dialog
-       * offers are narrowed in the program, where the reason lives.
-       */
-      identityKeys: z.array(z.string().max(20)).max(4).optional(),
-    }),
+    input(
+      Schema.Struct({
+        id: uuid,
+        singular: Schema.optional(
+          Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(60)),
+        ),
+        plural: Schema.optional(
+          Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(60)),
+        ),
+        icon: Schema.optional(
+          Schema.NullOr(Schema.String.check(Schema.isMaxLength(40))),
+        ),
+        archived: Schema.optional(Schema.Boolean),
+        /**
+         * The whole declaration, not a delta. Applied
+         * only while the object has no records; the two keys the dialog
+         * offers are narrowed in the program, where the reason lives.
+         */
+        identityKeys: Schema.optional(
+          Schema.Array(Schema.String.check(Schema.isMaxLength(20))).check(
+            Schema.isMaxLength(4),
+          ),
+        ),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const { requireAdmin } = await import('./shared')
@@ -229,7 +270,7 @@ export const listObjectRecords = createServerFn()
 
 /** The registry-generated record page's data. */
 export const getObjectRecord = createServerFn()
-  .validator(z.object({ id: z.string().uuid() }))
+  .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
     await requireUser()
     const { and: andOp } = await import('drizzle-orm')
@@ -325,11 +366,13 @@ export const getObjectRecord = createServerFn()
 
 export const createObjectRecord = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      objectId: z.string().uuid(),
-      name: z.string().trim().min(1).max(200),
-      values: z.record(z.string(), z.unknown()).optional(),
-    }),
+    input(
+      Schema.Struct({
+        objectId: uuid,
+        name: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(200)),
+        values: Schema.optional(plainRecord(Schema.Unknown)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()

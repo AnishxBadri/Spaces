@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * Versions: the two manual `supersedes` writers. Nothing is deleted;
@@ -9,9 +12,7 @@ import { requireUser } from './shared'
 
 /** "Newer version of…": `newerId` replaces `olderId`. One link row, idempotent. */
 export const markNewerVersion = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({ newerId: z.string().uuid(), olderId: z.string().uuid() }),
-  )
+  .validator(input(Schema.Struct({ newerId: uuid, olderId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { markNewerVersionProgram, supersedesMessage } =
@@ -30,7 +31,7 @@ export const markNewerVersion = createServerFn({ method: 'POST' })
 
 /** "Save as new version" on a note: a copy that supersedes it. */
 export const saveNoteAsNewVersion = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.string().uuid() }))
+  .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { saveNoteAsNewVersionProgram, noteVersionMessage } =

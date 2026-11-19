@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
 
 export type {
   ArtifactRole,
@@ -25,6 +26,20 @@ export type {
   WriteUpState,
 } from '../meetings/list'
 
+const uuid = Schema.String.check(Schema.isUUID())
+
+/**
+ * An ISO instant in UTC: a real calendar day, `T`, hours and minutes, then
+ * optional seconds and fraction, then `Z`. An offset or a local time is
+ * refused.
+ */
+const isoInstant = Schema.String.check(
+  Schema.isPattern(
+    /^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|02-(?:0[1-9]|1\d|2[0-8])))T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d+)?)?Z$/,
+    { expected: 'an ISO date-time in UTC' },
+  ),
+)
+
 /**
  * The meeting surfaces' server fns: Today's Meetings section, the Meetings
  * page, the meeting window, pinning a record and Prep.
@@ -34,7 +49,7 @@ export type {
 
 /** The meetings starting in one local day, `[from, to)` from the browser. */
 export const listDayMeetings = createServerFn()
-  .validator(z.object({ from: z.iso.datetime(), to: z.iso.datetime() }))
+  .validator(input(Schema.Struct({ from: isoInstant, to: isoInstant })))
   .handler(async ({ data }) => {
     await requireUser()
     const { dayMeetingsProgram } = await import('../interactions/meeting-read')
@@ -67,7 +82,7 @@ export const getTodayMeetings = createServerFn().handler(async () => {
  * both instants, so "this week and next" is the reader's.
  */
 export const listMeetings = createServerFn()
-  .validator(z.object({ now: z.iso.datetime(), until: z.iso.datetime() }))
+  .validator(input(Schema.Struct({ now: isoInstant, until: isoInstant })))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { calendarConnectedProgram, meetingListProgram } =
@@ -87,11 +102,11 @@ export const listMeetings = createServerFn()
     return { calendar, audience, ...list }
   })
 
-const byId = z.object({ id: z.uuid() })
+const byId = Schema.Struct({ id: uuid })
 
 /** The meeting window's read. */
 export const getMeeting = createServerFn()
-  .validator(byId)
+  .validator(input(byId))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { meetingDetailProgram, meetingMessage } =
@@ -106,7 +121,7 @@ export const getMeeting = createServerFn()
 
 /** Pin a record to a meeting: the one manual edge. */
 export const pinMeetingRecord = createServerFn({ method: 'POST' })
-  .validator(z.object({ interactionId: z.uuid(), entityId: z.uuid() }))
+  .validator(input(Schema.Struct({ interactionId: uuid, entityId: uuid })))
   .handler(async ({ data }) => {
     await requireUser()
     const { meetingMessage, pinMeetingRecordProgram } =
@@ -124,7 +139,7 @@ export const pinMeetingRecord = createServerFn({ method: 'POST' })
 
 /** Prep, streamed as `PrepEvent`s; nothing is stored. */
 export const prepMeeting = createServerFn({ method: 'POST' })
-  .validator(z.object({ interactionId: z.uuid() }))
+  .validator(input(Schema.Struct({ interactionId: uuid })))
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { prepStream } = await import('../interactions/meeting-prep')
@@ -134,10 +149,15 @@ export const prepMeeting = createServerFn({ method: 'POST' })
 /** "Save as note": the brief, filed on the meeting's records. */
 export const savePrepAsNote = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      interactionId: z.uuid(),
-      markdown: z.string().trim().min(1).max(200_000),
-    }),
+    input(
+      Schema.Struct({
+        interactionId: uuid,
+        markdown: Schema.Trim.check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(200_000),
+        ),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const user = await requireUser()

@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * Link a Drive folder (storage bindings): bind, the poll the bind dialog
@@ -18,34 +21,45 @@ export type {
 } from '../documents/bindings'
 
 /** A same-origin path, never a URL: where a Connect dance lands. */
-const samePath = z
-  .string()
-  .max(500)
-  .regex(/^\/(?!\/)/, 'A path on this site')
+const samePath = Schema.String.check(
+  Schema.isMaxLength(500),
+  Schema.isPattern(/^\/(?!\/)/, { message: 'A path on this site' }),
+)
+
+/**
+ * A link as a person pastes it: trimmed, then anything `URL` parses — the
+ * scheme is not pinned, so a `mailto:` passes and the program refuses it.
+ */
+const pastedUrl = Schema.Trim.check(
+  Schema.makeFilter((s: string) => URL.canParse(s), { expected: 'a URL' }),
+  Schema.isMaxLength(2000),
+)
 
 const COULD_NOT_LINK = 'Could not link this folder'
 
 export const linkDriveFolder = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      folder: z.union([
-        z.object({ url: z.string().url().max(2000) }),
-        z.object({
-          id: z
-            .string()
-            .regex(/^[\w-]+$/)
-            .max(200),
+    input(
+      Schema.Struct({
+        folder: Schema.Union([
+          Schema.Struct({ url: pastedUrl }),
+          Schema.Struct({
+            id: Schema.String.check(
+              Schema.isPattern(/^[\w-]+$/),
+              Schema.isMaxLength(200),
+            ),
+          }),
+        ]),
+        attachTo: uuid,
+        options: Schema.Struct({
+          mapSubfolders: Schema.Boolean,
+          retain: Schema.Literals(['full', 'text']),
+          direction: Schema.Literals(['pull', 'push', 'both']),
+          sensitivity: Schema.Literals(['inherit', 'sensitive']),
         }),
-      ]),
-      attachTo: z.string().uuid(),
-      options: z.object({
-        mapSubfolders: z.boolean(),
-        retain: z.enum(['full', 'text']),
-        direction: z.enum(['pull', 'push', 'both']),
-        sensitivity: z.enum(['inherit', 'sensitive']),
+        returnTo: samePath,
       }),
-      returnTo: samePath,
-    }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -59,7 +73,13 @@ export const linkDriveFolder = createServerFn({ method: 'POST' })
   })
 
 export const linkFolderStatus = createServerFn()
-  .validator(z.object({ bindIds: z.array(z.string().uuid()).max(10) }))
+  .validator(
+    input(
+      Schema.Struct({
+        bindIds: Schema.Array(uuid).check(Schema.isMaxLength(10)),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { linkFolderStatusProgram } = await import('../documents/bindings')
@@ -68,7 +88,7 @@ export const linkFolderStatus = createServerFn()
   })
 
 export const listRecordBindings = createServerFn()
-  .validator(z.object({ entityId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ entityId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { recordBindingsForProgram } = await import('../documents/bindings')
@@ -78,7 +98,7 @@ export const listRecordBindings = createServerFn()
 
 /** Unlink: the binding row goes; the documents it filed stay, with no binding. */
 export const unlinkDriveFolder = createServerFn({ method: 'POST' })
-  .validator(z.object({ bindingId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ bindingId: uuid })))
   .handler(async ({ data }) => {
     await requireUser()
     const { unlinkFolderProgram } = await import('../documents/bindings')
@@ -95,10 +115,12 @@ export const unlinkDriveFolder = createServerFn({ method: 'POST' })
  */
 export const setBindingRetain = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      bindingId: z.string().uuid(),
-      retain: z.enum(['full', 'text']),
-    }),
+    input(
+      Schema.Struct({
+        bindingId: uuid,
+        retain: Schema.Literals(['full', 'text']),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     await requireUser()
@@ -126,7 +148,7 @@ export type {
  * connection is not the reader's.
  */
 export const getAccountBindings = createServerFn()
-  .validator(z.object({ connectionId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ connectionId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { accountBindingsForProgram } =
@@ -142,11 +164,13 @@ export const getAccountBindings = createServerFn()
  */
 export const rebindFolder = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      bindingId: z.string().uuid(),
-      connectionId: z.string().uuid(),
-      commit: z.boolean(),
-    }),
+    input(
+      Schema.Struct({
+        bindingId: uuid,
+        connectionId: uuid,
+        commit: Schema.Boolean,
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -156,7 +180,13 @@ export const rebindFolder = createServerFn({ method: 'POST' })
   })
 
 export const rebindStatus = createServerFn()
-  .validator(z.object({ checkIds: z.array(z.string().uuid()).max(10) }))
+  .validator(
+    input(
+      Schema.Struct({
+        checkIds: Schema.Array(uuid).check(Schema.isMaxLength(10)),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { rebindStatusProgram } = await import('../documents/binding-health')

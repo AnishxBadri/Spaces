@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * Plugins as the app's surfaces see them: health, and the manifest actions a
@@ -21,7 +24,11 @@ export const listStoppedPlugins = createServerFn().handler(async () => {
 
 /** The manifest actions a record of `kind` carries in its head. */
 export const listRecordActions = createServerFn()
-  .validator(z.object({ kind: z.enum(['company', 'person', 'deal']) }))
+  .validator(
+    input(
+      Schema.Struct({ kind: Schema.Literals(['company', 'person', 'deal']) }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { recordActionsProgram } = await import('../integrations/actions')
@@ -32,11 +39,13 @@ export const listRecordActions = createServerFn()
 /** Fire one: enqueues the plugin's job and returns at once. Any member. */
 export const fireRecordAction = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      integrationId: z.string().uuid(),
-      actionId: z.string().min(1),
-      entityId: z.string().uuid(),
-    }),
+    input(
+      Schema.Struct({
+        integrationId: uuid,
+        actionId: Schema.String.check(Schema.isMinLength(1)),
+        entityId: uuid,
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const { fireRecordActionHandler } = await import('../integrations/actions')

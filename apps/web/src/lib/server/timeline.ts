@@ -1,7 +1,6 @@
 import { createServerFn } from '@tanstack/react-start'
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { desc, eq } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { user } from '@spaces/db/schema/auth'
 import { entity } from '@spaces/db/schema'
@@ -9,6 +8,9 @@ import { activity } from '@spaces/db/schema/activity'
 import { recordTimelineProgram } from '../timeline/record'
 import { jsonString } from '@spaces/core/json'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * The timeline server fns. The merged record timeline is its own program;
@@ -17,7 +19,7 @@ import { requireUser } from './shared'
  */
 
 export const getRecordTimeline = createServerFn()
-  .validator(z.object({ entityId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ entityId: uuid })))
   .handler(async ({ data }) => {
     const viewer = await requireUser()
     return Effect.runPromise(recordTimelineProgram(data.entityId, viewer))

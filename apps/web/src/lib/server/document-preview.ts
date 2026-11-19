@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * One document's card, by entity id — everything `DocumentPreview` needs to
@@ -14,7 +17,7 @@ import { requireUser } from './shared'
  * lazily, through `getDocumentText` / `getDocumentDownloadUrl`.
  */
 export const getDocumentPreview = createServerFn()
-  .validator(z.object({ id: z.string().uuid() }))
+  .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { documentPreviewCard } = await import('../documents/preview-card')
@@ -28,7 +31,7 @@ export const getDocumentPreview = createServerFn()
  * drizzle and Effect stay out of the client bundle.
  */
 export const getDocumentDetails = createServerFn()
-  .validator(z.object({ id: z.string().uuid() }))
+  .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { documentDetailsProgram } = await import('../documents/details')
@@ -42,7 +45,7 @@ export const getDocumentDetails = createServerFn()
  * opens with `poll: false` and asks again with `poll: true`.
  */
 export const getDocumentBytes = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.string().uuid(), poll: z.boolean() }))
+  .validator(input(Schema.Struct({ id: uuid, poll: Schema.Boolean })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { documentBytesProgram } = await import('../documents/remote-bytes')

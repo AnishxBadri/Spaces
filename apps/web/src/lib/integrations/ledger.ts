@@ -1,4 +1,4 @@
-import { Clock, Effect, Schema } from 'effect'
+import { Clock, Effect, Option, Schema } from 'effect'
 import {
   and,
   asc,
@@ -12,8 +12,8 @@ import {
   notLike,
   sql,
 } from 'drizzle-orm'
-import { z } from 'zod'
 import { formatAge } from '@spaces/core/format'
+import { plainRecord } from '../plain-record'
 import { db } from '@spaces/db'
 import {
   accountConnection,
@@ -289,27 +289,34 @@ export const agoOf = (at: Date, now: number): string => {
   return age.endsWith('d') ? `${age} ago` : age
 }
 
-const nonNegative = z.number().nonnegative()
-const declaredDefaults = z.object({
-  properties: z.record(z.string(), z.object({ default: z.unknown() }).loose()),
-})
+const nonNegative = Schema.decodeUnknownOption(
+  Schema.Finite.check(Schema.isGreaterThanOrEqualTo(0)),
+)
+const declaredDefaults = Schema.decodeUnknownOption(
+  Schema.Struct({
+    properties: plainRecord(
+      Schema.Struct({ default: Schema.optional(Schema.Unknown) }),
+    ),
+  }),
+)
 
 /** `dailyCreditCap` from the row's config, else the manifest's default, else none. */
-const capOf = (
+export const capOf = (
   config: { readonly [key: string]: unknown },
   manifest: Manifest | null,
 ): number | null => {
-  const configured = nonNegative.safeParse(config['dailyCreditCap'])
-  if (configured.success) return configured.data
-  const declared = declaredDefaults.safeParse(manifest?.settings)
-  if (!declared.success) return null
-  const properties = declared.data.properties
-  const fallback = nonNegative.safeParse(
-    Object.hasOwn(properties, 'dailyCreditCap')
-      ? properties['dailyCreditCap'].default
-      : undefined,
+  const configured = nonNegative(config['dailyCreditCap'])
+  if (Option.isSome(configured)) return configured.value
+  const declared = declaredDefaults(manifest?.settings)
+  if (Option.isNone(declared)) return null
+  const properties = declared.value.properties
+  return Option.getOrNull(
+    nonNegative(
+      Object.hasOwn(properties, 'dailyCreditCap')
+        ? properties['dailyCreditCap'].default
+        : undefined,
+    ),
   )
-  return fallback.success ? fallback.data : null
 }
 
 /** `<APP_URL>/api/webhooks/<integration id>`: the row id, never the plugin id. */
@@ -366,29 +373,32 @@ const ACCOUNT_PAGE_KEYS: ReadonlyArray<string> = [
   'excludeLabels',
 ]
 
-const objectSchema = z.looseObject({
-  properties: z.record(z.string(), z.unknown()).optional(),
-  required: z.array(z.string()).optional(),
-})
+/** The two keys it edits; every other keyword passes through untouched. */
+const readObjectSchema = Schema.decodeUnknownOption(
+  Schema.Struct({
+    properties: Schema.optional(plainRecord(Schema.Unknown)),
+    required: Schema.optional(Schema.Array(Schema.String)),
+  }).annotate({ parseOptions: { onExcessProperty: 'preserve' } }),
+)
 
 /** The manifest's settings schema, minus what an email-calendar plugin's account page owns. */
 export const withoutAccountPageKeys = (manifest: Manifest): unknown => {
   if (!manifest.roles?.includes('email-calendar')) return manifest.settings
-  const parsed = objectSchema.safeParse(manifest.settings)
-  if (!parsed.success || parsed.data.properties === undefined)
+  const parsed = Option.getOrNull(readObjectSchema(manifest.settings))
+  if (parsed === null || parsed.properties === undefined)
     return manifest.settings
   const properties = Object.fromEntries(
-    Object.entries(parsed.data.properties).filter(
+    Object.entries(parsed.properties).filter(
       ([key]) => !ACCOUNT_PAGE_KEYS.includes(key),
     ),
   )
   return {
-    ...parsed.data,
+    ...parsed,
     properties,
-    ...(parsed.data.required === undefined
+    ...(parsed.required === undefined
       ? {}
       : {
-          required: parsed.data.required.filter(
+          required: parsed.required.filter(
             (key) => !ACCOUNT_PAGE_KEYS.includes(key),
           ),
         }),
@@ -503,7 +513,9 @@ const RECENT_RUNS = 20
 
 const utcMidnight = sql`(date_trunc('day', now() at time zone 'UTC') at time zone 'UTC')`
 
-const displaySchema = z.object({ display: z.string() })
+const readDisplay = Schema.decodeUnknownOption(
+  Schema.Struct({ display: Schema.String }),
+)
 
 /** Rows, latest runs and today's spend for the given integrations, read together. */
 const readRows = Effect.fn('readRows')(function* (
@@ -761,16 +773,17 @@ export const integrationDetailProgram = Effect.fn('integrationDetailProgram')(
                 .from(credential)
                 .where(eq(credential.id, held)),
             )).at(0)
-      const display = displaySchema.safeParse(stored?.meta)
+      const display = readDisplay(stored?.meta)
       secrets.push({
         slot,
         label: spec.label(view.name),
         display:
           held === null
             ? null
-            : display.success
-              ? display.data.display
-              : '••••',
+            : Option.match(display, {
+                onNone: () => '••••',
+                onSome: (d) => d.display,
+              }),
       })
     }
     const drawn: SettingsForm =

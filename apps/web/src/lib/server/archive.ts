@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 export type { RecordArchive } from '@spaces/core/writes/entities/archive'
 
@@ -11,10 +14,10 @@ export type { RecordArchive } from '@spaces/core/writes/entities/archive'
  * exported from this file: it is re-exported to the client bundle.
  */
 
-const byRecord = z.object({ id: z.string().uuid() })
+const byRecord = Schema.Struct({ id: uuid })
 
 export const getRecordArchive = createServerFn()
-  .validator(byRecord)
+  .validator(input(byRecord))
   .handler(async ({ data }) => {
     await requireUser()
     const { recordArchiveProgram } =
@@ -24,7 +27,7 @@ export const getRecordArchive = createServerFn()
   })
 
 export const archiveRecord = createServerFn({ method: 'POST' })
-  .validator(byRecord)
+  .validator(input(byRecord))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { archiveRecordProgram, recordArchiveMessage } =
@@ -38,7 +41,7 @@ export const archiveRecord = createServerFn({ method: 'POST' })
   })
 
 export const restoreRecord = createServerFn({ method: 'POST' })
-  .validator(byRecord)
+  .validator(input(byRecord))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { restoreRecordProgram, recordArchiveMessage } =

@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
+import { JobStatusEventSchema } from '@spaces/core/queue/job-status'
 import type { JobStatusEvent } from '@spaces/core/queue/job-status'
 import type { JobStatusRow } from './job-status'
 
@@ -15,41 +16,32 @@ import type { JobStatusRow } from './job-status'
 /** How old a closed row from `init` may be and still show its outcome. */
 export const RECENT_MS = 10 * 60 * 1000
 
-const eventSchema = z.object({
-  jobRunId: z.string(),
-  queue: z.string(),
-  integrationId: z.string().nullable(),
-  entityId: z.string().nullable(),
-  watchId: z.string().nullable().exactOptional(),
-  status: z.enum(['running', 'succeeded', 'failed', 'skipped']),
-  startedAt: z.string(),
-  summary: z.string().nullable(),
-  error: z.string().nullable(),
+const initSchema = Schema.Struct({
+  rows: Schema.mutable(
+    Schema.Array(
+      Schema.Struct({
+        ...JobStatusEventSchema.fields,
+        closedAgoMs: Schema.NullOr(Schema.Finite),
+      }),
+    ),
+  ),
 })
 
-const initSchema = z.object({
-  rows: z.array(eventSchema.extend({ closedAgoMs: z.number().nullable() })),
-})
-
-const parse = (data: string): unknown => {
-  try {
-    return JSON.parse(data)
-  } catch {
-    return null
-  }
-}
+const readInit = Schema.decodeUnknownOption(Schema.fromJsonString(initSchema))
+const readStatus = Schema.decodeUnknownOption(
+  Schema.fromJsonString(JobStatusEventSchema),
+)
 
 /** An `init` event's data, or null for anything else. */
-export const decodeInit = (data: string): Array<JobStatusRow> | null => {
-  const parsed = initSchema.safeParse(parse(data))
-  return parsed.success ? parsed.data.rows : null
-}
+export const decodeInit = (data: string): Array<JobStatusRow> | null =>
+  Option.match(readInit(data), {
+    onNone: () => null,
+    onSome: (init) => init.rows,
+  })
 
 /** A `status` event's data, or null for anything else. */
-export const decodeStatus = (data: string): JobStatusEvent | null => {
-  const parsed = eventSchema.safeParse(parse(data))
-  return parsed.success ? parsed.data : null
-}
+export const decodeStatus = (data: string): JobStatusEvent | null =>
+  Option.getOrNull(readStatus(data))
 
 type Known = JobStatusEvent & { readonly shown: boolean }
 

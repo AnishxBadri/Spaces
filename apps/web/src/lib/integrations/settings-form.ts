@@ -1,4 +1,5 @@
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
+import { plainRecord } from '../plain-record'
 
 /**
  * The settings form a stored manifest becomes: its `settings` JSON Schema
@@ -64,54 +65,85 @@ export type SettingsForm =
   | { readonly ok: true; readonly fields: ReadonlyArray<SettingsField> }
   | { readonly ok: false; readonly reason: string }
 
+/** A keyword this module does not read refuses the shape. */
+const strict = { parseOptions: { onExcessProperty: 'error' } } as const
+
 /** The keywords every field kind may carry beside its own. */
 const annotations = {
-  title: z.string().optional(),
-  description: z.string().optional(),
+  title: Schema.optional(Schema.String),
+  description: Schema.optional(Schema.String),
 }
 
-const enumProperty = z.strictObject({
-  ...annotations,
-  type: z.literal('string').optional(),
-  enum: z.array(z.string()).min(1),
-  default: z.string().optional(),
-})
+const length = Schema.optional(
+  Schema.Int.check(Schema.isGreaterThanOrEqualTo(0)),
+)
 
-const stringProperty = z.strictObject({
-  ...annotations,
-  type: z.literal('string'),
-  default: z.string().optional(),
-  minLength: z.int().nonnegative().optional(),
-  maxLength: z.int().nonnegative().optional(),
-  pattern: z.string().optional(),
-  format: z.enum(['email', 'uri']).optional(),
-})
+const readEnum = Schema.decodeUnknownOption(
+  Schema.Struct({
+    ...annotations,
+    type: Schema.optional(Schema.Literal('string')),
+    enum: Schema.Array(Schema.String).check(Schema.isMinLength(1)),
+    default: Schema.optional(Schema.String),
+  }).annotate(strict),
+)
 
-const numberProperty = z.strictObject({
-  ...annotations,
-  type: z.enum(['number', 'integer']),
-  default: z.number().optional(),
-  minimum: z.number().optional(),
-  maximum: z.number().optional(),
-  exclusiveMinimum: z.number().optional(),
-  exclusiveMaximum: z.number().optional(),
-})
+const readString = Schema.decodeUnknownOption(
+  Schema.Struct({
+    ...annotations,
+    type: Schema.Literal('string'),
+    default: Schema.optional(Schema.String),
+    minLength: length,
+    maxLength: length,
+    pattern: Schema.optional(Schema.String),
+    format: Schema.optional(Schema.Literals(['email', 'uri'])),
+  }).annotate(strict),
+)
 
-const booleanProperty = z.strictObject({
-  ...annotations,
-  type: z.literal('boolean'),
-  default: z.boolean().optional(),
-})
+const bound = Schema.optional(Schema.Finite)
 
-const objectSchema = z.strictObject({
-  ...annotations,
-  $schema: z.string().optional(),
-  type: z.literal('object'),
-  properties: z.record(z.string(), z.unknown()).optional(),
-  required: z.array(z.string()).optional(),
-  additionalProperties: z.literal(false).optional(),
-  propertyOrder: z.array(z.string()).optional(),
-})
+const readNumber = Schema.decodeUnknownOption(
+  Schema.Struct({
+    ...annotations,
+    type: Schema.Literals(['number', 'integer']),
+    default: bound,
+    minimum: bound,
+    maximum: bound,
+    exclusiveMinimum: bound,
+    exclusiveMaximum: bound,
+  }).annotate(strict),
+)
+
+const readBoolean = Schema.decodeUnknownOption(
+  Schema.Struct({
+    ...annotations,
+    type: Schema.Literal('boolean'),
+    default: Schema.optional(Schema.Boolean),
+  }).annotate(strict),
+)
+
+// An object with no keys at all. Not an empty strict `Struct`: Effect reads
+// `Struct({})` as any value but null and undefined.
+const readEmpty = Schema.decodeUnknownOption(
+  Schema.Record(Schema.String, Schema.Never),
+)
+
+const readObject = Schema.decodeUnknownOption(
+  Schema.Struct({
+    ...annotations,
+    $schema: Schema.optional(Schema.String),
+    type: Schema.Literal('object'),
+    properties: Schema.optional(plainRecord(Schema.Unknown)),
+    required: Schema.optional(Schema.Array(Schema.String)),
+    additionalProperties: Schema.optional(Schema.Literal(false)),
+    propertyOrder: Schema.optional(Schema.Array(Schema.String)),
+  }).annotate(strict),
+)
+
+const readType = Schema.decodeUnknownOption(
+  Schema.Struct({
+    type: Schema.Union([Schema.String, Schema.Array(Schema.String)]),
+  }),
+)
 
 /** `cacheDays` → `Cache days`: the label when the schema gives no title. */
 export const labelOf = (key: string): string => {
@@ -125,12 +157,10 @@ export const labelOf = (key: string): string => {
 
 /** What a refused property is, for the sentence that names it. */
 const describe = (property: unknown): string => {
-  const parsed = z
-    .object({ type: z.union([z.string(), z.array(z.string())]) })
-    .safeParse(property)
-  if (!parsed.success) return 'a schema the form cannot draw'
-  const type = parsed.data.type
-  const text = Array.isArray(type) ? type.join(' or ') : type
+  const parsed = readType(property)
+  if (Option.isNone(parsed)) return 'a schema the form cannot draw'
+  const type = parsed.value.type
+  const text = typeof type === 'string' ? type : type.join(' or ')
   return `${/^[aeiou]/.test(text) ? 'an' : 'a'} ${text}`
 }
 
@@ -144,9 +174,9 @@ const fieldOf = (
   property: unknown,
   required: boolean,
 ): SettingsField | null => {
-  const asEnum = enumProperty.safeParse(property)
-  if (asEnum.success) {
-    const p = asEnum.data
+  const asEnum = readEnum(property)
+  if (Option.isSome(asEnum)) {
+    const p = asEnum.value
     return {
       kind: 'enum',
       key,
@@ -157,9 +187,9 @@ const fieldOf = (
       options: p.enum,
     }
   }
-  const asString = stringProperty.safeParse(property)
-  if (asString.success) {
-    const p = asString.data
+  const asString = readString(property)
+  if (Option.isSome(asString)) {
+    const p = asString.value
     return {
       kind: 'string',
       key,
@@ -173,9 +203,9 @@ const fieldOf = (
       format: p.format ?? null,
     }
   }
-  const asNumber = numberProperty.safeParse(property)
-  if (asNumber.success) {
-    const p = asNumber.data
+  const asNumber = readNumber(property)
+  if (Option.isSome(asNumber)) {
+    const p = asNumber.value
     return {
       kind: 'number',
       key,
@@ -190,9 +220,9 @@ const fieldOf = (
       exclusiveMaximum: p.exclusiveMaximum ?? null,
     }
   }
-  const asBoolean = booleanProperty.safeParse(property)
-  if (asBoolean.success) {
-    const p = asBoolean.data
+  const asBoolean = readBoolean(property)
+  if (Option.isSome(asBoolean)) {
+    const p = asBoolean.value
     return {
       kind: 'boolean',
       key,
@@ -213,18 +243,17 @@ const fieldOf = (
  *   misses (a manifest built before it) follows in stored order.
  */
 export const settingsFormOf = (settings: unknown): SettingsForm => {
-  const empty = z.strictObject({}).safeParse(settings)
-  if (empty.success) return { ok: true, fields: [] }
-  const parsed = objectSchema.safeParse(settings)
-  if (!parsed.success)
+  if (Option.isSome(readEmpty(settings))) return { ok: true, fields: [] }
+  const parsed = Option.getOrNull(readObject(settings))
+  if (parsed === null)
     return {
       ok: false,
       reason:
         'settings is not an object schema — the form renders string, number, boolean and enum settings only',
     }
-  const required = new Set(parsed.data.required ?? [])
-  const properties = parsed.data.properties ?? {}
-  const declared = (parsed.data.propertyOrder ?? []).filter((key) =>
+  const required = new Set(parsed.required ?? [])
+  const properties = parsed.properties ?? {}
+  const declared = (parsed.propertyOrder ?? []).filter((key) =>
     Object.hasOwn(properties, key),
   )
   const keys = [...new Set([...declared, ...Object.keys(properties)])]
@@ -294,7 +323,7 @@ const isUri = (text: string): boolean => {
 const range = (field: NumberField): string | null => {
   const low = field.minimum ?? field.exclusiveMinimum
   const high = field.maximum ?? field.exclusiveMaximum
-  // A bound at the safe-integer edge is zod's `int()` saying "any integer".
+  // A bound at the safe-integer edge is an integer schema saying "any integer".
   const real = (n: number | null) =>
     n !== null && Math.abs(n) < Number.MAX_SAFE_INTEGER ? n : null
   const lo = real(low)
@@ -329,7 +358,7 @@ const checkString = (field: StringField, input: FormValue): Checked => {
     return fail(`must be at least ${field.minLength} characters`)
   if (field.maxLength !== null && input.length > field.maxLength)
     return fail(`must be at most ${field.maxLength} characters`)
-  // Format first: zod emits a pattern beside it, and the format's sentence reads better.
+  // Format first: a schema may emit a pattern beside it, and the format's sentence reads better.
   if (field.format === 'email' && !EMAIL.test(input))
     return fail('must be an email address')
   if (field.format === 'uri' && !isUri(input)) return fail('must be a URL')

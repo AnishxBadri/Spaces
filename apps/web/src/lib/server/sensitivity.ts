@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * The record header's Sensitive switch. Any member may flag a
@@ -14,10 +17,10 @@ import { requireUser } from './shared'
  * beneath it resolves sensitive at read, through `sensitivityFor`.
  */
 
-const byEntity = z.object({ entityId: z.string().uuid() })
+const byEntity = Schema.Struct({ entityId: uuid })
 
 export const getEntitySensitivity = createServerFn()
-  .validator(byEntity)
+  .validator(input(byEntity))
   .handler(async ({ data }) => {
     await requireUser()
     const { sensitivityFor } = await import('../ai/sensitivity-for')
@@ -26,7 +29,9 @@ export const getEntitySensitivity = createServerFn()
   })
 
 export const setEntitySensitive = createServerFn({ method: 'POST' })
-  .validator(byEntity.extend({ sensitive: z.boolean() }))
+  .validator(
+    input(Schema.Struct({ ...byEntity.fields, sensitive: Schema.Boolean })),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { setEntitySensitiveProgram } = await import('../ai/sensitivity-for')

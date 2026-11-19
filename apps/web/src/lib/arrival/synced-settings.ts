@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 import type { IntegrationConfig } from '@spaces/db/schema'
 import { DEFAULT_MAIL_EXCLUDE } from './noise'
 import type { MailExclude } from './noise'
@@ -16,19 +16,23 @@ export type SyncedMailSettings = {
   exclude: MailExclude
 }
 
-const strings = z.array(z.string())
+const readShare = Schema.decodeUnknownOption(Schema.Boolean)
+const readStrings = Schema.decodeUnknownOption(Schema.Array(Schema.String))
 
 export function syncedMailSettingsOf(
   config: IntegrationConfig,
 ): SyncedMailSettings {
-  const share = z.boolean().safeParse(config.shareBodies)
-  const senders = strings.safeParse(config.excludeSenders)
-  const labels = strings.safeParse(config.excludeLabels)
   return {
-    shareBodies: share.success ? share.data : false,
+    shareBodies: Option.getOrElse(readShare(config.shareBodies), () => false),
     exclude: {
-      senders: senders.success ? senders.data : DEFAULT_MAIL_EXCLUDE.senders,
-      labels: labels.success ? labels.data : DEFAULT_MAIL_EXCLUDE.labels,
+      senders: Option.getOrElse(
+        readStrings(config.excludeSenders),
+        () => DEFAULT_MAIL_EXCLUDE.senders,
+      ),
+      labels: Option.getOrElse(
+        readStrings(config.excludeLabels),
+        () => DEFAULT_MAIL_EXCLUDE.labels,
+      ),
     },
   }
 }

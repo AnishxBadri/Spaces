@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * The Summarize buttons — on a Files-tab row (a document) and in a record's
@@ -12,11 +15,13 @@ import { requireUser } from './shared'
 
 export const summarize = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      recordId: z.string().uuid(),
-      /** Null summarizes the record itself. */
-      documentId: z.string().uuid().nullable(),
-    }),
+    input(
+      Schema.Struct({
+        recordId: uuid,
+        /** Null summarizes the record itself. */
+        documentId: Schema.NullOr(uuid),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -41,10 +46,12 @@ export const summarize = createServerFn({ method: 'POST' })
 /** Where each source's latest summary on a record stands — polled while one runs. */
 export const summarizeStatus = createServerFn()
   .validator(
-    z.object({
-      recordId: z.string().uuid(),
-      sourceIds: z.array(z.string().uuid()).max(200),
-    }),
+    input(
+      Schema.Struct({
+        recordId: uuid,
+        sourceIds: Schema.Array(uuid).check(Schema.isMaxLength(200)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     await requireUser()

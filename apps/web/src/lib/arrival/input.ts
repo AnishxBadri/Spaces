@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Schema, SchemaTransformation } from 'effect'
 
 /**
  * Settings → Arrival's inputs. Client-safe on purpose: the mailbox server
@@ -6,19 +6,35 @@ import { z } from 'zod'
  * so nothing here may import the vault, the database or imapflow.
  */
 
+/** An address as the form takes it: trimmed, lower-cased, then checked. */
+const address = Schema.String.pipe(
+  Schema.decode(
+    SchemaTransformation.trim().compose(SchemaTransformation.toLowerCase()),
+  ),
+).check(
+  Schema.isPattern(
+    /^(?!\.)(?!.*\.\.)([A-Za-z0-9_'+\-.]*)[A-Za-z0-9_+-]@([A-Za-z0-9][A-Za-z0-9-]*\.)+[A-Za-z]{2,}$/,
+    { expected: 'an email address' },
+  ),
+  Schema.isMaxLength(320),
+)
+
 /** The mailbox's connection, as the section edits it. */
-export const mailboxFields = z.object({
-  address: z.string().trim().toLowerCase().email().max(320),
-  host: z
-    .string()
-    .trim()
-    .min(1, 'Host is required')
-    .max(255)
-    .regex(/^[A-Za-z0-9.-]+$/, 'A host name, like imap.fastmail.com'),
-  port: z.number().int().min(1).max(65535),
-  useTls: z.boolean(),
-  folder: z.string().trim().min(1).max(255),
-  cadenceMinutes: z.number().int().min(1).max(60),
+export const mailboxFields = Schema.Struct({
+  address,
+  host: Schema.Trim.check(
+    Schema.isMinLength(1, { message: 'Host is required' }),
+    Schema.isMaxLength(255),
+    Schema.isPattern(/^[A-Za-z0-9.-]+$/, {
+      message: 'A host name, like imap.fastmail.com',
+    }),
+  ),
+  port: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 65535 })),
+  useTls: Schema.Boolean,
+  folder: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(255)),
+  cadenceMinutes: Schema.Int.check(
+    Schema.isBetween({ minimum: 1, maximum: 60 }),
+  ),
 })
 
 /**
@@ -26,11 +42,14 @@ export const mailboxFields = z.object({
  * stored one — the password is write-only and the section never has it to
  * send back — and the first save must carry one.
  */
-export const mailboxInput = mailboxFields.extend({
-  password: z.string().min(1).max(1000).optional(),
+export const mailboxInput = Schema.Struct({
+  ...mailboxFields.fields,
+  password: Schema.optional(
+    Schema.String.check(Schema.isMinLength(1), Schema.isMaxLength(1000)),
+  ),
 })
 
-export type MailboxInput = z.infer<typeof mailboxInput>
+export type MailboxInput = typeof mailboxInput.Type
 
 export const MAILBOX_DEFAULTS = {
   port: 993,

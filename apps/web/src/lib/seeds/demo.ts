@@ -1,6 +1,5 @@
-import { Effect, Schema } from 'effect'
+import { Effect, Option, Schema } from 'effect'
 import { count, eq, inArray, sql } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   company,
@@ -298,12 +297,16 @@ export async function seedDemoData(
 // --- removal -------------------------------------------------------------
 
 /** `workspace.settings.demo`: the ids `seedDemoData` birthed. Absent once removed. */
-const demoSetting = z.object({ entity_ids: z.array(z.string()) })
+const readDemo = Schema.decodeUnknownOption(
+  Schema.Struct({ entity_ids: Schema.mutable(Schema.Array(Schema.String)) }),
+)
 
 /** The recorded demo ids, or null when no demo data is recorded. */
 export function demoIdsOf(settings: WorkspaceSettings): Array<string> | null {
-  const parsed = demoSetting.safeParse(settings.demo)
-  return parsed.success ? parsed.data.entity_ids : null
+  return Option.match(readDemo(settings.demo), {
+    onNone: () => null,
+    onSome: (demo) => demo.entity_ids,
+  })
 }
 
 async function recordDemo(ids: Array<string>) {

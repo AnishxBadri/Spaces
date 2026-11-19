@@ -8,6 +8,7 @@ import {
   recorderKeyInput,
   recorderSettingsInput,
 } from '../connections/input'
+import { input } from './input'
 
 export type {
   AccountsView,
@@ -49,7 +50,7 @@ export const getConnections = createServerFn().handler(async () => {
 
 /** One provider's page: its client, Set up answers, uses and who is connected. */
 export const getProviderPage = createServerFn()
-  .validator(providerIdInput)
+  .validator(input(providerIdInput))
   .handler(async ({ data }) => {
     const { providerPageHandler } = await import('../connections/providers')
     return providerPageHandler(data)
@@ -57,7 +58,7 @@ export const getProviderPage = createServerFn()
 
 /** One Set up answer (Workspace or personal Gmail; the consent type), applied at once. */
 export const setProviderChoice = createServerFn({ method: 'POST' })
-  .validator(providerChoiceInput)
+  .validator(input(providerChoiceInput))
   .handler(async ({ data }) => {
     const { setProviderChoiceHandler } =
       await import('../connections/providers')
@@ -66,7 +67,7 @@ export const setProviderChoice = createServerFn({ method: 'POST' })
 
 /** Saves a provider's client id and, when given, its secret; returns the redacted row. */
 export const setProviderApp = createServerFn({ method: 'POST' })
-  .validator(providerAppInput)
+  .validator(input(providerAppInput))
   .handler(async ({ data }) => {
     const { setProviderAppHandler } =
       await import('../connections/provider-apps')
@@ -85,7 +86,7 @@ export const getMyAccounts = createServerFn().handler(async () => {
 
 /** Disconnect one product: deletes the row; revokes when it was the account's last product. */
 export const disconnectConnection = createServerFn({ method: 'POST' })
-  .validator(connectionIdInput)
+  .validator(input(connectionIdInput))
   .handler(async ({ data }) => {
     const { disconnectConnectionHandler } =
       await import('../connections/custody')
@@ -98,7 +99,7 @@ export const disconnectConnection = createServerFn({ method: 'POST' })
  * no mail sync is bound to it.
  */
 export const getMailboxSync = createServerFn()
-  .validator(connectionIdInput)
+  .validator(input(connectionIdInput))
   .handler(async ({ data }) => {
     const { mailboxSyncHandler } = await import('../arrival/mailbox-sync')
     return mailboxSyncHandler(data)
@@ -106,7 +107,7 @@ export const getMailboxSync = createServerFn()
 
 /** Saves them; mail the list now names is taken out, and bodies follow the toggle. */
 export const saveMailboxSync = createServerFn({ method: 'POST' })
-  .validator(mailboxSyncInput)
+  .validator(input(mailboxSyncInput))
   .handler(async ({ data }) => {
     const { saveMailboxSyncHandler } = await import('../arrival/mailbox-sync')
     return saveMailboxSyncHandler(data)
@@ -120,7 +121,7 @@ export const getMeetingNotes = createServerFn().handler(async () => {
 
 /** A key the reader pasted: checked with the provider, then one connection row. */
 export const connectRecorderKey = createServerFn({ method: 'POST' })
-  .validator(recorderKeyInput)
+  .validator(input(recorderKeyInput))
   .handler(async ({ data }) => {
     const { connectRecorderKeyHandler } =
       await import('../connections/recorders')
@@ -129,7 +130,7 @@ export const connectRecorderKey = createServerFn({ method: 'POST' })
 
 /** The reader's folder ticks and private opt-ins, applied at once. */
 export const saveRecorderSettings = createServerFn({ method: 'POST' })
-  .validator(recorderSettingsInput)
+  .validator(input(recorderSettingsInput))
   .handler(async ({ data }) => {
     const { saveRecorderSettingsHandler } =
       await import('../connections/recorders')

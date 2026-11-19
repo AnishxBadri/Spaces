@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * The suggestion card's two verbs, over the propose programs. Accept writes through the one write path with the
@@ -12,7 +15,7 @@ import { requireUser } from './shared'
  * shows, and the row stays open for the queue.
  */
 
-const byId = z.object({ id: z.string().uuid() })
+const byId = Schema.Struct({ id: uuid })
 
 export type { WaitingSuggestion } from '../inbox/queue'
 
@@ -21,7 +24,7 @@ export type { WaitingSuggestion } from '../inbox/queue'
  * section: the count, and the newest few as `Founders from Apollo +3`.
  */
 export const listOpenSuggestionTitles = createServerFn()
-  .validator(z.object({ entityId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ entityId: uuid })))
   .handler(async ({ data }) => {
     await requireUser()
     const { listOpenSuggestionTitlesProgram } = await import('../inbox/queue')
@@ -30,7 +33,7 @@ export const listOpenSuggestionTitles = createServerFn()
   })
 
 export const acceptSuggestion = createServerFn({ method: 'POST' })
-  .validator(byId)
+  .validator(input(byId))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { acceptProgram, suggestionMessage } = await import('../ai/propose')
@@ -61,7 +64,7 @@ export type { BatchOutcome } from '../ai/propose'
  * item carries `suggestionMessage()`'s sentence, and its row stays open.
  */
 export const acceptSuggestionsForRecord = createServerFn({ method: 'POST' })
-  .validator(z.object({ entityId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ entityId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { acceptRecordProgram, suggestionMessage } =
@@ -79,11 +82,13 @@ export const acceptSuggestionsForRecord = createServerFn({ method: 'POST' })
 
 export const acceptSuggestionColumn = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      attributeSlug: z.string().min(1),
-      // A column run's "Accept all": only that run's suggestions.
-      runId: z.string().uuid().optional(),
-    }),
+    input(
+      Schema.Struct({
+        attributeSlug: Schema.String.check(Schema.isMinLength(1)),
+        // A column run's "Accept all": only that run's suggestions.
+        runId: Schema.optional(uuid),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -102,7 +107,7 @@ export const acceptSuggestionColumn = createServerFn({ method: 'POST' })
   })
 
 export const rejectSuggestion = createServerFn({ method: 'POST' })
-  .validator(byId)
+  .validator(input(byId))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { rejectProgram, suggestionMessage } = await import('../ai/propose')

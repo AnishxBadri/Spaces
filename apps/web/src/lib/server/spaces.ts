@@ -1,6 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
 import { db } from '@spaces/db'
 import { activity } from '@spaces/db/schema/activity'
 import {
@@ -9,6 +8,10 @@ import {
   spacesIndexProgram,
 } from '#/lib/spaces/read'
 import { createSpaceRow, requireUser } from './shared'
+import { plainRecord } from '../plain-record'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 // Spaces server fns. The handler checks the session, an Effect program does
 // the work, `Effect.runPromise` is the seam. Nothing but server fns may be
@@ -26,19 +29,19 @@ export const getSpacesIndex = createServerFn().handler(async () => {
 })
 
 export const getSpace = createServerFn()
-  .validator(z.object({ id: z.string().uuid() }))
+  .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     return Effect.runPromise(getSpaceProgram(data.id, u.id))
   })
 
-const createSpaceInput = z.object({
-  name: z.string().trim().min(1).max(120),
-  parentId: z.string().uuid().optional(),
+const createSpaceInput = Schema.Struct({
+  name: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+  parentId: Schema.optional(uuid),
 })
 
 export const createSpace = createServerFn({ method: 'POST' })
-  .validator(createSpaceInput)
+  .validator(input(createSpaceInput))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const id = await createSpaceRow(data.name, data.parentId ?? null, u.id)
@@ -53,10 +56,12 @@ export const createSpace = createServerFn({ method: 'POST' })
 /** Rename in place: the name changes everywhere it is read; slug and path stay. */
 export const renameSpace = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      id: z.string().uuid(),
-      name: z.string().trim().min(1).max(120),
-    }),
+    input(
+      Schema.Struct({
+        id: uuid,
+        name: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(120)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -72,7 +77,12 @@ export const renameSpace = createServerFn({ method: 'POST' })
  */
 export const setSpaceCriteria = createServerFn({ method: 'POST' })
   .validator(
-    z.object({ id: z.string().uuid(), criteria: z.string().max(1000) }),
+    input(
+      Schema.Struct({
+        id: uuid,
+        criteria: Schema.String.check(Schema.isMaxLength(1000)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -88,7 +98,7 @@ export const setSpaceCriteria = createServerFn({ method: 'POST' })
 
 /** Archive asks nothing — Restore undoes it. */
 export const archiveSpace = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.string().uuid() }))
+  .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { archiveSpaceProgram, spaceWriteMessage } =
@@ -102,7 +112,7 @@ export const archiveSpace = createServerFn({ method: 'POST' })
   })
 
 export const restoreSpace = createServerFn({ method: 'POST' })
-  .validator(z.object({ id: z.string().uuid() }))
+  .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { restoreSpaceProgram, spaceWriteMessage } =
@@ -120,9 +130,7 @@ export const restoreSpace = createServerFn({ method: 'POST' })
  * lowering half of the sensitivity cache is queued after the commit.
  */
 export const moveSpace = createServerFn({ method: 'POST' })
-  .validator(
-    z.object({ id: z.string().uuid(), parentId: z.string().uuid().nullable() }),
-  )
+  .validator(input(Schema.Struct({ id: uuid, parentId: Schema.NullOr(uuid) })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { moveSpaceProgram, spaceWriteMessage } =
@@ -144,7 +152,7 @@ export const moveSpace = createServerFn({ method: 'POST' })
  * refused, never queued.
  */
 export const runWatchNow = createServerFn({ method: 'POST' })
-  .validator(z.object({ watchId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ watchId: uuid })))
   .handler(async ({ data }) => {
     await requireUser()
     const { runWatchNowProgram, WatchRunRefused } =
@@ -172,7 +180,7 @@ export type {
 
 /** The space page's Watching and What's moving lanes, and the engines to add with. */
 export const getSpaceWatching = createServerFn()
-  .validator(z.object({ spaceId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ spaceId: uuid })))
   .handler(async ({ data }) => {
     await requireUser()
     const { spaceWatchingProgram } = await import('../spaces/watching')
@@ -186,12 +194,16 @@ export const getSpaceWatching = createServerFn()
  */
 export const addSpaceWatch = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      spaceId: z.string().uuid(),
-      integrationId: z.string().uuid(),
-      values: z.record(z.string(), z.union([z.string(), z.boolean()])),
-      cadenceMinutes: z.int().positive().nullable(),
-    }),
+    input(
+      Schema.Struct({
+        spaceId: uuid,
+        integrationId: uuid,
+        values: plainRecord(Schema.Union([Schema.String, Schema.Boolean])),
+        cadenceMinutes: Schema.NullOr(
+          Schema.Int.check(Schema.isGreaterThan(0)),
+        ),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
@@ -212,11 +224,16 @@ export const addSpaceWatch = createServerFn({ method: 'POST' })
  */
 export const moveIntoSubspace = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      fromSpaceId: z.string().uuid(),
-      toSpaceId: z.string().uuid(),
-      entityIds: z.array(z.string().uuid()).min(1).max(500),
-    }),
+    input(
+      Schema.Struct({
+        fromSpaceId: uuid,
+        toSpaceId: uuid,
+        entityIds: Schema.Array(uuid).check(
+          Schema.isMinLength(1),
+          Schema.isMaxLength(500),
+        ),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()

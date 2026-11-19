@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * A record's picture set or cleared by hand: held from then on, so
@@ -11,7 +14,7 @@ import { requireUser } from './shared'
 const MAX_FORM_BYTES = 4 * 1024 * 1024
 
 function readPictureForm(data: FormData): { entityId: string; file: File } {
-  const entityId = z.uuid().parse(data.get('entityId'))
+  const entityId = Schema.decodeUnknownSync(uuid)(data.get('entityId'))
   const file = data.get('file')
   if (!(file instanceof File)) throw new Error('Choose an image')
   if (file.size > MAX_FORM_BYTES) throw new Error('The picture is too large')
@@ -38,7 +41,7 @@ export const setRecordPicture = createServerFn({ method: 'POST' })
   })
 
 export const clearRecordPicture = createServerFn({ method: 'POST' })
-  .validator(z.object({ entityId: z.uuid() }))
+  .validator(input(Schema.Struct({ entityId: uuid })))
   .handler(async ({ data }) => {
     await requireUser()
     const { clearPictureProgram } =

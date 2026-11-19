@@ -1,4 +1,4 @@
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
 import type { InboxRow, SuggestionItem, SuggestionRow } from '#/lib/inbox/queue'
 
 /**
@@ -7,34 +7,54 @@ import type { InboxRow, SuggestionItem, SuggestionRow } from '#/lib/inbox/queue'
  * client store, the beacon route and the queue's filter read one shape.
  */
 
-const uuid = z.uuid()
+const uuid = Schema.String.check(Schema.isUUID())
 
-export const heldDecisionSchema = z.discriminatedUnion('verb', [
-  z.object({ verb: z.literal('accept'), id: uuid }),
-  z.object({ verb: z.literal('dismiss'), id: uuid }),
-  z.object({
-    verb: z.literal('accept-column'),
-    attributeSlug: z.string().min(1).max(200),
-    runId: uuid.nullable(),
+const heldDecisionSchema = Schema.Union([
+  Schema.Struct({ verb: Schema.Literal('accept'), id: uuid }),
+  Schema.Struct({ verb: Schema.Literal('dismiss'), id: uuid }),
+  Schema.Struct({
+    verb: Schema.Literal('accept-column'),
+    attributeSlug: Schema.String.check(
+      Schema.isMinLength(1),
+      Schema.isMaxLength(200),
+    ),
+    runId: Schema.NullOr(uuid),
   }),
-  z.object({ verb: z.literal('dismiss-duplicate'), candidateId: uuid }),
-  z.object({ verb: z.literal('apply-card'), suggestionId: uuid }),
-  z.object({ verb: z.literal('skip-card'), suggestionId: uuid }),
+  Schema.Struct({
+    verb: Schema.Literal('dismiss-duplicate'),
+    candidateId: uuid,
+  }),
+  Schema.Struct({ verb: Schema.Literal('apply-card'), suggestionId: uuid }),
+  Schema.Struct({ verb: Schema.Literal('skip-card'), suggestionId: uuid }),
   // A registry proposal's Add option: the option, then the proposal closes.
-  z.object({
-    verb: z.literal('add-option'),
+  Schema.Struct({
+    verb: Schema.Literal('add-option'),
     suggestionId: uuid,
-    label: z.string().trim().min(1).max(60),
+    label: Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(60)),
   }),
 ])
 
-export type HeldDecision = z.infer<typeof heldDecisionSchema>
+export type HeldDecision = typeof heldDecisionSchema.Type
 export type HeldVerb = HeldDecision['verb']
 
 /** The beacon's body: every decision still held when the page went. */
-export const heldBeaconSchema = z.object({
-  decisions: z.array(heldDecisionSchema).min(1).max(200),
+const heldBeaconSchema = Schema.Struct({
+  decisions: Schema.Array(heldDecisionSchema).check(
+    Schema.isMinLength(1),
+    Schema.isMaxLength(200),
+  ),
 })
+
+const decodeBeacon = Schema.decodeUnknownOption(heldBeaconSchema)
+
+/** A beacon body's decisions, or null when the body is not one. */
+export const readHeldBeacon = (
+  raw: unknown,
+): ReadonlyArray<HeldDecision> | null =>
+  Option.match(decodeBeacon(raw), {
+    onNone: () => null,
+    onSome: (body) => body.decisions,
+  })
 
 /**
  * The sentence an accept or dismiss of a suggestion decided elsewhere fails

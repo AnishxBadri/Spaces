@@ -1,21 +1,30 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { KEYED_PROVIDER_IDS } from '@spaces/core/providers/keyed'
 import type { KeyedProviderId } from '@spaces/core/providers/keyed'
 import { PROVIDER_IDS } from '@spaces/core/providers/registry'
 import type { ProviderId } from '@spaces/core/providers/registry'
+
+const uuid = Schema.String.check(Schema.isUUID())
+
+/** One list entry as a settings page saves it: trimmed, never blank. */
+const entry = (max: number) =>
+  Schema.Trim.check(Schema.isMinLength(1), Schema.isMaxLength(max))
 
 /**
  * A provider's OAuth app as its Set up tab saves it. Client-safe: the
  * server fn validates with it and the section types its draft by it.
  * - `clientSecret` empty keeps the stored secret; a first save needs one.
  */
-export const providerAppInput = z.object({
-  provider: z.enum(PROVIDER_IDS),
-  clientId: z.string().trim().min(1, 'Paste the client ID').max(512),
-  clientSecret: z.string().trim().max(4000),
+export const providerAppInput = Schema.Struct({
+  provider: Schema.Literals(PROVIDER_IDS),
+  clientId: Schema.Trim.check(
+    Schema.isMinLength(1, { message: 'Paste the client ID' }),
+    Schema.isMaxLength(512),
+  ),
+  clientSecret: Schema.Trim.check(Schema.isMaxLength(4000)),
 })
 
-export type ProviderAppInput = z.infer<typeof providerAppInput>
+export type ProviderAppInput = typeof providerAppInput.Type
 
 /** One provider's OAuth app as the section draws it. The secret never leaves. */
 export type ProviderAppRow = {
@@ -34,9 +43,9 @@ export type ProviderAppRow = {
 }
 
 /** One of the session user's connections, by id. */
-export const connectionIdInput = z.object({ connectionId: z.uuid() })
+export const connectionIdInput = Schema.Struct({ connectionId: uuid })
 
-export type ConnectionIdInput = z.infer<typeof connectionIdInput>
+export type ConnectionIdInput = typeof connectionIdInput.Type
 
 /** One of the session user's connections as the accounts pages list it. Never a token. */
 export type ConnectionListRow = {
@@ -89,14 +98,14 @@ export type AccountsView = {
  * A synced mailbox's settings as its account page saves them. Entries
  * are checked again by the server against `senderEntry`.
  */
-export const mailboxSyncInput = z.object({
-  connectionId: z.uuid(),
-  shareBodies: z.boolean(),
-  excludeSenders: z.array(z.string().trim().min(1).max(320)).max(500),
-  excludeLabels: z.array(z.string().trim().min(1).max(256)).max(200),
+export const mailboxSyncInput = Schema.Struct({
+  connectionId: uuid,
+  shareBodies: Schema.Boolean,
+  excludeSenders: Schema.Array(entry(320)).check(Schema.isMaxLength(500)),
+  excludeLabels: Schema.Array(entry(256)).check(Schema.isMaxLength(200)),
 })
 
-export type MailboxSyncInput = z.infer<typeof mailboxSyncInput>
+export type MailboxSyncInput = typeof mailboxSyncInput.Type
 
 /** A synced mailbox's settings as its account page draws them. */
 export type MailboxSyncView = {
@@ -115,22 +124,27 @@ export type MailboxSyncResult = {
 }
 
 /** A member's own key for a recorder, pasted on You → Meeting notes. */
-export const recorderKeyInput = z.object({
-  provider: z.enum(KEYED_PROVIDER_IDS),
-  key: z.string().trim().min(1, 'Paste the key').max(512),
+export const recorderKeyInput = Schema.Struct({
+  provider: Schema.Literals(KEYED_PROVIDER_IDS),
+  key: Schema.Trim.check(
+    Schema.isMinLength(1, { message: 'Paste the key' }),
+    Schema.isMaxLength(512),
+  ),
 })
 
-export type RecorderKeyInput = z.infer<typeof recorderKeyInput>
+export type RecorderKeyInput = typeof recorderKeyInput.Type
 
 /** A recorder connection's ticks and opt-ins, applied at once. */
-export const recorderSettingsInput = z.object({
-  connectionId: z.uuid(),
-  folderIds: z.array(z.string().trim().min(1).max(256)).max(500),
-  typedNotes: z.boolean(),
-  transcript: z.boolean(),
+export const recorderSettingsInput = Schema.Struct({
+  connectionId: uuid,
+  folderIds: Schema.mutable(
+    Schema.Array(entry(256)).check(Schema.isMaxLength(500)),
+  ),
+  typedNotes: Schema.Boolean,
+  transcript: Schema.Boolean,
 })
 
-export type RecorderSettingsInput = z.infer<typeof recorderSettingsInput>
+export type RecorderSettingsInput = typeof recorderSettingsInput.Type
 
 /** One of the reader's recorder connections as Meeting notes draws it. Never the key. */
 export type RecorderAccountView = {
@@ -178,16 +192,18 @@ export type ProviderChoices = {
 }
 
 /** One Set up answer, applied at once. */
-export const providerChoiceInput = z.object({
-  provider: z.literal('google'),
-  audience: z.enum(GOOGLE_AUDIENCES).optional(),
-  consent: z.enum(CONSENT_TYPES).optional(),
+export const providerChoiceInput = Schema.Struct({
+  provider: Schema.Literal('google'),
+  audience: Schema.optional(Schema.Literals(GOOGLE_AUDIENCES)),
+  consent: Schema.optional(Schema.Literals(CONSENT_TYPES)),
 })
 
-export type ProviderChoiceInput = z.infer<typeof providerChoiceInput>
+export type ProviderChoiceInput = typeof providerChoiceInput.Type
 
 /** One provider by id, for its page. */
-export const providerIdInput = z.object({ provider: z.enum(PROVIDER_IDS) })
+export const providerIdInput = Schema.Struct({
+  provider: Schema.Literals(PROVIDER_IDS),
+})
 
 /** One use of a provider (a bundled plugin) as In use draws it. */
 export type ProviderUse = {

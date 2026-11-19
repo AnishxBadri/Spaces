@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireAdmin, requireSettingsReader, requireUser } from './shared'
+import { input } from './input'
 
 export type {
   AutoEnrichView as EnrichmentAutoView,
@@ -14,6 +15,8 @@ export type {
   LastRun,
   RecordEnrichment,
 } from '../integrations/enrichment-record'
+
+const uuid = Schema.String.check(Schema.isUUID())
 export type { GridCell, WhereFrom } from '@spaces/core/enrichment/page'
 
 /**
@@ -33,7 +36,11 @@ export const getEnrichmentPage = createServerFn().handler(async () => {
 
 /** The sources on, in the order a run asks them; a source left out is off. */
 export const saveEnrichmentOrder = createServerFn({ method: 'POST' })
-  .validator(z.object({ ids: z.array(z.uuid()).max(50) }))
+  .validator(
+    input(
+      Schema.Struct({ ids: Schema.Array(uuid).check(Schema.isMaxLength(50)) }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireAdmin()
     const { saveSourceOrderProgram } =
@@ -45,10 +52,14 @@ export const saveEnrichmentOrder = createServerFn({ method: 'POST' })
 /** The paid sources' auto-enrich scope. */
 export const saveEnrichmentAuto = createServerFn({ method: 'POST' })
   .validator(
-    z.object({
-      scopes: z.array(z.enum(['deal', 'space', 'meeting'])).max(3),
-      spaces: z.array(z.uuid()).max(500),
-    }),
+    input(
+      Schema.Struct({
+        scopes: Schema.Array(
+          Schema.Literals(['deal', 'space', 'meeting']),
+        ).check(Schema.isMaxLength(3)),
+        spaces: Schema.Array(uuid).check(Schema.isMaxLength(500)),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     await requireAdmin()
@@ -63,7 +74,13 @@ export const saveEnrichmentAuto = createServerFn({ method: 'POST' })
 
 /** How many days a source's answer is reused before it is asked again. */
 export const saveEnrichmentReuse = createServerFn({ method: 'POST' })
-  .validator(z.object({ days: z.int().min(0).max(3650) }))
+  .validator(
+    input(
+      Schema.Struct({
+        days: Schema.Int.check(Schema.isBetween({ minimum: 0, maximum: 3650 })),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireAdmin()
     const { saveReuseDaysProgram } =
@@ -75,7 +92,12 @@ export const saveEnrichmentReuse = createServerFn({ method: 'POST' })
 /** A record's Enrich line and the where-from of each filled value. */
 export const getRecordEnrichment = createServerFn()
   .validator(
-    z.object({ entityId: z.uuid(), kind: z.enum(['company', 'person']) }),
+    input(
+      Schema.Struct({
+        entityId: uuid,
+        kind: Schema.Literals(['company', 'person']),
+      }),
+    ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()

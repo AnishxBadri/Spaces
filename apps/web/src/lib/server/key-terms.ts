@@ -1,6 +1,9 @@
 import { createServerFn } from '@tanstack/react-start'
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { requireUser } from './shared'
+import { input } from './input'
+
+const uuid = Schema.String.check(Schema.isUUID())
 
 /**
  * The Files tab's Extract key terms button. Manual and pull-based, the Read
@@ -12,7 +15,7 @@ import { requireUser } from './shared'
  */
 
 export const extractKeyTerms = createServerFn({ method: 'POST' })
-  .validator(z.object({ documentId: z.string().uuid() }))
+  .validator(input(Schema.Struct({ documentId: uuid })))
   .handler(async ({ data }) => {
     const u = await requireUser()
     const { enqueueKeyTermsProgram, KeyTermsRefused } =
@@ -31,7 +34,13 @@ export const extractKeyTerms = createServerFn({ method: 'POST' })
 
 /** Where each document's latest key-terms read stands — polled while one runs. */
 export const keyTermsStatus = createServerFn()
-  .validator(z.object({ documentIds: z.array(z.string().uuid()).max(200) }))
+  .validator(
+    input(
+      Schema.Struct({
+        documentIds: Schema.Array(uuid).check(Schema.isMaxLength(200)),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     await requireUser()
     const { keyTermsStatusProgram } = await import('../ai/key-terms')
