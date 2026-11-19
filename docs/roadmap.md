@@ -74,7 +74,6 @@ Plus the UI sweep (the printed sheets landing), Corrections, the list and the re
 - `SPA-455` `tasks-4` — Today's tasks and the sidebar's `n due` are your own; a task opens in the window (D113). Project 36; `afk`, after SPA-450.
 - `SPA-456` `tasks-5` — a task made from an action item keeps its write-up; pending items head Tasks › Open (D113). Project 36; `migration`, `afk`, after SPA-442 and SPA-451.
 - `SPA-467` `zod-1` — the web app validates with Effect Schema: every server-fn validator through `input()`, no zod import left in `apps/web` (D85). Project 37; `afk`.
-- `SPA-468` `zod-2` — the worker decodes job payloads and plugin calls with Effect Schema (D85). Project 37; `afk`, beside zod-1.
 - `SPA-469` `zod-3` — core converts, `ai/schema` from its four failing rows first, and `jsonValueZod` goes (D85). Project 37; `afk`, after zod-1 and zod-2.
 - `SPA-470` `zod-4` — zod leaves every `package.json` and lint refuses it in every package (D85). Project 37; `afk`, last.
 - `SPA-471` `deps-1` — drop `@tailwindcss/typography` (unused) and `dotenv`/`dotenv-cli` (Node 22 reads env files); the site sets in IBM Plex. `afk`.
