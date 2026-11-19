@@ -1,6 +1,6 @@
 import { Effect, Schema } from 'effect'
 import { sql } from 'drizzle-orm'
-import { z } from 'zod'
+import { scheduled, uuid } from '../job-data'
 import { db } from '@spaces/db'
 import { duplicateCandidate, entity, entityAlias } from '@spaces/db/schema'
 import { QUEUES } from '@spaces/core/queue/names'
@@ -35,15 +35,15 @@ export const DEDUPE_SWEEP_BOUNDS = {
 
 /**
  * Nullish-tolerant: pg-boss stores `data = null` for the payload-less nightly
- * schedule, which a bare `z.object({...})` would fail as `invalid-data`.
+ * schedule, which a bare struct would fail as `invalid-data`.
  * `objectId` scopes a run to one object.
  */
-export const dedupeSweepData = z
-  .object({ objectId: z.string().uuid().optional() })
-  .nullish()
-  .transform((v) => v ?? {})
+export const dedupeSweepData = scheduled(
+  Schema.Struct({ objectId: Schema.optional(uuid) }),
+  {},
+)
 
-export type DedupeSweepData = z.infer<typeof dedupeSweepData>
+export type DedupeSweepData = typeof dedupeSweepData.Type
 
 export interface DedupeSweepResult {
   /** Alive, mergeable entities in scope for this run. */

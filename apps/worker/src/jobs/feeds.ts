@@ -1,6 +1,6 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import type { Layer } from 'effect'
-import { z } from 'zod'
+import { emptyObject, scheduled, uuid } from '../job-data'
 import { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
 import { FEED_IMAGE_BATCH } from '@spaces/core/feeds/fetch'
@@ -24,15 +24,11 @@ import type { JobDef, JobRetryPolicy } from '../run-job'
  * Feeds on the worker: the half-hourly poll that sends one fetch per feed
  * and the failed photos due another try, the fetch itself, the photos of its new headlines on their own queue,
  * each source's logo (on add and weekly), and the daily delete past 90 days.
- * - Zod data, because `JobDef.schema` is still a zod type.
  * - Nullish data on the two scheduled jobs: pg-boss stores `null` for a
  *   schedule with no payload.
  */
 
-const scheduled = z
-  .object({})
-  .nullish()
-  .transform((v) => v ?? {})
+const scheduledData = scheduled(emptyObject, {})
 
 /** Never retried: the next tick is the retry. */
 export const feedPollRetry: JobRetryPolicy = {
@@ -94,9 +90,9 @@ const sendPhotoRetries = Effect.fn('feeds.sendPhotoRetries')(function* () {
  * another try sent back to `feed.images`, which fetches only what is still
  * due when it runs, so a batch sent twice fetches once.
  */
-export const feedPoll: JobDef<z.infer<typeof scheduled>, Enqueue> = {
+export const feedPoll: JobDef<typeof scheduledData.Type, Enqueue> = {
   name: QUEUES.feedPoll,
-  schema: scheduled,
+  schema: scheduledData,
   retry: feedPollRetry,
   run: () =>
     Effect.gen(function* () {
@@ -106,7 +102,7 @@ export const feedPoll: JobDef<z.infer<typeof scheduled>, Enqueue> = {
     }),
 }
 
-export const feedFetchData = z.object({ feedId: z.uuid() })
+export const feedFetchData = Schema.Struct({ feedId: uuid })
 
 /**
  * Within the half hour: a timeout, a 5xx or a 429 tries again a minute
@@ -142,7 +138,7 @@ const sendImages = Effect.fn('feeds.sendImages')(function* (
  * their own queue. Its failure is already on the row when the job fails;
  * the job's own outcome only decides whether pg-boss retries.
  */
-export const feedFetch: JobDef<z.infer<typeof feedFetchData>, Enqueue> = {
+export const feedFetch: JobDef<typeof feedFetchData.Type, Enqueue> = {
   name: QUEUES.feedFetch,
   schema: feedFetchData,
   retry: feedFetchRetry,
@@ -164,9 +160,9 @@ export const feedFetch: JobDef<z.infer<typeof feedFetchData>, Enqueue> = {
  * feed.prune: every headline published more than 90 days ago, deleted, and
  * the photos no other row holds reclaimed.
  */
-export const feedPrune: JobDef<z.infer<typeof scheduled>> = {
+export const feedPrune: JobDef<typeof scheduledData.Type> = {
   name: QUEUES.feedPrune,
-  schema: scheduled,
+  schema: scheduledData,
   run: () =>
     pruneFeedItemsProgram().pipe(
       Effect.map(
@@ -182,8 +178,8 @@ export const feedPrune: JobDef<z.infer<typeof scheduled>> = {
     ),
 }
 
-export const feedImagesData = z.object({
-  itemIds: z.array(z.uuid()).max(FEED_IMAGE_BATCH),
+export const feedImagesData = Schema.Struct({
+  itemIds: Schema.Array(uuid).check(Schema.isMaxLength(FEED_IMAGE_BATCH)),
 })
 
 /**
@@ -203,7 +199,7 @@ export const feedImagesRetry: JobRetryPolicy = {
  * the store failing retries the job, and that retry fetches only what is
  * still missing.
  */
-export const feedImages: JobDef<z.infer<typeof feedImagesData>> = {
+export const feedImages: JobDef<typeof feedImagesData.Type> = {
   name: QUEUES.feedImages,
   schema: feedImagesData,
   retry: feedImagesRetry,
@@ -228,14 +224,14 @@ const logoSummaryOf = (fetched: FeedLogoFetched): string => {
   }
 }
 
-export const feedLogoData = z.object({ feedId: z.uuid() })
+export const feedLogoData = Schema.Struct({ feedId: uuid })
 
 /**
  * feed.logo: one source's logo, the feed's own image else the site's icon.
  * Finding none is a success the page answers with the monogram; only the
  * store failing retries.
  */
-export const feedLogo: JobDef<z.infer<typeof feedLogoData>> = {
+export const feedLogo: JobDef<typeof feedLogoData.Type> = {
   name: QUEUES.feedLogo,
   schema: feedLogoData,
   retry: feedImagesRetry,
@@ -247,9 +243,9 @@ export const feedLogo: JobDef<z.infer<typeof feedLogoData>> = {
 }
 
 /** feed.logos: the weekly fan-out, one `feed.logo` per feed. */
-export const feedLogos: JobDef<z.infer<typeof scheduled>, Enqueue> = {
+export const feedLogos: JobDef<typeof scheduledData.Type, Enqueue> = {
   name: QUEUES.feedLogos,
-  schema: scheduled,
+  schema: scheduledData,
   retry: feedPollRetry,
   run: () => sendPerFeed(QUEUES.feedLogo, 'logo fetches'),
 }

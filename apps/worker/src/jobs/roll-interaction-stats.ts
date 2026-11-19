@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { z } from 'zod'
+import { emptyObject, scheduled } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import { rollElapsedInteractionStatsProgram } from '@spaces/core/writes/interactions/stats'
 import { JobRetryable } from '../run-job'
@@ -10,13 +10,10 @@ import type { JobDef } from '../run-job'
  * meeting has started get their stats rebuilt, so it reads as last contact.
  * Nullish data: pg-boss stores `null` for a schedule with no payload.
  */
-export const rollInteractionStatsData = z
-  .object({})
-  .nullish()
-  .transform((v) => v ?? {})
+export const rollInteractionStatsData = scheduled(emptyObject, {})
 
 export const rollInteractionStats: JobDef<
-  z.infer<typeof rollInteractionStatsData>
+  typeof rollInteractionStatsData.Type
 > = {
   name: QUEUES.rollInteractionStats,
   schema: rollInteractionStatsData,

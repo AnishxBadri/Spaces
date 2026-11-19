@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { nonEmpty, uuid } from '../job-data'
 import { commitRunLine, runLinePrefix } from '@spaces/core/import/commit'
 import { QUEUES } from '@spaces/core/queue/names'
 import { commitImportProgram, commitMessage } from '#web/lib/import/commit'
@@ -17,13 +17,13 @@ import type { JobDef } from '../run-job'
  *   the same prefix in `job_run.error`.
  */
 
-export const importCommitData = z.object({
-  batchId: z.string().uuid(),
-  userId: z.string().min(1),
-  onlyFailed: z.boolean(),
+export const importCommitData = Schema.Struct({
+  batchId: uuid,
+  userId: nonEmpty,
+  onlyFailed: Schema.Boolean,
 })
 
-export type ImportCommitData = z.infer<typeof importCommitData>
+export type ImportCommitData = typeof importCommitData.Type
 
 /** A 20,000-row sheet is minutes of work; pg-boss's default expiry is 15. */
 export const IMPORT_COMMIT_EXPIRE_SECONDS = 4 * 60 * 60

@@ -1,6 +1,6 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { and, eq } from 'drizzle-orm'
-import { z } from 'zod'
+import { nonEmpty, urlString, uuid } from '../job-data'
 import { db } from '@spaces/db'
 import { accountConnection } from '@spaces/db/schema'
 import { Enqueue } from '@spaces/core/queue/enqueue'
@@ -23,23 +23,23 @@ import type { JobDef, JobFailure } from '../run-job'
  * - Every refusal is a `JobPermanent` whose reason the bind dialog shows.
  */
 
-export const bindStorageFolderData = z.object({
-  connectionId: z.string().uuid(),
-  folder: z.union([
-    z.object({ url: z.string().url() }),
-    z.object({ id: z.string().min(1).max(200) }),
+export const bindStorageFolderData = Schema.Struct({
+  connectionId: uuid,
+  folder: Schema.Union([
+    Schema.Struct({ url: urlString }),
+    Schema.Struct({ id: nonEmpty.check(Schema.isMaxLength(200)) }),
   ]),
-  targetEntityId: z.string().uuid(),
-  actorUserId: z.string().min(1),
-  options: z.object({
-    mapSubfolders: z.boolean(),
-    retain: z.enum(['full', 'text']),
-    direction: z.enum(['pull', 'push', 'both']),
-    sensitivity: z.enum(['inherit', 'sensitive']),
+  targetEntityId: uuid,
+  actorUserId: nonEmpty,
+  options: Schema.Struct({
+    mapSubfolders: Schema.Boolean,
+    retain: Schema.Literals(['full', 'text']),
+    direction: Schema.Literals(['pull', 'push', 'both']),
+    sensitivity: Schema.Literals(['inherit', 'sensitive']),
   }),
 })
 
-export type BindStorageFolderData = z.infer<typeof bindStorageFolderData>
+export type BindStorageFolderData = typeof bindStorageFolderData.Type
 
 /** The sentences a refusal reads as in the dialog. */
 export const BIND_REFUSALS = {

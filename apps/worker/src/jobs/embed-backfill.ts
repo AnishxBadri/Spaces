@@ -1,5 +1,5 @@
 import { Clock, Effect } from 'effect'
-import { z } from 'zod'
+import { emptyObject } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import { embedBackfillProgram } from '#web/lib/ai/embed-backfill'
 import type {
@@ -25,9 +25,9 @@ import type { JobDef, JobRetryPolicy } from '../run-job'
  * - no key, a wrong width, … → permanent, with `embedMessage`'s sentence
  */
 
-export const embedBackfillData = z.object({})
+export const embedBackfillData = emptyObject
 
-export type EmbedBackfillData = z.infer<typeof embedBackfillData>
+export type EmbedBackfillData = typeof embedBackfillData.Type
 
 /** How long after the cap's reset the resumed run starts. */
 export const RESUME_SLACK_MS = 60_000

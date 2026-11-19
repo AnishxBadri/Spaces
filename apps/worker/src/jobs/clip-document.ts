@@ -3,7 +3,7 @@ import { Readability } from '@mozilla/readability'
 import { Effect, Schema } from 'effect'
 import { eq, sql } from 'drizzle-orm'
 import { parseHTML } from 'linkedom'
-import { z } from 'zod'
+import { uuid } from '../job-data'
 import { db } from '@spaces/db'
 import { document, entity } from '@spaces/db/schema'
 import { guessDocumentKind } from '@spaces/core/documents'
@@ -31,11 +31,11 @@ import type { JobDef } from '../run-job'
  *   exists. Content addressing still dedupes the blob: one blob, two rows.
  */
 
-export const clipDocumentData = z.object({
-  documentId: z.string().uuid(),
+export const clipDocumentData = Schema.Struct({
+  documentId: uuid,
 })
 
-export type ClipDocumentData = z.infer<typeof clipDocumentData>
+export type ClipDocumentData = typeof clipDocumentData.Type
 
 /**
  * 10MB and 20 seconds: the cap is against a URL that streams forever, not long

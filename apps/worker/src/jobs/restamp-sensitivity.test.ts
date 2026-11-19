@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { Effect } from 'effect'
+import { Effect, Result } from 'effect'
 import { eq } from 'drizzle-orm'
 import { describe, expect, it } from 'vitest'
+import { decodeJobData } from '../job-data'
 import { db } from '@spaces/db'
 import { chunk, entity } from '@spaces/db/schema'
 import { QUEUES } from '@spaces/core/queue/names'
@@ -56,9 +57,11 @@ describe('sensitivity.restamp', () => {
     expect(restampSensitivity.refs?.({ entityId: id })).toEqual({
       entityId: id,
     })
-    expect(restampSensitivityData.safeParse({ entityId: 'x' }).success).toBe(
-      false,
-    )
+    expect(
+      Result.isSuccess(
+        decodeJobData(restampSensitivityData, { entityId: 'x' }),
+      ),
+    ).toBe(false)
   })
 
   it('lowers a stale stamp when nothing keeps the entity sensitive', async () => {

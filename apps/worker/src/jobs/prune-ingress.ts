@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { nonNegativeInt, scheduled } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import { pruneIngressPayloadsProgram } from '@spaces/core/writes/ingress/prune'
 import { JobRetryable } from '../run-job'
@@ -10,12 +10,12 @@ import type { JobDef } from '../run-job'
  * `INGRESS_RETENTION_DAYS`. Nullish data, because pg-boss stores `null` for
  * a schedule registered with no payload; `retentionDays` is for a test.
  */
-export const pruneIngressData = z
-  .object({ retentionDays: z.number().int().nonnegative().optional() })
-  .nullish()
-  .transform((v) => v ?? {})
+export const pruneIngressData = scheduled(
+  Schema.Struct({ retentionDays: Schema.optional(nonNegativeInt) }),
+  {},
+)
 
-export const pruneIngress: JobDef<z.infer<typeof pruneIngressData>> = {
+export const pruneIngress: JobDef<typeof pruneIngressData.Type> = {
   name: QUEUES.pruneIngress,
   schema: pruneIngressData,
   run: (data) =>

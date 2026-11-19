@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Result } from 'effect'
 import { MockLanguageModelV4 } from 'ai/test'
 import { PDFDocument } from 'pdf-lib'
 import { eq, isNotNull, sql } from 'drizzle-orm'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { decodeJobData } from '../job-data'
 import { db } from '@spaces/db'
 import { aiUsage, document, entity } from '@spaces/db/schema'
 import { QUEUES } from '@spaces/core/queue/names'
@@ -365,7 +366,9 @@ describe('document.vision — refusals leave the row alone', () => {
     expect(visionDocument.retry?.limit).toBe(0)
     expect(visionDocument.name).toBe(QUEUES.visionDocument)
     expect(
-      visionDocumentData.safeParse({ documentId: randomUUID() }).success,
+      Result.isSuccess(
+        decodeJobData(visionDocumentData, { documentId: randomUUID() }),
+      ),
     ).toBe(false)
   })
 })

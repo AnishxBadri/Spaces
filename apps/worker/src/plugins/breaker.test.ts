@@ -3,11 +3,10 @@ import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { and, eq, isNotNull } from 'drizzle-orm'
 import { PgBoss } from 'pg-boss'
 import type { JobWithMetadata } from 'pg-boss'
-import { z } from 'zod'
 import {
   afterAll,
   afterEach,
@@ -255,7 +254,7 @@ const coreQueueWorks = async () => {
     runJob(
       {
         name: queue,
-        schema: z.object({ n: z.number() }),
+        schema: Schema.Struct({ n: Schema.Number }),
         run: ({ n }) => Effect.succeed(`ran ${String(n)}`),
       },
       { host: pgBossHost(boss), layer: Layer.empty },
@@ -580,7 +579,7 @@ describe('runJob — a breaker trip inside one batch', () => {
     const handler = runJob(
       {
         name: queue,
-        schema: z.object({}),
+        schema: Schema.Struct({}),
         run: () => Effect.fail(new JobPermanent({ reason: 'nope' })),
         refs: () => ({ integrationId: batch.id }),
       },
@@ -620,7 +619,7 @@ describe('runJob — a breaker trip inside one batch', () => {
     const handler = runJob(
       {
         name: queue,
-        schema: z.object({}),
+        schema: Schema.Struct({}),
         run: () =>
           Effect.fail(
             new JobRateLimited({ reason: 'slow down', retryAfterMs: 1000 }),

@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { Cause, Effect, Exit, Layer } from 'effect'
+import { Cause, Effect, Exit, Layer, Schema } from 'effect'
 import { eq, isNotNull, sql } from 'drizzle-orm'
-import { z } from 'zod'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
 import {
@@ -100,9 +99,9 @@ describe('box with the fakes on', () => {
       .filter((l) => l.startsWith('[plugin:box] entry '))
       .map(
         (l) =>
-          z
-            .object({ path: z.string() })
-            .parse(JSON.parse(l.slice('[plugin:box] entry '.length))).path,
+          Schema.decodeUnknownSync(Schema.Struct({ path: Schema.String }))(
+            JSON.parse(l.slice('[plugin:box] entry '.length)),
+          ).path,
       )
     expect(paths).toContain(
       'All Files/Acme Data Room/02 Finance/Board/Minutes Q3.pdf',

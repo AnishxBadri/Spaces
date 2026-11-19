@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { Client } from 'pg'
 import type { JobWithMetadata } from 'pg-boss'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
+import { uuid } from './job-data'
 import {
   JOB_STATUS_CHANNEL,
   NOTIFY_LIMIT_BYTES,
@@ -104,7 +104,7 @@ const job = (name: string, fail: boolean) =>
     return runJob(
       {
         name,
-        schema: z.object({ entityId: z.uuid() }),
+        schema: Schema.Struct({ entityId: uuid }),
         run: () =>
           fail
             ? Effect.fail(new JobPermanent({ reason: 'provider said no' }))

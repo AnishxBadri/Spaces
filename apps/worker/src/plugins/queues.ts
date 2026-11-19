@@ -1,7 +1,6 @@
-import { Duration, Effect, Layer } from 'effect'
+import { Duration, Effect, Layer, Result, Schema } from 'effect'
 import { and, asc, eq, sql } from 'drizzle-orm'
 import type { PgBoss } from 'pg-boss'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   accountConnection,
@@ -12,8 +11,7 @@ import {
 import { runLinePrefix } from '@spaces/core/import/commit'
 import { fileJobData } from '@spaces/core/import/dialect'
 import type { FileJobData } from '@spaces/core/import/dialect'
-import { jsonRecord } from '@spaces/core/json'
-import { jsonValueZod } from '@spaces/core/json-zod'
+import { jsonRecord, jsonValue } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import { pluginQueueName } from '@spaces/core/queue/names'
 import type { PluginQueueName } from '@spaces/core/queue/names'
@@ -45,6 +43,13 @@ import type {
   JobError,
   Manifest,
 } from '@spaces/sdk'
+import {
+  decodeJobData,
+  emptyObject,
+  jsonObject,
+  nonEmpty,
+  uuid,
+} from '../job-data'
 import { JobSkipped, runJob } from '../run-job'
 import type {
   JobBreaker,
@@ -406,47 +411,50 @@ export const runKeyedSchedule = (
 // JobDefs, by trigger
 // ---------------------------------------------------------------------------
 
-const actionData = z.object({ entityId: z.uuid() })
+export const actionData = Schema.Struct({ entityId: uuid })
 /** What the host sends a payload action: its own caller's prepared input. */
-const payloadActionData = z.object({
-  payload: z.record(z.string(), z.json()),
-})
-const scheduleData = z.object({})
+export const payloadActionData = Schema.Struct({ payload: jsonObject })
+export const scheduleData = emptyObject
 /** What core's dispatcher sends, one shape per `DOMAIN_EVENTS` name. */
 const eventBase = {
-  entityId: z.uuid(),
-  kind: z.enum(ACTION_TARGETS),
-  occurredAt: z.string().min(1),
+  entityId: uuid,
+  kind: Schema.Literals(ACTION_TARGETS),
+  occurredAt: nonEmpty,
 }
-const eventData = z.object({
-  event: z.discriminatedUnion('name', [
-    z.object({ name: z.literal('entity.created'), ...eventBase }),
-    z.object({ name: z.literal('filed'), ...eventBase, spaceId: z.uuid() }),
-    z.object({
-      name: z.literal('deal.linked'),
+const party = Schema.Literals(['company', 'person'])
+export const eventData = Schema.Struct({
+  event: Schema.Union([
+    Schema.Struct({ name: Schema.Literal('entity.created'), ...eventBase }),
+    Schema.Struct({
+      name: Schema.Literal('filed'),
       ...eventBase,
-      kind: z.enum(['company', 'person']),
-      dealId: z.uuid(),
+      spaceId: uuid,
     }),
-    z.object({
-      name: z.literal('identity.added'),
+    Schema.Struct({
+      name: Schema.Literal('deal.linked'),
       ...eventBase,
-      kind: z.enum(['company', 'person']),
-      key: z.enum(['domain', 'email']),
-      value: z.string().min(1),
+      kind: party,
+      dealId: uuid,
     }),
-    z.object({
-      name: z.literal('interaction.logged'),
+    Schema.Struct({
+      name: Schema.Literal('identity.added'),
       ...eventBase,
-      kind: z.enum(['company', 'person']),
-      interactionId: z.uuid(),
-      interactionKind: z.enum(['meeting', 'call']),
+      kind: party,
+      key: Schema.Literals(['domain', 'email']),
+      value: nonEmpty,
+    }),
+    Schema.Struct({
+      name: Schema.Literal('interaction.logged'),
+      ...eventBase,
+      kind: party,
+      interactionId: uuid,
+      interactionKind: Schema.Literals(['meeting', 'call']),
     }),
   ]),
 })
-const webhookData = z.object({
-  payload: z.json(),
-  receivedAt: z.string().min(1),
+export const webhookData = Schema.Struct({
+  payload: jsonValue,
+  receivedAt: nonEmpty,
 })
 
 // ---------------------------------------------------------------------------
@@ -540,12 +548,10 @@ export const runFileJob = (
 // A watch run, and the tick that sends them
 // ---------------------------------------------------------------------------
 
-const tickData = z.object({})
+export const tickData = emptyObject
 
 /** What a watch job hands back, decoded once for the column. */
-const watchState = z.object({
-  state: z.record(z.string(), jsonValueZod).nullable(),
-})
+export const watchState = Schema.Struct({ state: Schema.NullOr(jsonObject) })
 
 const watchFailed = (what: string) => (cause: unknown) =>
   new JobRetryable({ reason: `could not ${what}: ${messageOf(cause)}` })
@@ -619,12 +625,12 @@ export const runWatchJob = (
         ).pipe(Effect.ignore),
       ),
     )
-    const parsed = watchState.safeParse(out)
-    if (!parsed.success)
+    const parsed = decodeJobData(watchState, out)
+    if (Result.isFailure(parsed))
       return yield* new JobPermanent({
         reason: `${plan.queue} returned no { state } object or null`,
       })
-    const state = parsed.data.state
+    const state = parsed.success.state
     // The lane's status cell reads this line; a tally that cannot be read
     // never fails the run.
     const tally = yield* watchRunTallyProgram(

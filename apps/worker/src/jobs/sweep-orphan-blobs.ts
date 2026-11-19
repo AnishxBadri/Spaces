@@ -1,6 +1,6 @@
 import { Effect, Schema } from 'effect'
+import { nonNegativeInt, scheduled } from '../job-data'
 import { eq, lt } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { pendingBlob } from '@spaces/db/schema'
 import { QUEUES } from '@spaces/core/queue/names'
@@ -35,14 +35,14 @@ export const ORPHAN_BLOB_PER_RUN = 500
 
 /**
  * Nullish-tolerant: pg-boss stores `data = null` for the payload-less nightly
- * schedule, which a bare `z.object({…})` would fail as `invalid-data`.
+ * schedule, which a bare struct would fail as `invalid-data`.
  */
-export const sweepOrphanBlobsData = z
-  .object({ graceMs: z.number().int().nonnegative().optional() })
-  .nullish()
-  .transform((v) => v ?? {})
+export const sweepOrphanBlobsData = scheduled(
+  Schema.Struct({ graceMs: Schema.optional(nonNegativeInt) }),
+  {},
+)
 
-export type SweepOrphanBlobsData = z.infer<typeof sweepOrphanBlobsData>
+export type SweepOrphanBlobsData = typeof sweepOrphanBlobsData.Type
 
 export interface SweepOrphanBlobsResult {
   /** Pending rows past the grace period this run looked at. */

@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { nonEmpty, uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import {
   ledgerEventMessage,
@@ -19,12 +19,12 @@ import type { JobDef } from '../run-job'
  *   not a failure: the job completes and says why.
  */
 
-export const ledgerEventData = z.object({
-  documentId: z.string().uuid(),
-  revisionId: z.string().min(1),
+export const ledgerEventData = Schema.Struct({
+  documentId: uuid,
+  revisionId: nonEmpty,
 })
 
-export type LedgerEventData = z.infer<typeof ledgerEventData>
+export type LedgerEventData = typeof ledgerEventData.Type
 
 /** The job's body, with the model seam the test uses. */
 export const runLedgerEvent = (

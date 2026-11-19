@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { between, int } from '@spaces/core/attributes/registry'
+import { nonEmpty, urlString } from '../../job-data'
 
 /**
  * A recorded cassette: a provider's answers, committed beside the plugin at
@@ -14,21 +16,22 @@ import { z } from 'zod'
  *   answers a key that has been revoked (`makeFakeProvider`).
  */
 
-const response = z.object({
-  status: z.int().min(100).max(599),
+const responseFields = {
+  status: Schema.Number.check(int, between(100, 599)),
   /** Relative to the plugin's `fixtures/`. */
-  file: z.string().min(1),
+  file: nonEmpty,
+}
+
+const interaction = Schema.Struct({
+  ...responseFields,
+  method: Schema.Literals(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
+  url: urlString,
 })
 
-const interaction = response.extend({
-  method: z.enum(['GET', 'POST', 'PUT', 'PATCH', 'DELETE']),
-  url: z.url(),
-})
-
-const cassetteFile = z.object({
-  keyHeader: z.string().min(1),
-  interactions: z.array(interaction).min(1),
-  revoked: response.optional(),
+export const cassetteFile = Schema.Struct({
+  keyHeader: nonEmpty,
+  interactions: Schema.Array(interaction).check(Schema.isMinLength(1)),
+  revoked: Schema.optional(Schema.Struct(responseFields)),
 })
 
 export type Recorded = {
@@ -95,7 +98,9 @@ const splice = (
 /** Reads and compiles `<fixturesDir>/cassette/cassette.json`; throws naming what is wrong. */
 export const loadCassette = (fixturesDir: string): Cassette => {
   const file = path.join(fixturesDir, 'cassette', 'cassette.json')
-  const parsed = cassetteFile.parse(JSON.parse(readFileSync(file, 'utf8')))
+  const parsed = Schema.decodeUnknownSync(cassetteFile)(
+    JSON.parse(readFileSync(file, 'utf8')),
+  )
   const read = (name: string) =>
     readFileSync(path.join(fixturesDir, name), 'utf8')
   const compiled: ReadonlyArray<Compiled> = parsed.interactions

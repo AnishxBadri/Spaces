@@ -2,11 +2,10 @@ import { randomUUID } from 'node:crypto'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { MockLanguageModelV4 } from 'ai/test'
 import { and, count, eq } from 'drizzle-orm'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import {
   aiRun,
@@ -59,14 +58,22 @@ const post = (body: Record<string, unknown>) =>
     }),
   )
 
-const Captured = z.object({
-  documentId: z.string(),
-  url: z.string(),
-  extraction: z.enum(['queued', 'skipped']),
-})
-const Failure = z.object({
-  error: z.object({ tag: z.string(), message: z.string() }),
-})
+const Captured = {
+  parse: Schema.decodeUnknownSync(
+    Schema.Struct({
+      documentId: Schema.String,
+      url: Schema.String,
+      extraction: Schema.Literals(['queued', 'skipped']),
+    }),
+  ),
+}
+const Failure = {
+  parse: Schema.decodeUnknownSync(
+    Schema.Struct({
+      error: Schema.Struct({ tag: Schema.String, message: Schema.String }),
+    }),
+  ),
+}
 
 const profile = (tag: string, extra: Record<string, unknown> = {}) => ({
   captureSchemaVersion: CAPTURE_SCHEMA_VERSION,
@@ -149,7 +156,7 @@ async function runQueued(documentId: string, answer: Answer) {
     (e) => e.name === QUEUES.readDeck && e.data.documentId === documentId,
   )
   expect(job).toBeDefined()
-  const data = readDeckData.parse(job?.data)
+  const data = Schema.decodeUnknownSync(readDeckData)(job?.data)
   const model = mockModel(() => answer)
   await Effect.runPromise(runReadDeck(data, { extractModel: model }))
   return model
@@ -254,7 +261,9 @@ describe('capture extraction (SPA-134)', () => {
     })
     expect(
       Object.keys(
-        z.record(z.string(), z.unknown()).parse(patch.payload),
+        Schema.decodeUnknownSync(Schema.Record(Schema.String, Schema.Unknown))(
+          patch.payload,
+        ),
       ).sort(),
     ).toEqual(['job_title', 'location'])
     for (const row of rows) {

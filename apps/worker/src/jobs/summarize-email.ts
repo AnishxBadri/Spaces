@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { emptyObject, uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import {
   summarizeEmailBackfillProgram,
@@ -39,11 +39,11 @@ const failed = (failure: SummarizeEmailFailure) => {
     : new JobPermanent({ reason })
 }
 
-export const summarizeEmailData = z.object({
-  interactionId: z.string().uuid(),
+export const summarizeEmailData = Schema.Struct({
+  interactionId: uuid,
 })
 
-export type SummarizeEmailData = z.infer<typeof summarizeEmailData>
+export type SummarizeEmailData = typeof summarizeEmailData.Type
 
 type Seam = Pick<SummarizeEmailInput, 'model'>
 
@@ -70,11 +70,9 @@ export const summarizeEmail: JobDef<SummarizeEmailData> = {
   run: (data) => runSummarizeEmail(data),
 }
 
-export const summarizeEmailBackfillData = z.object({})
+export const summarizeEmailBackfillData = emptyObject
 
-export type SummarizeEmailBackfillData = z.infer<
-  typeof summarizeEmailBackfillData
->
+export type SummarizeEmailBackfillData = typeof summarizeEmailBackfillData.Type
 
 /** The backfill's body, with the model seam the test uses. */
 export const runSummarizeEmailBackfill = (

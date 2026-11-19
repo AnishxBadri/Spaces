@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { nonEmpty } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import { exportSummary } from '@spaces/core/export/workspace'
 import { exportWorkspaceProgram } from '@spaces/core/writes/export/workspace'
@@ -18,9 +18,9 @@ import type { JobDef } from '../run-job'
  */
 export const EXPORT_WORKSPACE_EXPIRE_SECONDS = 2 * 60 * 60
 
-export const exportWorkspaceData = z.object({ requestedBy: z.string().min(1) })
+export const exportWorkspaceData = Schema.Struct({ requestedBy: nonEmpty })
 
-export type ExportWorkspaceData = z.infer<typeof exportWorkspaceData>
+export type ExportWorkspaceData = typeof exportWorkspaceData.Type
 
 export const exportWorkspace: JobDef<ExportWorkspaceData> = {
   name: QUEUES.exportWorkspace,

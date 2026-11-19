@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { Effect } from 'effect'
+import { Effect, Result } from 'effect'
 import { eq, isNotNull } from 'drizzle-orm'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { decodeJobData } from '../job-data'
 import { db } from '@spaces/db'
 import { aiUsage, chunk, entity, note, workspace } from '@spaces/db/schema'
 import type { WorkspaceSettings } from '@spaces/db/schema/workspace'
@@ -42,7 +43,8 @@ describe('chunk.embed', () => {
 
   it('accepts a note with an empty key and an attribute with a slug, nothing else', () => {
     const entityId = randomUUID()
-    const ok = (data: unknown) => embedSourceData.safeParse(data).success
+    const ok = (data: unknown) =>
+      Result.isSuccess(decodeJobData(embedSourceData, data))
     expect(ok({ entityId, sourceKind: 'note', sourceKey: '' })).toBe(true)
     expect(
       ok({ entityId, sourceKind: 'attribute', sourceKey: 'close_reason' }),

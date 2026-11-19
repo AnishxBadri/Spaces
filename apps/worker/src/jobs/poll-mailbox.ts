@@ -1,6 +1,6 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { asc } from 'drizzle-orm'
-import { z } from 'zod'
+import { scheduled, uuid } from '../job-data'
 import { db } from '@spaces/db'
 import { mailbox } from '@spaces/db/schema'
 import { QUEUES } from '@spaces/core/queue/names'
@@ -19,15 +19,15 @@ import type { JobDef, JobRetryPolicy } from '../run-job'
  *   tight loop the backoff prevents. The next scheduled tick is the retry.
  */
 
-export const pollMailboxData = z
-  .object({
-    mailboxId: z.string().uuid().optional(),
-    integrationId: z.string().uuid().optional(),
-  })
-  .nullish()
-  .transform((v) => v ?? {})
+export const pollMailboxData = scheduled(
+  Schema.Struct({
+    mailboxId: Schema.optional(uuid),
+    integrationId: Schema.optional(uuid),
+  }),
+  {},
+)
 
-export type PollMailboxData = z.infer<typeof pollMailboxData>
+export type PollMailboxData = typeof pollMailboxData.Type
 
 export const pollMailboxRetry: JobRetryPolicy = {
   limit: 0,

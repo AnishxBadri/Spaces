@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { nonEmpty, uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import {
   attributeRunMessage,
@@ -18,13 +18,13 @@ import type { JobDef } from '../run-job'
  * - A run that finds no answer completes; the cell's status counts its rows.
  */
 
-export const attributeRunData = z.object({
-  entityId: z.string().uuid(),
-  attributeId: z.string().uuid(),
-  userId: z.string().min(1),
+export const attributeRunData = Schema.Struct({
+  entityId: uuid,
+  attributeId: uuid,
+  userId: nonEmpty,
 })
 
-export type AttributeRunData = z.infer<typeof attributeRunData>
+export type AttributeRunData = typeof attributeRunData.Type
 
 /** The job's body, with the model seam the test uses. */
 export const runAttributeRun = (

@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import {
   exportDocumentProgram,
@@ -28,11 +28,11 @@ import type { JobDef, JobRetryPolicy } from '../run-job'
  *   fail for good.
  */
 
-export const exportDocumentData = z.object({
-  documentId: z.string().uuid(),
+export const exportDocumentData = Schema.Struct({
+  documentId: uuid,
 })
 
-export type ExportDocumentData = z.infer<typeof exportDocumentData>
+export type ExportDocumentData = typeof exportDocumentData.Type
 
 /**
  * About a day of waiting for a connection: 60 s doubling to the one-hour cap

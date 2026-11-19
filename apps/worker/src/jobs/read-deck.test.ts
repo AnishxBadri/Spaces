@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { Effect } from 'effect'
+import { Effect, Result } from 'effect'
 import { describe, expect, it } from 'vitest'
+import { decodeJobData } from '../job-data'
 import { JobPermanent } from '../run-job'
 import { readDeck, readDeckData, runReadDeck } from './read-deck'
 
@@ -35,16 +36,20 @@ describe('document.read-deck', () => {
 
   it('never retries, and carries who pressed', () => {
     expect(readDeck.retry?.limit).toBe(0)
-    expect(readDeckData.safeParse({ documentId: randomUUID() }).success).toBe(
-      false,
-    )
+    expect(
+      Result.isSuccess(
+        decodeJobData(readDeckData, { documentId: randomUUID() }),
+      ),
+    ).toBe(false)
     // Read deck and summarize: the same job, with the summary's record.
     expect(
-      readDeckData.safeParse({
-        documentId: randomUUID(),
-        userId: 'someone',
-        summarizeOnto: randomUUID(),
-      }).success,
+      Result.isSuccess(
+        decodeJobData(readDeckData, {
+          documentId: randomUUID(),
+          userId: 'someone',
+          summarizeOnto: randomUUID(),
+        }),
+      ),
     ).toBe(true)
   })
 })

@@ -10,7 +10,6 @@ import {
   Schema,
 } from 'effect'
 import { isNotNull } from 'drizzle-orm'
-import { z } from 'zod'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
@@ -94,10 +93,9 @@ describe('google-drive with the fakes on', () => {
       .filter((l) => l.startsWith('[plugin:google-drive] entry '))
       .map(
         (l) =>
-          z
-            .object({ path: z.string() })
-            .parse(JSON.parse(l.slice('[plugin:google-drive] entry '.length)))
-            .path,
+          Schema.decodeUnknownSync(Schema.Struct({ path: Schema.String }))(
+            JSON.parse(l.slice('[plugin:google-drive] entry '.length)),
+          ).path,
       )
     expect(paths).toContain(
       'My Drive/Acme Data Room/02 Finance/Board/Minutes Q3.pdf',

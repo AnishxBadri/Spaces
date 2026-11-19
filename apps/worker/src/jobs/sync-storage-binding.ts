@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { uuid } from '../job-data'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
 import { documentIntakeMessage } from '@spaces/core/writes/documents/intake'
@@ -34,11 +34,11 @@ import type { JobDef } from '../run-job'
  *   company; a re-sync proposes nothing twice.
  */
 
-export const syncStorageBindingData = z.object({
-  bindingId: z.string().uuid(),
+export const syncStorageBindingData = Schema.Struct({
+  bindingId: uuid,
 })
 
-export type SyncStorageBindingData = z.infer<typeof syncStorageBindingData>
+export type SyncStorageBindingData = typeof syncStorageBindingData.Type
 
 /** The sentences a binding's `error` reads when the provider gave none. */
 export const SYNC_REFUSALS = {

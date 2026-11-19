@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import {
   restampStampedProgram,
@@ -22,12 +22,12 @@ import type { JobDef } from '../run-job'
  *     idempotent update per entity, so a retry is safe
  */
 
-export const restampSensitivityData = z.union([
-  z.object({ entityId: z.string().uuid() }),
-  z.object({ all: z.literal(true) }),
+export const restampSensitivityData = Schema.Union([
+  Schema.Struct({ entityId: uuid }),
+  Schema.Struct({ all: Schema.Literal(true) }),
 ])
 
-export type RestampSensitivityData = z.infer<typeof restampSensitivityData>
+export type RestampSensitivityData = typeof restampSensitivityData.Type
 
 const retryable = {
   SensitivityReadFailed: () =>

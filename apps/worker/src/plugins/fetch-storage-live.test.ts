@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { Cause, Effect, Exit, Layer } from 'effect'
+import { Cause, Effect, Exit, Layer, Schema } from 'effect'
 import { and, eq, isNotNull, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
@@ -342,7 +342,7 @@ describe('document.fetch-storage on the google-drive bundle', () => {
       const jobs = enqueued.filter((e) => e.name === QUEUES.fetchStorageFile)
       expect(jobs).toHaveLength(ids.length)
       for (const job of jobs) {
-        const data = fetchStorageFileData.parse(job.data)
+        const data = Schema.decodeUnknownSync(fetchStorageFileData)(job.data)
         expect(data.connectionId).toBe(connectionId)
         const exit = await run(data, layer)
         expect(Exit.isSuccess(exit)).toBe(true)

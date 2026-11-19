@@ -1,6 +1,6 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { and, eq } from 'drizzle-orm'
-import { z } from 'zod'
+import { nonEmpty, uuid } from '../job-data'
 import { db } from '@spaces/db'
 import { accountConnection } from '@spaces/db/schema'
 import { Enqueue } from '@spaces/core/queue/enqueue'
@@ -33,14 +33,14 @@ import type { JobDef, JobFailure } from '../run-job'
  *   uploads still waiting to write through get their export again.
  */
 
-export const rebindStorageFolderData = z.object({
-  bindingId: z.string().uuid(),
-  connectionId: z.string().uuid(),
-  actorUserId: z.string().min(1),
-  commit: z.boolean(),
+export const rebindStorageFolderData = Schema.Struct({
+  bindingId: uuid,
+  connectionId: uuid,
+  actorUserId: nonEmpty,
+  commit: Schema.Boolean,
 })
 
-export type RebindStorageFolderData = z.infer<typeof rebindStorageFolderData>
+export type RebindStorageFolderData = typeof rebindStorageFolderData.Type
 
 const UNCHANGED = 'nothing changed'
 

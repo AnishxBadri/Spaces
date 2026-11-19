@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { uuid } from '../job-data'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
 import {
@@ -22,11 +22,11 @@ import type { JobDef, JobFailure } from '../run-job'
  * - Every refusal is a `JobPermanent` whose reason the viewer shows.
  */
 
-export const restoreBytesData = z.object({
-  documentId: z.string().uuid(),
+export const restoreBytesData = Schema.Struct({
+  documentId: uuid,
 })
 
-export type RestoreBytesData = z.infer<typeof restoreBytesData>
+export type RestoreBytesData = typeof restoreBytesData.Type
 
 /** The bytes hash differently at the provider: the viewer's sentence. */
 export const REMOTE_BYTES_CHANGED =

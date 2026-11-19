@@ -1,8 +1,16 @@
-import { Cause, Context, Data, Duration, Effect, Exit, Option } from 'effect'
+import {
+  Cause,
+  Context,
+  Data,
+  Duration,
+  Effect,
+  Exit,
+  Option,
+  Result,
+} from 'effect'
 import type { Layer } from 'effect'
 import { and, count, eq, gt, ne, notLike, or, isNull, sql } from 'drizzle-orm'
 import type { JobWithMetadata, PgBoss } from 'pg-boss'
-import type { z } from 'zod'
 import { db } from '@spaces/db'
 import { integration, jobRun } from '@spaces/db/schema'
 import { JobPermanent, JobRateLimited, JobRetryable } from '@spaces/sdk'
@@ -13,6 +21,8 @@ import {
   encodeJobStatus,
 } from '@spaces/core/queue/job-status'
 import type { JobStatusEvent } from '@spaces/core/queue/job-status'
+import { decodeJobData } from './job-data'
+import type { JobSchema } from './job-data'
 
 /**
  * The one wrapper every job goes through: parse job.data against the JobDef's
@@ -146,7 +156,7 @@ export type JobResult = JobSummary | JobClose | void
 
 export interface JobDef<TData, TServices = never> {
   readonly name: string
-  readonly schema: z.ZodType<TData>
+  readonly schema: JobSchema<TData>
   readonly run: (
     data: TData,
   ) => Effect.Effect<JobResult, JobFailure, TServices | JobContext>
@@ -723,8 +733,8 @@ async function settle<TData, TServices>(
   // below, so a handler that returns through any of the eight branches — or
   // through none of them — still leaves the ledger a finished row.
   const startedAt = new Date()
-  const parsed = def.schema.safeParse(job.data)
-  const refs = parsed.success ? await refsOf(def, parsed.data) : {}
+  const parsed = decodeJobData(def.schema, job.data)
+  const refs = Result.isSuccess(parsed) ? await refsOf(def, parsed.success) : {}
   const ledger = options.ledger ?? postgresLedger
   const runId = await beginRun(ledger, {
     queue,
@@ -745,10 +755,8 @@ async function settle<TData, TServices>(
   let close: JobClose['close'] | null = null
 
   try {
-    if (!parsed.success) {
-      const issues = parsed.error.issues
-        .map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-        .join('; ')
+    if (Result.isFailure(parsed)) {
+      const issues = parsed.failure
       console.error(
         `[worker] ${queue} ${job.id}: job data failed the schema — ${issues}`,
       )
@@ -761,7 +769,7 @@ async function settle<TData, TServices>(
         withTimeout(
           def,
           Effect.provideService(
-            def.run(parsed.data),
+            def.run(parsed.success),
             JobContext,
             JobContext.of({ queue, jobId: job.id, attempt, isFinalAttempt }),
           ),

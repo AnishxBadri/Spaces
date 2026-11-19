@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { nonEmpty, uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import { readDeckMessage, readDeckProgram } from '#web/lib/ai/read-deck'
 import {
@@ -22,16 +22,16 @@ import type { JobDef } from '../run-job'
  *   on the document id keeps one read per document at a time.
  */
 
-export const readDeckData = z.object({
-  documentId: z.string().uuid(),
-  userId: z.string().min(1),
+export const readDeckData = Schema.Struct({
+  documentId: uuid,
+  userId: nonEmpty,
   /** Set by "Read deck and summarize": the record the summary lands on. */
-  summarizeOnto: z.string().uuid().optional(),
+  summarizeOnto: Schema.optional(uuid),
   /** Set by `POST /api/v1/capture`: the object the page is read as. */
-  capture: z.object({ objectId: z.string().uuid() }).optional(),
+  capture: Schema.optional(Schema.Struct({ objectId: uuid })),
 })
 
-export type ReadDeckData = z.infer<typeof readDeckData>
+export type ReadDeckData = typeof readDeckData.Type
 
 /** The test seam: one injected model per lane the job may call. */
 export type ReadDeckSeam = Pick<

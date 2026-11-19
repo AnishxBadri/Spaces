@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import {
   recordedNoteTasksMessage,
@@ -38,14 +38,14 @@ const failed = (failure: RecordedNoteTasksFailure) => {
     : new JobPermanent({ reason })
 }
 
-export const recordedNoteTasksData = z.object({
-  interactionId: z.string().uuid(),
-  noteId: z.string().uuid(),
-  integrationId: z.string().uuid(),
-  receiptId: z.string().uuid(),
+export const recordedNoteTasksData = Schema.Struct({
+  interactionId: uuid,
+  noteId: uuid,
+  integrationId: uuid,
+  receiptId: uuid,
 })
 
-export type RecordedNoteTasksData = z.infer<typeof recordedNoteTasksData>
+export type RecordedNoteTasksData = typeof recordedNoteTasksData.Type
 
 type Seam = Pick<RecordedNoteTasksInput, 'model'>
 

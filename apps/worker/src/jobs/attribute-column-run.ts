@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { nonEmpty, uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import { columnRunProgram } from '#web/lib/ai/column-run'
 import type { ColumnRunInput } from '#web/lib/ai/column-run'
@@ -21,13 +21,13 @@ import type { JobDef } from '../run-job'
  */
 export const COLUMN_RUN_EXPIRE_SECONDS = 4 * 60 * 60
 
-export const attributeColumnRunData = z.object({
-  viewId: z.string().uuid(),
-  attributeId: z.string().uuid(),
-  userId: z.string().min(1),
+export const attributeColumnRunData = Schema.Struct({
+  viewId: uuid,
+  attributeId: uuid,
+  userId: nonEmpty,
 })
 
-export type AttributeColumnRunData = z.infer<typeof attributeColumnRunData>
+export type AttributeColumnRunData = typeof attributeColumnRunData.Type
 
 /** The job's body, with the seams the test uses. */
 export const runAttributeColumnRun = (

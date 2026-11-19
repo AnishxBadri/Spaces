@@ -1,7 +1,7 @@
 import { Effect, Schema } from 'effect'
 import type { Layer } from 'effect'
 import { and, eq } from 'drizzle-orm'
-import { z } from 'zod'
+import { nonEmpty, urlString, uuid } from '../job-data'
 import { db } from '@spaces/db'
 import { accountConnection, document } from '@spaces/db/schema'
 import { guessDocumentKind } from '@spaces/core/documents'
@@ -36,14 +36,14 @@ import type { JobDef, JobFailure } from '../run-job'
  *   the pending row; only a rate limit or a store that blinked retries.
  */
 
-export const fetchStorageFileData = z.object({
-  url: z.string().url(),
-  connectionId: z.string().uuid(),
-  attachTo: z.string().uuid(),
-  actorUserId: z.string().min(1),
+export const fetchStorageFileData = Schema.Struct({
+  url: urlString,
+  connectionId: uuid,
+  attachTo: uuid,
+  actorUserId: nonEmpty,
 })
 
-export type FetchStorageFileData = z.infer<typeof fetchStorageFileData>
+export type FetchStorageFileData = typeof fetchStorageFileData.Type
 
 /** The sentences a refusal reads as on the row. */
 export const FETCH_REFUSALS = {

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { Effect } from 'effect'
+import { Effect, Result } from 'effect'
 import { describe, expect, it } from 'vitest'
+import { decodeJobData } from '../job-data'
 import { JobPermanent } from '../run-job'
 import { runSummarize, summarize, summarizeData } from './summarize'
 
@@ -27,15 +28,19 @@ describe('entity.summarize', () => {
 
   it('never retries, and carries who pressed and what', () => {
     expect(summarize.retry?.limit).toBe(0)
-    expect(summarizeData.safeParse({ recordId: randomUUID() }).success).toBe(
-      false,
-    )
     expect(
-      summarizeData.safeParse({
-        recordId: randomUUID(),
-        documentId: null,
-        userId: 'u',
-      }).success,
+      Result.isSuccess(
+        decodeJobData(summarizeData, { recordId: randomUUID() }),
+      ),
+    ).toBe(false)
+    expect(
+      Result.isSuccess(
+        decodeJobData(summarizeData, {
+          recordId: randomUUID(),
+          documentId: null,
+          userId: 'u',
+        }),
+      ),
     ).toBe(true)
   })
 })

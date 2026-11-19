@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { desc, eq } from 'drizzle-orm'
 import type { JobWithMetadata } from 'pg-boss'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
+import { uuid } from '../job-data'
 import { db } from '@spaces/db'
 import { entity, jobRun, workerHeartbeat } from '@spaces/db/schema'
 import { WORKER_ROLE } from '@spaces/db/heartbeat'
@@ -83,7 +83,7 @@ const gated = (queue: string) => {
   const handler = runJob(
     {
       name: queue,
-      schema: z.object({ entityId: z.uuid() }),
+      schema: Schema.Struct({ entityId: uuid }),
       run: () => Effect.promise(() => gate).pipe(Effect.as('filled 1 field')),
       refs: (data) => ({ entityId: data.entityId }),
     },

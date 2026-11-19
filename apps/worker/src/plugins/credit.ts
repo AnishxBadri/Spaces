@@ -1,6 +1,5 @@
-import { Clock, Effect, Predicate } from 'effect'
+import { Clock, Effect, Predicate, Schema } from 'effect'
 import { and, eq, max } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { enrichmentRecord, integration } from '@spaces/db/schema'
 import { utcDayStart } from '@spaces/core/ai/caps'
@@ -14,6 +13,7 @@ import type { CreditPolicy } from '@spaces/core/plugins/credit'
 import { spendSince } from '@spaces/core/writes/enrichment/credits'
 import { JobPermanent, JobRetryable } from '@spaces/sdk'
 import type { CostHook, CostInput } from '@spaces/sdk'
+import { nonNegative } from '../job-data'
 import { JobSkipped } from '../run-job'
 import { messageOf } from './loader'
 
@@ -32,9 +32,7 @@ const DAY_MS = 24 * 60 * 60 * 1000
 export { DEFAULT_CACHE_DAYS, creditDefaults, creditPolicy }
 export type { CreditPolicy }
 
-const nonNegative = z.number().nonnegative()
-
-const costOutput = z.object({ credits: nonNegative })
+const costOutput = Schema.Struct({ credits: nonNegative })
 
 /** A bundle's hook: what it returns is checked, so only callability is claimed. */
 const isHook = (value: unknown): value is (input: CostInput) => unknown =>
@@ -44,7 +42,9 @@ const isHook = (value: unknown): value is (input: CostInput) => unknown =>
 export const costOf = (exported: unknown): CostHook | null => {
   if (!Predicate.hasProperty(exported, 'cost')) return null
   const hook = exported.cost
-  return isHook(hook) ? (input) => costOutput.parse(hook(input)) : null
+  return isHook(hook)
+    ? (input) => Schema.decodeUnknownSync(costOutput)(hook(input))
+    : null
 }
 
 const unreadable = (what: string) => (error: unknown) =>

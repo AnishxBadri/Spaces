@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { nonEmpty, uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import { keyTermsMessage, keyTermsProgram } from '#web/lib/ai/key-terms'
 import type { KeyTermsInput } from '#web/lib/ai/key-terms'
@@ -15,12 +15,12 @@ import type { JobDef } from '../run-job'
  * output (`JobOutcome.reason`), which `keyTermsStatus` reads for the toast.
  */
 
-export const extractKeyTermsData = z.object({
-  documentId: z.string().uuid(),
-  userId: z.string().min(1),
+export const extractKeyTermsData = Schema.Struct({
+  documentId: uuid,
+  userId: nonEmpty,
 })
 
-export type ExtractKeyTermsData = z.infer<typeof extractKeyTermsData>
+export type ExtractKeyTermsData = typeof extractKeyTermsData.Type
 
 /** The job's body, with the model seam the test uses. */
 export const runExtractKeyTerms = (

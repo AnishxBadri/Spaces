@@ -8,11 +8,12 @@ import {
   Layer,
   Option,
   Predicate,
+  Result,
+  Schema,
   Scope,
 } from 'effect'
 import type { Layer as LayerType } from 'effect'
 import { eq } from 'drizzle-orm'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
 import {
@@ -53,6 +54,7 @@ import type { DiscoverBinding } from '@spaces/core/writes/ports/discover'
 import type { ModelCall } from '@spaces/core/writes/ports/ai'
 import type { FetchLike } from '@spaces/core/writes/ports/http'
 import type { LogSink } from '@spaces/core/writes/ports/log'
+import { decodeJobData, jsonObject } from '../job-data'
 import { BREAKER_REASON } from '../run-job'
 import type { JobBreaker } from '../run-job'
 import type { FakeProviders } from './fakes/switch'
@@ -277,10 +279,10 @@ const notGranted = (defect: unknown): string | null => {
   return key === undefined ? null : portOfKey(key)
 }
 
-const scheduleOutput = z.object({ nextCursor: z.string().nullable() })
-const watchOutput = z.object({
-  state: z.record(z.string(), z.json()).nullable(),
+export const scheduleOutput = Schema.Struct({
+  nextCursor: Schema.NullOr(Schema.String),
 })
+export const watchOutput = Schema.Struct({ state: Schema.NullOr(jsonObject) })
 
 /**
  * The entity an invocation runs on, which `Ai` resolves sensitivity from.
@@ -778,9 +780,9 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
         }),
         Effect.flatMap((out): Effect.Effect<JobOutput, JobError> => {
           if (job.trigger === 'watch') {
-            const parsed = watchOutput.safeParse(out)
-            return parsed.success
-              ? Effect.succeed(parsed.data)
+            const parsed = decodeJobData(watchOutput, out)
+            return Result.isSuccess(parsed)
+              ? Effect.succeed(parsed.success)
               : Effect.fail(
                   new JobPermanent({
                     reason: `${label} returned no { state } object or null`,
@@ -788,9 +790,9 @@ export const makePluginHost = (options: PluginHostOptions): PluginHost => {
                 )
           }
           if (job.trigger !== 'schedule') return Effect.void
-          const parsed = scheduleOutput.safeParse(out)
-          return parsed.success
-            ? Effect.succeed(parsed.data)
+          const parsed = decodeJobData(scheduleOutput, out)
+          return Result.isSuccess(parsed)
+            ? Effect.succeed(parsed.success)
             : Effect.fail(
                 new JobPermanent({
                   reason: `${label} returned no { nextCursor }`,

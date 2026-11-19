@@ -1,5 +1,5 @@
 import { Effect } from 'effect'
-import { z } from 'zod'
+import { emptyObject, scheduled } from '../job-data'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
 import { QUEUES } from '@spaces/core/queue/names'
 import { markBindingFailedProgram } from '@spaces/core/writes/bindings/sync'
@@ -34,12 +34,9 @@ import type { JobDef, JobRetryPolicy } from '../run-job'
  * Nullish data: pg-boss stores `null` for a schedule with no payload.
  */
 
-export const pollStorageChangesData = z
-  .object({})
-  .nullish()
-  .transform((v) => v ?? {})
+export const pollStorageChangesData = scheduled(emptyObject, {})
 
-export type PollStorageChangesData = z.infer<typeof pollStorageChangesData>
+export type PollStorageChangesData = typeof pollStorageChangesData.Type
 
 /** Never retried: the next tick is the retry, from the same cursor. */
 export const pollStorageChangesRetry: JobRetryPolicy = {

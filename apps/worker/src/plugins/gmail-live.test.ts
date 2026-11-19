@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { and, count, desc, eq, isNotNull } from 'drizzle-orm'
 import { PgBoss } from 'pg-boss'
 import {
@@ -24,7 +24,6 @@ import {
   note,
 } from '@spaces/db/schema'
 import { Enqueue } from '@spaces/core/queue/enqueue'
-import { z } from 'zod'
 import { DEFAULT_MAIL_EXCLUDE } from '#web/lib/arrival/noise'
 import { FAKE_GMAIL_OWNER } from '@spaces/sdk/testing'
 import type { FakeGmailApi } from '@spaces/sdk/testing'
@@ -363,24 +362,28 @@ describe('gmail with the fakes on', () => {
   }, 60_000)
 
   it('ships the host’s default blocklist as its settings’ defaults', () => {
-    const manifest = z
-      .object({
-        settings: z.object({
-          properties: z.object({
-            shareBodies: z.object({ default: z.literal(false) }),
-            excludeSenders: z.object({ default: z.array(z.string()) }),
-            excludeLabels: z.object({ default: z.array(z.string()) }),
+    const manifest = Schema.decodeUnknownSync(
+      Schema.Struct({
+        settings: Schema.Struct({
+          properties: Schema.Struct({
+            shareBodies: Schema.Struct({ default: Schema.Literal(false) }),
+            excludeSenders: Schema.Struct({
+              default: Schema.Array(Schema.String),
+            }),
+            excludeLabels: Schema.Struct({
+              default: Schema.Array(Schema.String),
+            }),
           }),
         }),
-      })
-      .parse(
-        JSON.parse(
-          readFileSync(
-            path.join(REPO_PLUGINS, 'gmail', 'dist', 'manifest.json'),
-            'utf8',
-          ),
+      }),
+    )(
+      JSON.parse(
+        readFileSync(
+          path.join(REPO_PLUGINS, 'gmail', 'dist', 'manifest.json'),
+          'utf8',
         ),
-      )
+      ),
+    )
     expect(manifest.settings.properties.excludeSenders.default).toEqual([
       ...DEFAULT_MAIL_EXCLUDE.senders,
     ])

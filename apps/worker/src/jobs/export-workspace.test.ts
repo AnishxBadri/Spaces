@@ -1,5 +1,6 @@
-import { Effect } from 'effect'
+import { Effect, Result } from 'effect'
 import { describe, expect, it } from 'vitest'
+import { decodeJobData } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import { readExportSummary } from '@spaces/core/export/workspace'
 import { storage } from '@spaces/core/writes/storage'
@@ -15,7 +16,7 @@ import { exportWorkspace, exportWorkspaceData } from './export-workspace'
 
 describe('workspace.export', () => {
   it('refuses data with no requester', () => {
-    expect(exportWorkspaceData.safeParse({}).success).toBe(false)
+    expect(Result.isSuccess(decodeJobData(exportWorkspaceData, {}))).toBe(false)
   })
 
   it('stores the zip and names it in its summary', async () => {

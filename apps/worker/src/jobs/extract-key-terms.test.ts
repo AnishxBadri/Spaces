@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { Effect } from 'effect'
+import { Effect, Result } from 'effect'
 import { describe, expect, it } from 'vitest'
+import { decodeJobData } from '../job-data'
 import { JobPermanent } from '../run-job'
 import {
   extractKeyTerms,
@@ -28,11 +29,17 @@ describe('document.key-terms', () => {
   it('never retries, and carries who pressed and what', () => {
     expect(extractKeyTerms.retry?.limit).toBe(0)
     expect(
-      extractKeyTermsData.safeParse({ documentId: randomUUID() }).success,
+      Result.isSuccess(
+        decodeJobData(extractKeyTermsData, { documentId: randomUUID() }),
+      ),
     ).toBe(false)
     expect(
-      extractKeyTermsData.safeParse({ documentId: randomUUID(), userId: 'u' })
-        .success,
+      Result.isSuccess(
+        decodeJobData(extractKeyTermsData, {
+          documentId: randomUUID(),
+          userId: 'u',
+        }),
+      ),
     ).toBe(true)
   })
 })

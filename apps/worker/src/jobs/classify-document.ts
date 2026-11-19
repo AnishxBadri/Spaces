@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import {
   classifyDocumentProgram,
@@ -17,11 +17,11 @@ import type { JobDef } from '../run-job'
  *   completes and says why.
  */
 
-export const classifyDocumentData = z.object({
-  documentId: z.string().uuid(),
+export const classifyDocumentData = Schema.Struct({
+  documentId: uuid,
 })
 
-export type ClassifyDocumentData = z.infer<typeof classifyDocumentData>
+export type ClassifyDocumentData = typeof classifyDocumentData.Type
 
 /** The job's body, with the model seam the test uses. */
 export const runClassifyDocument = (

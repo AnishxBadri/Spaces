@@ -1,7 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import type { JobWithMetadata } from 'pg-boss'
 import type { JobHost, JobOutcome } from './run-job'
 
@@ -83,7 +82,7 @@ describe('runJob — the job_run ledger', () => {
     const handler = runJob(
       {
         name: queue,
-        schema: z.object({ n: z.number() }),
+        schema: Schema.Struct({ n: Schema.Number }),
         run: () =>
           Effect.fail(new JobRetryable({ reason: 'blob not there yet' })),
       },
@@ -174,7 +173,7 @@ describe('runJob — refs looked up', () => {
     const handler = runJob(
       {
         name: queue,
-        schema: z.object({ found: z.boolean() }),
+        schema: Schema.Struct({ found: Schema.Boolean }),
         lookupRefs: (data) =>
           data.found
             ? Promise.resolve({ entityId: record.id })
@@ -251,7 +250,7 @@ describe('runJob — a JobClose commits with the row that closes the run', () =>
     const handler = t.runJob(
       {
         name: queue,
-        schema: z.object({}),
+        schema: Schema.Struct({}),
         run: () =>
           Effect.succeed({
             summary: 'advanced',
@@ -283,7 +282,7 @@ describe('runJob — a JobClose commits with the row that closes the run', () =>
     return t.runJob(
       {
         name: queue,
-        schema: z.object({}),
+        schema: Schema.Struct({}),
         run: () =>
           options.fail
             ? Effect.fail(new t.JobRetryable({ reason: 'not yet' }))

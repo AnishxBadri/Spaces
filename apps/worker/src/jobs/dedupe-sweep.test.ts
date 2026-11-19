@@ -1,5 +1,7 @@
+import { Result, Schema } from 'effect'
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it } from 'vitest'
+import { decodeJobData } from '../job-data'
 import type { JobWithMetadata } from 'pg-boss'
 import { runJob } from '../run-job'
 import type { JobHost, JobOutcome, JobRunLedger } from '../run-job'
@@ -109,16 +111,20 @@ describe('dedupeSweepData', () => {
   it('accepts the nightly schedule’s empty payload and an object scope', () => {
     // pg-boss stores `data = null` for a schedule registered with no
     // payload, which is exactly how the 03:30 row is registered. A bare
-    // z.object() would fail every nightly run before the handler ran.
-    expect(dedupeSweepData.parse(null)).toEqual({})
-    expect(dedupeSweepData.parse(undefined)).toEqual({})
-    expect(dedupeSweepData.parse({})).toEqual({})
+    // struct would fail every nightly run before the handler ran.
+    expect(Schema.decodeUnknownSync(dedupeSweepData)(null)).toEqual({})
+    expect(Schema.decodeUnknownSync(dedupeSweepData)(undefined)).toEqual({})
+    expect(Schema.decodeUnknownSync(dedupeSweepData)({})).toEqual({})
 
     const objectId = randomUUID()
-    expect(dedupeSweepData.parse({ objectId })).toEqual({ objectId })
-    expect(dedupeSweepData.safeParse({ objectId: 'not-a-uuid' }).success).toBe(
-      false,
-    )
+    expect(Schema.decodeUnknownSync(dedupeSweepData)({ objectId })).toEqual({
+      objectId,
+    })
+    expect(
+      Result.isSuccess(
+        decodeJobData(dedupeSweepData, { objectId: 'not-a-uuid' }),
+      ),
+    ).toBe(false)
   })
 })
 

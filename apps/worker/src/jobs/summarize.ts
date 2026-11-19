@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { nonEmpty, uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import { summarizeMessage, summarizeProgram } from '#web/lib/ai/summarize'
 import type { SummarizeInput } from '#web/lib/ai/summarize'
@@ -15,13 +15,13 @@ import type { JobDef } from '../run-job'
  * (`JobOutcome.reason`), which `summarizeStatus` reads back for the toast.
  */
 
-export const summarizeData = z.object({
-  recordId: z.string().uuid(),
-  documentId: z.string().uuid().nullable(),
-  userId: z.string().min(1),
+export const summarizeData = Schema.Struct({
+  recordId: uuid,
+  documentId: Schema.NullOr(uuid),
+  userId: nonEmpty,
 })
 
-export type SummarizeData = z.infer<typeof summarizeData>
+export type SummarizeData = typeof summarizeData.Type
 
 /** The job's body, with the model seam the test uses. */
 export const runSummarize = (

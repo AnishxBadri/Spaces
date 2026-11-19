@@ -1,14 +1,14 @@
 import { createHash } from 'node:crypto'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import path from 'node:path'
-import { Data, Effect, Exit, Layer, Predicate } from 'effect'
+import { Data, Effect, Exit, Layer, Predicate, Schema } from 'effect'
 import type { Pool, PoolClient, QueryConfig, QueryResultRow } from 'pg'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { JobPermanent, JobRetryable, PluginDb } from '@spaces/sdk'
 import type { JobError, JsonObject, JsonValue } from '@spaces/sdk'
 import type { BoundIntegration } from '@spaces/core/writes/ports/binding'
 import { pluginSchemaName } from '@spaces/core/writes/plugins/schema'
+import { jsonObject } from '../job-data'
 import { splitStatements } from './sql-split'
 
 /**
@@ -399,13 +399,13 @@ const toJobError = (error: SqlFailed): JobError =>
     ? new JobRetryable({ reason: `PluginDb: ${error.message}` })
     : new JobPermanent({ reason: `PluginDb: ${error.message}` })
 
-const jsonRows = z.array(z.record(z.string(), z.json()))
+export const jsonRows = Schema.Array(jsonObject)
 
 /** pg's rows as JSON: a Date becomes its ISO string, as `JSON.stringify` writes it. */
 const toJsonRows = (rows: ReadonlyArray<unknown>) =>
   Effect.try({
     try: (): ReadonlyArray<JsonObject> =>
-      jsonRows.parse(JSON.parse(JSON.stringify(rows))),
+      Schema.decodeUnknownSync(jsonRows)(JSON.parse(JSON.stringify(rows))),
     catch: (error) =>
       new JobPermanent({
         reason: `PluginDb: a row is not JSON: ${error instanceof Error ? error.message : String(error)}`,

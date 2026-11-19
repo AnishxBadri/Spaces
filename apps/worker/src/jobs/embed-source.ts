@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { nonEmpty, uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import { embedSourceProgram } from '#web/lib/ai/embed-source'
 import type { EmbedSourceInput } from '#web/lib/ai/embed-source'
@@ -20,20 +20,20 @@ import type { JobDef } from '../run-job'
  *   transaction makes a retry safe
  */
 
-export const embedSourceData = z.discriminatedUnion('sourceKind', [
-  z.object({
-    entityId: z.string().uuid(),
-    sourceKind: z.literal('note'),
-    sourceKey: z.literal(''),
+export const embedSourceData = Schema.Union([
+  Schema.Struct({
+    entityId: uuid,
+    sourceKind: Schema.Literal('note'),
+    sourceKey: Schema.Literal(''),
   }),
-  z.object({
-    entityId: z.string().uuid(),
-    sourceKind: z.literal('attribute'),
-    sourceKey: z.string().min(1),
+  Schema.Struct({
+    entityId: uuid,
+    sourceKind: Schema.Literal('attribute'),
+    sourceKey: nonEmpty,
   }),
 ])
 
-export type EmbedSourceData = z.infer<typeof embedSourceData>
+export type EmbedSourceData = typeof embedSourceData.Type
 
 const label = (s: EmbedSource) =>
   s.sourceKind === 'note'

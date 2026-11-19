@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { Effect, Layer } from 'effect'
+import { Effect, Layer, Schema } from 'effect'
 import { describe, expect, it } from 'vitest'
-import { z } from 'zod'
 import type { JobWithMetadata } from 'pg-boss'
 import { db } from '@spaces/db'
 import { integration } from '@spaces/db/schema'
@@ -101,7 +100,7 @@ const attempt = (
   return runJob(
     {
       name: queue,
-      schema: z.object({}),
+      schema: Schema.Struct({}),
       refs: () => ({ integrationId }),
       run: () => outcome,
     },

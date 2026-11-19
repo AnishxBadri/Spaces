@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { Effect } from 'effect'
+import { Effect, Result } from 'effect'
 import { describe, expect, it, vi } from 'vitest'
+import { decodeJobData } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import {
   runSummarizeEmail,
@@ -27,9 +28,11 @@ describe('interaction.summarize-email', () => {
   it('names its queue, takes one interaction id, and retries a provider outage', () => {
     expect(summarizeEmail.name).toBe(QUEUES.summarizeEmail)
     expect(summarizeEmail.retry?.limit).toBe(2)
-    expect(summarizeEmailData.safeParse({}).success).toBe(false)
+    expect(Result.isSuccess(decodeJobData(summarizeEmailData, {}))).toBe(false)
     expect(
-      summarizeEmailData.safeParse({ interactionId: randomUUID() }).success,
+      Result.isSuccess(
+        decodeJobData(summarizeEmailData, { interactionId: randomUUID() }),
+      ),
     ).toBe(true)
   })
 })

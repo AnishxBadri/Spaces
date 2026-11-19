@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import { db } from '@spaces/db'
 import { document } from '@spaces/db/schema'
 import { QUEUES } from '@spaces/core/queue/names'
@@ -57,9 +56,9 @@ describe('a captured page, through the existing extract job', () => {
       }),
     )
     expect(response.status).toBe(200)
-    const { documentId } = z
-      .object({ documentId: z.string() })
-      .parse(await response.json())
+    const { documentId } = Schema.decodeUnknownSync(
+      Schema.Struct({ documentId: Schema.String }),
+    )(await response.json())
 
     const { enqueued } = await import('#web/test/queue-stub')
     expect(enqueued).toEqual([

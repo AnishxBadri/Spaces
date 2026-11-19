@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { Context, Effect, Layer, Schema } from 'effect'
 import { eq, sql } from 'drizzle-orm'
-import { z } from 'zod'
+import { uuid } from '../job-data'
 import { db } from '@spaces/db'
 import { document } from '@spaces/db/schema'
 import { onDocumentExtracted } from '#web/lib/documents/on-extracted'
@@ -28,11 +28,11 @@ import type { JobDef } from '../run-job'
  * - extractor says unsupported/failed → JobPermanent, that status
  */
 
-export const extractDocumentData = z.object({
-  documentId: z.string().uuid(),
+export const extractDocumentData = Schema.Struct({
+  documentId: uuid,
 })
 
-export type ExtractDocumentData = z.infer<typeof extractDocumentData>
+export type ExtractDocumentData = typeof extractDocumentData.Type
 
 export interface DocumentForExtraction {
   readonly blobSha: string | null

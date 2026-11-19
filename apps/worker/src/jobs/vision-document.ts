@@ -1,6 +1,6 @@
-import { Effect } from 'effect'
+import { Effect, Schema } from 'effect'
 import { eq } from 'drizzle-orm'
-import { z } from 'zod'
+import { nonEmpty, uuid } from '../job-data'
 import type { LanguageModel } from 'ai'
 import { db } from '@spaces/db'
 import { document } from '@spaces/db/schema'
@@ -48,12 +48,12 @@ import type { BlobUnreadable, StoreUnavailable } from './extract-document'
  *   every page before it.
  */
 
-export const visionDocumentData = z.object({
-  documentId: z.string().uuid(),
-  userId: z.string().min(1),
+export const visionDocumentData = Schema.Struct({
+  documentId: uuid,
+  userId: nonEmpty,
 })
 
-export type VisionDocumentData = z.infer<typeof visionDocumentData>
+export type VisionDocumentData = typeof visionDocumentData.Type
 
 /** The test seam: an injected model, and a smaller chunk to see the split. */
 export type VisionSeam = { model?: LanguageModel; pagesPerChunk?: number }

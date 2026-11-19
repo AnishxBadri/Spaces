@@ -1,7 +1,6 @@
-import { Clock, Effect, Layer } from 'effect'
+import { Clock, Effect, Layer, Schema } from 'effect'
 import { TestClock } from 'effect/testing'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { z } from 'zod'
 import type { JobWithMetadata } from 'pg-boss'
 import {
   JobContext,
@@ -115,8 +114,8 @@ function fakeJob(
   }
 }
 
-const schema = z.object({ n: z.number() })
-type Data = z.infer<typeof schema>
+const schema = Schema.Struct({ n: Schema.Number })
+type Data = typeof schema.Type
 
 function def(run: JobDef<Data>['run']): JobDef<Data> {
   return { name: 'test.queue', schema, run }

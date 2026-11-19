@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { nonEmpty, uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import {
   suggestSpacesMessage,
@@ -18,12 +18,12 @@ import type { JobDef } from '../run-job'
  * - A run that finds nothing completes; the rail counts the rows it wrote.
  */
 
-export const suggestSpacesData = z.object({
-  entityId: z.string().uuid(),
-  userId: z.string().min(1),
+export const suggestSpacesData = Schema.Struct({
+  entityId: uuid,
+  userId: nonEmpty,
 })
 
-export type SuggestSpacesData = z.infer<typeof suggestSpacesData>
+export type SuggestSpacesData = typeof suggestSpacesData.Type
 
 /** The job's body, with the model seam the test uses. */
 export const runSuggestSpaces = (

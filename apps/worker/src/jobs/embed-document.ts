@@ -1,5 +1,5 @@
-import { Effect } from 'effect'
-import { z } from 'zod'
+import { Effect, Schema } from 'effect'
+import { uuid } from '../job-data'
 import { QUEUES } from '@spaces/core/queue/names'
 import { embedDocumentProgram } from '#web/lib/ai/embed-document'
 import type { EmbedDocumentInput } from '#web/lib/ai/embed-document'
@@ -20,11 +20,11 @@ import type { JobDef } from '../run-job'
  *   transaction makes the run idempotent
  */
 
-export const embedDocumentData = z.object({
-  documentId: z.string().uuid(),
+export const embedDocumentData = Schema.Struct({
+  documentId: uuid,
 })
 
-export type EmbedDocumentData = z.infer<typeof embedDocumentData>
+export type EmbedDocumentData = typeof embedDocumentData.Type
 
 /** The job's body, with the model seam the test uses. */
 export const runEmbedDocument = (
