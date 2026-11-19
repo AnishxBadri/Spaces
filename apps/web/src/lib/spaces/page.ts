@@ -1,4 +1,6 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { uuidString } from '@spaces/core/attributes/registry'
+import { caught, searchValidator } from '#/lib/search-validator'
 
 /**
  * The space page's pure half: its tabs, the funding-stage mix, and the
@@ -23,12 +25,14 @@ export const DEFAULT_SPACE_TAB: SpaceTab = 'overview'
  * subspace a split moves companies into: the Companies tab opens selecting.
  * `?watch=` marks one watch in the Watching lane.
  */
-export const spaceSearch = z.object({
-  tab: z.enum(SPACE_TABS).optional().catch(undefined),
-  into: z.string().uuid().optional().catch(undefined),
-  /** A watch the Watching lane marks: where "Already watching this" lands. */
-  watch: z.string().uuid().optional().catch(undefined),
-})
+export const spaceSearch = searchValidator(
+  Schema.Struct({
+    tab: caught(Schema.Literals(SPACE_TABS)),
+    into: caught(uuidString),
+    /** A watch the Watching lane marks: where "Already watching this" lands. */
+    watch: caught(uuidString),
+  }),
+)
 
 /** The subspace Move here targets: the picked one, else the link's. */
 export function moveTarget(

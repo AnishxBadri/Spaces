@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
-import { z } from 'zod'
+import { loginSearch } from '#/lib/route-search'
 import { AuthShell, FormError } from '#/components/auth-shell'
 import { PasswordInput } from '#/components/password-input'
 import { Button } from '#/components/ui/button'
@@ -12,10 +12,7 @@ import { getSession, getSetupState } from '#/lib/server-fns'
 export const Route = createFileRoute('/login')({
   // `reset=done` is where a reset link lands once the password is set;
   // `from=setup` is where a closed /setup sends whoever opened it.
-  validateSearch: z.object({
-    reset: z.string().optional(),
-    from: z.string().optional(),
-  }),
+  validateSearch: loginSearch,
   beforeLoad: async () => {
     const { needsSetup, workspaceName } = await getSetupState()
     if (needsSetup) throw redirect({ to: '/setup' })

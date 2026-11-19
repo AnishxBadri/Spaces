@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
-import { z } from 'zod'
+import { importSearch } from '#/lib/route-search'
 import {
   DropZone,
   ImportHeader,
@@ -19,10 +19,6 @@ import type { PreviousImport } from '#/components/import/import-wizard'
  * `Import` action on an object list page (which carries `?object=<slug>` so
  * the target is picked already), never from the sidebar.
  */
-const importSearch = z.object({
-  object: z.string().max(80).optional(),
-})
-
 export const Route = createFileRoute('/_app/import')({
   validateSearch: importSearch,
   loader: async () => listObjects(),

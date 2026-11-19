@@ -1,7 +1,6 @@
 import { Window } from 'happy-dom'
 import { act, useState } from 'react'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { z } from 'zod'
 import type { Root, createRoot as CreateRoot } from 'react-dom/client'
 import {
   afterAll,
@@ -16,6 +15,7 @@ import {
 
 import type { ViewRow } from '@spaces/core/writes/views/store'
 import { useViewState } from './views/use-view-state'
+import { listSearch } from '#/lib/route-search'
 import type * as SidebarModule from './app-sidebar'
 import type * as PrefsModule from '#/lib/chassis-prefs'
 import type * as RouterModule from '@tanstack/react-router'
@@ -632,7 +632,6 @@ describe('pinned views', () => {
       updatedAt: '2026-10-10T00:00:00.000Z',
     }
     pinned(4, 'Seed, India')
-    const listSearch = z.object({ view: z.string().optional() })
 
     const {
       Outlet,

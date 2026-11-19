@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { z } from 'zod'
+import { usageSearch } from '#/lib/route-search'
 import { LimitsGroup } from '#/components/settings/caps-section'
 import {
   SettingsColumns,
@@ -40,10 +40,7 @@ type RunStep = RunDetail['steps'][number]
  *   A member reads Limits disabled; only an admin changes them.
  */
 export const Route = createFileRoute('/_app/settings/usage')({
-  validateSearch: z.object({
-    run: z.string().uuid().optional(),
-    integration: z.string().uuid().optional(),
-  }),
+  validateSearch: usageSearch,
   loaderDeps: ({ search }) => ({
     run: search.run ?? null,
     integration: search.integration ?? null,

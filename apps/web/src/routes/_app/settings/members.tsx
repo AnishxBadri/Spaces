@@ -2,7 +2,7 @@ import { createFileRoute, getRouteApi, useRouter } from '@tanstack/react-router'
 import { Email, icon, Link, Locked } from '#/components/icons'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { z } from 'zod'
+import { membersSearch } from '#/lib/route-search'
 import { InitialsMark } from '#/components/record/record-parts'
 import { ResetLinkDialog } from '#/components/settings/reset-link-dialog'
 import {
@@ -41,9 +41,7 @@ const shell = getRouteApi('/_app/settings')
  * (the workspace menu's `Invite a member…`) opens the Invite window.
  */
 export const Route = createFileRoute('/_app/settings/members')({
-  validateSearch: z.object({
-    invite: z.boolean().optional().catch(undefined),
-  }),
+  validateSearch: membersSearch,
   component: MembersRoute,
 })
 

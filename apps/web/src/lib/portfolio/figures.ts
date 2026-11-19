@@ -1,7 +1,8 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { formatDay } from '@spaces/core/format'
 import { fmtMoney, fmtMultiple, fmtXirr } from '@spaces/core/portfolio/format'
 import type { HoldingMetrics } from '@spaces/core/portfolio/metrics'
+import { caught, searchValidator } from '#/lib/search-validator'
 
 /**
  * The holding page's pure half: its search and the figures row. Client-safe —
@@ -13,13 +14,11 @@ import type { HoldingMetrics } from '@spaces/core/portfolio/metrics'
  * ownership ledger as they stood that day. Anything but an ISO day reads as
  * today.
  */
-export const holdingSearch = z.object({
-  asOf: z
-    .string()
-    .regex(/^\d{4}-\d{2}-\d{2}$/)
-    .optional()
-    .catch(undefined),
-})
+export const holdingSearch = searchValidator(
+  Schema.Struct({
+    asOf: caught(Schema.String.check(Schema.isPattern(/^\d{4}-\d{2}-\d{2}$/))),
+  }),
+)
 
 export type HoldingFigure = { label: string; value: string }
 

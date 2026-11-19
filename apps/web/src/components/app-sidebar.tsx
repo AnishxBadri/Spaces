@@ -21,7 +21,6 @@ import {
 import type { IconComponent } from '#/components/icons'
 import { useEffect, useId, useMemo, useState } from 'react'
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
-import { z } from 'zod'
 import { Mark, Wordmark } from './wordmark'
 import { WorkspaceMark } from './workspace-mark'
 import {
@@ -47,6 +46,7 @@ import {
 } from '#/lib/chassis-prefs'
 import type { FoldableGroup } from '#/lib/chassis-prefs'
 import { objectIcon } from '#/lib/object-icons'
+import { listViewOf } from '#/lib/route-search'
 import { EMAIL_DRAFTS_QUERY, openDrafts } from '#/lib/email/compose'
 import {
   countEmailDrafts,
@@ -205,13 +205,6 @@ type CustomObject = { slug: string; plural: string; icon: string | null }
 
 type PinnedView = Awaited<ReturnType<typeof listPinnedViews>>[number]
 
-/** The list's `?view=`, read without trusting the location's type. */
-const viewSearch = z.object({ view: z.string() })
-const viewOf = (search: unknown): string | null => {
-  const parsed = viewSearch.safeParse(search)
-  return parsed.success ? parsed.data.view : null
-}
-
 /**
  * The pinned views this user may still open, in pin order. The pins the
  * server was asked about and left out (deleted, or private to someone else)
@@ -301,7 +294,7 @@ export function AppSidebar({
   const [objectsOpen, setObjectsOpen] = useState(false)
   const pinned = usePinnedViewRows()
   const currentView = useRouterState({
-    select: (s) => viewOf(s.location.search),
+    select: (s) => listViewOf(s.location.search),
   })
   const [pinsOpen, setPinsOpen] = useState<ReadonlyArray<string>>([])
   const drafts = useDraftsCount()

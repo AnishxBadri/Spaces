@@ -13,7 +13,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { z } from 'zod'
+import { listSearch } from '#/lib/route-search'
 import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
 import { useColumnRun } from '#/components/views/column-run'
@@ -70,7 +70,7 @@ import {
 } from '#/lib/server-fns'
 
 export const Route = createFileRoute('/_app/companies')({
-  validateSearch: z.object({ view: z.string().optional() }),
+  validateSearch: listSearch,
   // `?view=` is the only linkable filter state, so it is the only loader dep:
   // an ad-hoc condition edit refetches through the query below instead.
   loaderDeps: ({ search }) => ({ view: search.view ?? null }),

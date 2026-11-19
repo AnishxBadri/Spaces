@@ -1,4 +1,6 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { uuidString } from '@spaces/core/attributes/registry'
+import { caught, searchValidator } from './search-validator'
 
 /**
  * The window a page opens over itself from its URL: `?modal=meeting&id=`,
@@ -10,11 +12,11 @@ export const MODALS = ['meeting', 'email', 'note'] as const
 export type Modal = (typeof MODALS)[number]
 
 export const modalSearchShape = {
-  modal: z.enum(MODALS).optional().catch(undefined),
-  id: z.uuid().optional().catch(undefined),
+  modal: caught(Schema.Literals(MODALS)),
+  id: caught(uuidString),
 }
 
-export const modalSearch = z.object(modalSearchShape)
+export const modalSearch = searchValidator(Schema.Struct(modalSearchShape))
 
 /** The id of the `modal` window the search opens, else null. */
 export function openModalId(

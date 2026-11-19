@@ -1,5 +1,6 @@
-import { z } from 'zod'
+import { Schema } from 'effect'
 import { modalSearchShape } from '#/lib/modal-search'
+import { caught, searchValidator } from '#/lib/search-validator'
 import { recordNotesCount } from '#/lib/notes/record-groups'
 import type { NoteLanes } from '#/lib/notes/record-groups'
 import { threadCount } from '#/lib/timeline/threads'
@@ -27,10 +28,12 @@ export const DEFAULT_RECORD_TAB: RecordTab = 'overview'
  * `?tab=` deep-links a tab; anything else reads as no tab. `?modal=` opens a
  * window over the record (`linkedRecordTab` picks the tab behind it).
  */
-export const recordSearch = z.object({
-  tab: z.enum(RECORD_TABS).optional().catch(undefined),
-  ...modalSearchShape,
-})
+export const recordSearch = searchValidator(
+  Schema.Struct({
+    tab: caught(Schema.Literals(RECORD_TABS)),
+    ...modalSearchShape,
+  }),
+)
 
 /**
  * The tab a link asks for: its own, else Notes under a note's window and

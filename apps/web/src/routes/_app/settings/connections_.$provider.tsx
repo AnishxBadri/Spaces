@@ -1,8 +1,8 @@
 import { createFileRoute, notFound } from '@tanstack/react-router'
-import { z } from 'zod'
+import { providerSearch } from '#/lib/route-search'
 import { ProviderPage } from '#/components/settings/provider-page'
 import { isProviderId } from '@spaces/core/providers/registry'
-import { PROVIDER_TABS, defaultTab } from '#/lib/connections/provider-view'
+import { defaultTab } from '#/lib/connections/provider-view'
 import { getProviderPage } from '#/lib/server-fns'
 
 /**
@@ -12,7 +12,7 @@ import { getProviderPage } from '#/lib/server-fns'
  * client is active, Set up before. An unknown provider is not found.
  */
 export const Route = createFileRoute('/_app/settings/connections_/$provider')({
-  validateSearch: z.object({ tab: z.enum(PROVIDER_TABS).optional() }),
+  validateSearch: providerSearch,
   loader: async ({ params }) => {
     const provider = params.provider
     if (!isProviderId(provider)) throw notFound()

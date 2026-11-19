@@ -1,19 +1,22 @@
 import { redirect } from '@tanstack/react-router'
-import { z } from 'zod'
+import { Schema } from 'effect'
+import { fallback, searchValidator } from '#/lib/search-validator'
 
 /**
  * The search of the Files page, shared with `/documents` so a redirect
  * carries it whole.
  *
- * - `.catch('all')`, not a bare default: a hand-typed `?filed=nonsense`
- *   lands on the list, not on an error boundary.
+ * - A fallback, not a bare default: a hand-typed `?filed=nonsense` lands on
+ *   the list, not on an error boundary.
  */
-export const filesSearch = z.object({
-  filed: z.enum(['all', 'unfiled']).catch('all').default('all'),
-  view: z.string().optional(),
+const FilesSearch = Schema.Struct({
+  filed: fallback(Schema.Literals(['all', 'unfiled']), 'all'),
+  view: Schema.optional(Schema.String),
 })
 
-export type FilesSearch = z.infer<typeof filesSearch>
+export const filesSearch = searchValidator(FilesSearch)
+
+export type FilesSearch = typeof FilesSearch.Type
 
 /**
  * The `beforeLoad` of `/documents`: one permanent redirect to `/files`, query

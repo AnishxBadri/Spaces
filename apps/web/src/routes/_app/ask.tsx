@@ -6,7 +6,7 @@ import {
 } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { z } from 'zod'
+import { askSearch } from '#/lib/route-search'
 import {
   AskComposer,
   AskTurns,
@@ -45,9 +45,7 @@ import { cn } from '#/lib/utils'
  * a 760px column whose tables break out to the content width.
  */
 export const Route = createFileRoute('/_app/ask')({
-  validateSearch: z.object({
-    thread: z.uuid().optional().catch(undefined),
-  }),
+  validateSearch: askSearch,
   loader: () => listAskThreads(),
   component: AskPage,
 })

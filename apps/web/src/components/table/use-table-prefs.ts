@@ -1,17 +1,7 @@
 import { useEffect, useState } from 'react'
-import { z } from 'zod'
 import type { ColumnSizingState, VisibilityState } from '@tanstack/react-table'
-
-type Prefs = {
-  columnVisibility: VisibilityState
-  columnSizing: ColumnSizingState
-}
-
-/** localStorage is a boundary like any other: decoded, never asserted. */
-const storedPrefs = z.object({
-  columnVisibility: z.record(z.string(), z.boolean()).optional(),
-  columnSizing: z.record(z.string(), z.number()).optional(),
-})
+import { tablePrefsOf } from '#/lib/table-prefs'
+import type { TablePrefs } from '#/lib/table-prefs'
 
 /**
  * Which columns are shown and how wide they are, remembered per object kind.
@@ -19,18 +9,13 @@ const storedPrefs = z.object({
  * to survive a reload, not a stand-in for shared, server-side saved views.
  */
 export function useTablePrefs(key: string) {
-  const [prefs, setPrefs] = useState<Prefs>(() => {
+  const [prefs, setPrefs] = useState<TablePrefs>(() => {
     if (typeof localStorage === 'undefined')
       return { columnVisibility: {}, columnSizing: {} }
     try {
-      const stored = storedPrefs.safeParse(
-        JSON.parse(localStorage.getItem(key) ?? '{}'),
-      )
-      return {
-        columnVisibility: stored.data?.columnVisibility ?? {},
-        columnSizing: stored.data?.columnSizing ?? {},
-      }
+      return tablePrefsOf(localStorage.getItem(key))
     } catch {
+      // A storage the browser refuses to read, as in some private modes.
       return { columnVisibility: {}, columnSizing: {} }
     }
   })

@@ -10,7 +10,7 @@ import type { ColumnDef, VisibilityState } from '@tanstack/react-table'
 import { Partnership } from '#/components/icons'
 import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { z } from 'zod'
+import { listSearch } from '#/lib/route-search'
 import { ViewBar } from '#/components/views/view-bar'
 import { useViewState } from '#/components/views/use-view-state'
 import { useColumnRun } from '#/components/views/column-run'
@@ -74,7 +74,7 @@ import { jsonString } from '@spaces/core/json'
  * (counts per stage plus a page per group), not a `limit` bolted on here.
  */
 export const Route = createFileRoute('/_app/deals')({
-  validateSearch: z.object({ view: z.string().optional() }),
+  validateSearch: listSearch,
   loader: async () => {
     const [deals, registry, funnel, viewData, session] = await Promise.all([
       listDealsTable(),

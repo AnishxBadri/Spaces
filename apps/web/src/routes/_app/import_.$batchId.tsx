@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate, useRouter } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { z } from 'zod'
+import { importBatchSearch } from '#/lib/route-search'
 import { formatBytes } from '@spaces/core/documents'
 import { columnName } from '@spaces/core/import/mapping'
 import {
@@ -75,17 +75,8 @@ import { landingRows } from '@spaces/core/import/plan'
  * changes which rows the server sends. The escaping `_` keeps the
  * page outside `/import`'s component.
  */
-const importSearch = z.object({
-  show: z
-    .enum(['all', 'create', 'attach', 'decide', 'noland'])
-    .catch('all')
-    .default('all'),
-  /** Step 4's filter: every row, or the ones that failed. */
-  outcome: z.enum(['all', 'failed']).catch('all').default('all'),
-})
-
 export const Route = createFileRoute('/_app/import_/$batchId')({
-  validateSearch: importSearch,
+  validateSearch: importBatchSearch,
   loaderDeps: ({ search }) => ({
     show: search.show,
     outcome: search.outcome,

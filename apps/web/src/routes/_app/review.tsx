@@ -3,7 +3,7 @@ import { Checkmark, icon, MailAll } from '#/components/icons'
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
-import { z } from 'zod'
+import { reviewSearch } from '#/lib/route-search'
 import { EmptyState } from '#/components/empty-state'
 import { SuggestionCard } from '#/components/inbox/suggestion-card'
 import { ColumnRunGroup } from '#/components/inbox/column-run-group'
@@ -48,21 +48,11 @@ import { cn } from '#/lib/utils'
  * chips link here); `source` and `space` are a Today Review row's
  * filter. All three are loader deps, since they change what the server
  * sends. `lane` only seeds the tab on arrival and is not a dep: the
- * tabs stay React state. `.catch` rather than a failure, so a
+ * tabs stay React state. Each key is caught rather than refused, so a
  * hand-typed bad value lands on the whole queue, not an error boundary.
  */
-const inboxSearch = z.object({
-  record: z.string().uuid().optional().catch(undefined),
-  source: z.string().min(1).max(100).optional().catch(undefined),
-  space: z.string().uuid().optional().catch(undefined),
-  lane: z
-    .enum(['all', 'suggestions', 'duplicates'])
-    .optional()
-    .catch(undefined),
-})
-
 export const Route = createFileRoute('/_app/review')({
-  validateSearch: inboxSearch,
+  validateSearch: reviewSearch,
   loaderDeps: ({ search }) => ({
     record: search.record ?? null,
     source: search.source ?? null,

@@ -1,6 +1,5 @@
 import { createFileRoute, useRouter } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
-import { z } from 'zod'
 import { DensityRamp } from '#/components/dither'
 import { LedgerRow } from '#/components/ledger-section'
 import { MeetingDialog } from '#/components/meeting-dialog'
@@ -15,7 +14,8 @@ import {
   upcomingHorizon,
 } from '#/lib/meetings/list'
 import type { MeetingFilter } from '#/lib/meetings/list'
-import { modalSearchShape, openModalId } from '#/lib/modal-search'
+import { openModalId } from '#/lib/modal-search'
+import { meetingsSearch } from '#/lib/route-search'
 
 /**
  * Meetings: what is coming this week and next, by day with Prep, and the
@@ -23,10 +23,7 @@ import { modalSearchShape, openModalId } from '#/lib/modal-search'
  * interactions; a meeting is an activity, never a record.
  */
 export const Route = createFileRoute('/_app/meetings')({
-  validateSearch: z.object({
-    ...modalSearchShape,
-    show: z.enum(MEETING_FILTERS).optional().catch(undefined),
-  }),
+  validateSearch: meetingsSearch,
   component: MeetingsPage,
 })
 

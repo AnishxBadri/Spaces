@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
-import { z } from 'zod'
+import { Option, Schema } from 'effect'
+import { uuidString } from '@spaces/core/attributes/registry'
 
 /**
  * The chassis' per-browser memory: which groups are folded, which spaces are
@@ -35,9 +36,16 @@ const STARRED_KEY = 'chassis:starred-spaces'
 const PINNED_KEY = 'chassis:pinned-views'
 const KEYS: ReadonlyArray<string> = [FOLDED_KEY, STARRED_KEY, PINNED_KEY]
 
-const foldedCodec = z.array(z.enum(FOLDABLE_GROUPS))
-const starredCodec = z.array(z.object({ id: z.string(), name: z.string() }))
-const pinnedCodec = z.array(z.string().uuid())
+/** A stored string through `schema`: None when not JSON or not the shape. */
+const storedAs = <TSchema extends Schema.ConstraintDecoder<unknown>>(
+  schema: TSchema,
+) => Schema.decodeUnknownOption(Schema.fromJsonString(schema))
+
+const decodeFolded = storedAs(Schema.Array(Schema.Literals(FOLDABLE_GROUPS)))
+const decodeStarred = storedAs(
+  Schema.Array(Schema.Struct({ id: Schema.String, name: Schema.String })),
+)
+const decodePinned = storedAs(Schema.Array(uuidString))
 
 const listeners = new Set<() => void>()
 
@@ -46,12 +54,19 @@ const EMPTY_STARRED: ReadonlyArray<StarredSpace> = []
 const EMPTY_PINNED: ReadonlyArray<string> = []
 
 /** One key's snapshot, re-decoded only when the stored string changes. */
-function snapshot<T>(key: string, codec: z.ZodType<T>, empty: T) {
+function snapshot<T>(
+  key: string,
+  decode: (raw: string) => Option.Option<T>,
+  empty: T,
+) {
   let last: { raw: string | null; value: T } | null = null
   return (): T => {
     const raw = rawOf(key)
     if (last?.raw === raw) return last.value
-    last = { raw, value: decode(raw, codec) ?? empty }
+    last = {
+      raw,
+      value: raw === null ? empty : Option.getOrElse(decode(raw), () => empty),
+    }
     return last.value
   }
 }
@@ -66,29 +81,19 @@ function rawOf(key: string): string | null {
 
 const readFolded = snapshot<ReadonlyArray<FoldableGroup>>(
   FOLDED_KEY,
-  foldedCodec,
+  decodeFolded,
   EMPTY_FOLDED,
 )
 const readStarred = snapshot<ReadonlyArray<StarredSpace>>(
   STARRED_KEY,
-  starredCodec,
+  decodeStarred,
   EMPTY_STARRED,
 )
 const readPinned = snapshot<ReadonlyArray<string>>(
   PINNED_KEY,
-  pinnedCodec,
+  decodePinned,
   EMPTY_PINNED,
 )
-
-function decode<T>(raw: string | null, codec: z.ZodType<T>): T | null {
-  if (raw === null) return null
-  try {
-    const parsed = codec.safeParse(JSON.parse(raw))
-    return parsed.success ? parsed.data : null
-  } catch {
-    return null
-  }
-}
 
 function write(key: string, value: unknown) {
   try {

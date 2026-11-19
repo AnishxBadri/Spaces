@@ -1,6 +1,6 @@
 import { createFileRoute, redirect, useNavigate } from '@tanstack/react-router'
 import { useState } from 'react'
-import { z } from 'zod'
+import { tokenSearch } from '#/lib/route-search'
 import { AuthShell, FieldHint, FormError } from '#/components/auth-shell'
 import { PasswordInput } from '#/components/password-input'
 import { Button } from '#/components/ui/button'
@@ -15,7 +15,7 @@ import { getInvitePreview, getSession } from '#/lib/server-fns'
  * what validates it, so hitting the signup endpoint directly buys nothing.
  */
 export const Route = createFileRoute('/join')({
-  validateSearch: z.object({ token: z.string().catch('') }),
+  validateSearch: tokenSearch,
   loaderDeps: ({ search }) => ({ token: search.token }),
   loader: async ({ deps }) => {
     const session = await getSession()

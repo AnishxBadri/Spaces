@@ -1,7 +1,7 @@
 import { useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { z } from 'zod'
+import { pendingFolderLinkOf } from '#/lib/documents/pending-folder-link'
 import {
   linkDriveFolder,
   linkFolderStatus,
@@ -45,38 +45,17 @@ export function filesTabPath(href: string): string {
   return `${url.pathname}${url.search}`
 }
 
-const pendingSchema = z.object({
-  entityId: z.string(),
-  folder: z.union([
-    z.object({ url: z.string() }),
-    z.object({ id: z.string() }),
-  ]),
-  title: z.string(),
-  options: z.object({
-    mapSubfolders: z.boolean(),
-    retain: z.enum(['full', 'text']),
-    direction: z.literal('pull'),
-    sensitivity: z.enum(['inherit', 'sensitive']),
-  }),
-})
-
 /** The bind a consent detour left for this record, taken once. */
 function takePending(entityId: string): FolderLinking | null {
   const raw = window.sessionStorage.getItem(PENDING_KEY)
   if (raw === null) return null
   window.sessionStorage.removeItem(PENDING_KEY)
-  let json: unknown
-  try {
-    json = JSON.parse(raw)
-  } catch {
-    return null
-  }
-  const parsed = pendingSchema.safeParse(json)
-  if (!parsed.success || parsed.data.entityId !== entityId) return null
+  const pending = pendingFolderLinkOf(raw)
+  if (pending === null || pending.entityId !== entityId) return null
   return {
-    folder: parsed.data.folder,
-    title: parsed.data.title,
-    initial: parsed.data.options,
+    folder: pending.folder,
+    title: pending.title,
+    initial: pending.options,
     busy: false,
     bindId: null,
     refusal: null,

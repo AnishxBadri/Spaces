@@ -7,7 +7,7 @@ import {
 import { CheckboxChecked, icon } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { z } from 'zod'
+import { tasksSearch } from '#/lib/route-search'
 import { EmptyState } from '#/components/empty-state'
 import { LabelHead, LedgerFigure } from '#/components/ledger-section'
 import { PageBody, PageHeader } from '#/components/page-header'
@@ -36,10 +36,7 @@ export const Route = createFileRoute('/_app/tasks')({
   // `?task=` is the row a Cmd-K hit lands on; `?record=` narrows the list to
   // one record's tasks. A malformed id catches to undefined: the page renders
   // unfocused and unnarrowed, with no error.
-  validateSearch: z.object({
-    task: z.string().uuid().optional().catch(undefined),
-    record: z.string().uuid().optional().catch(undefined),
-  }),
+  validateSearch: tasksSearch,
   // The focused id is a loader dep because Done is a 50-row window: a hit on
   // a task closed long ago is fetched by id, not hoped for in the window.
   loaderDeps: ({ search }) => ({ task: search.task, record: search.record }),
