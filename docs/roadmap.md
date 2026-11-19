@@ -75,6 +75,9 @@ Plus Zod leaves (project 37: every server-fn validator through `input()`, job pa
 - `SPA-456` `tasks-5` — a task made from an action item keeps its write-up; pending items head Tasks › Open (D113). Project 36; `migration`, `afk`, after SPA-442 and SPA-451.
 - `SPA-471` `deps-1` — drop `@tailwindcss/typography` (unused) and `dotenv`/`dotenv-cli` (Node 22 reads env files); the site sets in IBM Plex. `afk`.
 - `SPA-472` `errors-1` — a failed query shows its area's plain line and logs the cause; every failure class carries a message; one query failure per area; unknown `/api` paths answer 404 (D117). `afk`.
+- `SPA-486` `mcp-schema` — an MCP tool's JSON Schema is generated from its Effect decoder; a live MCP client check. Project 40; `afk`.
+- `SPA-487` `schema-tidy` — one plain-record guard, the registry's error wording, no exports kept only for tests. Project 40; `afk`.
+- `SPA-488` `auth-links` — `/join` and `/reset` require their token; a link without one says so. Project 40; `afk`.
 - `SPA-188` `ship-10` — install, upgrade and rollback docs. Project 16, In Progress. `docs/install.md` and `docs/upgrade.md` exist; check what is left.
 - `SPA-190` `ship-12` — one-click templates for Coolify, Railway, Render and Unraid. Project 16, In Progress; each needs a human deploy.
 
@@ -89,7 +92,6 @@ Plus Zod leaves (project 37: every server-fn validator through `input()`, job pa
 
 ## Unticketed follow-ups
 
-- Zod leaves, after `zod-1` to `zod-4`: the guarded plain record exists three times (`plainRecord` in core `json.ts`, core `ai/decode.ts` and web `lib/plain-record.ts`) and `ai/decode.ts` copies the registry's error-wording helpers; an MCP tool's JSON Schema is written out beside its Effect decoder (`lib/mcp/input-schema.ts`), tied only by a guard test, and the MCP server answers `tools/list` and `tools/call` itself because the SDK's `registerTool` takes zod; several shapes are exported only so their characterisation tables can reach them; refusals (server-fn input, a refused search param, a job payload, `refileDocumentOf`, the plugin loader) now read in Effect's wording; `/join` and `/reset` links type `token` as optional; transitive zod moved to 4.6.5 under the AI SDK packages once the direct pin went.
 - Icons, after `icons-2`: the space page's parent-space row and Enrichment's move buttons still print `↑`/`↓` as text; the stored `OBJECT_ICONS` keys (`boxes`, `kanban`, …) keep their Lucide names, since renaming them needs a data migration.
 - Export, after `export-1`: interactions are not exported; a record's identity cell holds its first domain or email only (Import reads one); the zip's bytes go with the nightly orphan sweep, so 24 to 48 hours after export; S3 `put` now streams when given a size, untested against real S3.
 - Data layer, after `data-1`: setting an FX rate, the base currency or renaming a company does not invalidate the Portfolio keys, so Portfolio opened afterwards paints the cached figures until the loader's background read lands; Today's mark window refreshes Today through an `onSaved` callback, since Today still reads through its loader.
