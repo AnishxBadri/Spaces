@@ -4,18 +4,6 @@ Floating thoughts, not on the roadmap and not decided. Each is a few lines:
 the idea, what exists today, what it could become. Promote one to a decision
 or a slice when it earns it; delete it when it stops being interesting.
 
-## An Emails page — 2026-10-18
-
-Every CRM has one; we have email only on records.
-
-- **Shape:** a threads list across all records — Mine / Team, plus a filter
-  for threads that matched no record. The same `ThreadRow` rows and email
-  window as the record's Interactions tab; nothing new to design beyond the
-  page.
-- Answers "what came in this week" without opening each record.
-- **Place:** sidebar Library — Notes · Emails · Meetings · Files · Feeds;
-  shortcut `G I` (`G E` is Meetings, `G M` Mandate).
-
 ## Decision traces (context graphs) — 2026-10-16
 
 A context graph in the newer sense stores _why_ a decision was made, not only
@@ -125,26 +113,6 @@ Drawn on the Ask sheet (board 10, panels 3 and 6) and parked.
 - Editing the **last** question (↑ in an empty composer) is not parked: it
   stays in the Ask set.
 
-## Panes that scroll, not the page — 2026-11-11
-
-The window scrolls today and the head folds into a 48px bar; only the
-record's rail scrolls on its own.
-
-- **Shape:** the head and the tabs stay put and the body under them scrolls,
-  one scroller per pane and never one inside another. Records and a space
-  (rail and tab body as two panes), lists (the table scrolls both ways, so
-  its horizontal bar is always in reach), the deal board (each column),
-  Tasks, Review, Notes, Settings (the Save bar pins to the pane foot), Ask.
-- **Stays a page:** Today, a note, a holding, Portfolio, Import, and every
-  page on a phone.
-- **Costs:** the full head stays on screen; every sticky offset is
-  re-anchored; Back must restore a pane's scroll by hand; the body pane has
-  to take focus for Space and Page Down; panes need
-  `overscroll-behavior: contain`. It reverses the sticky-head verdict of
-  2026-10-08, and most of `head-fold.tsx` goes on desktop.
-- **First step, free of all that:** thin rule-coloured scrollbars with a
-  reserved gutter.
-
 ## Fewer settings pages — 2026-11-11
 
 Sixteen pages in four groups, and one provider can sit on four of them
@@ -176,6 +144,28 @@ confirmation to the client's tool prompt.
   merge has no unmerge, and portfolio history is append-only.
 - **Precedent to square:** a space watch's find is an `add_record` proposal,
   not a birth.
+
+## Workflows: plugin steps chained — 2026-11-21
+
+Each plugin capability is a fixed feature with a fixed trigger today: Exa
+finds and watches, Apollo enriches, Granola files. A workflow chains them:
+a trigger, then steps, then a result ("a company tagged to Climate → enrich
+→ research brief → mandate check → archive with a reason, or a task for the
+partner"). Third-party plugins would ship steps rather than pages.
+
+- **Have:** the pg-boss queue, typed plugin capabilities, host-owned
+  triggers (auto-enrich, the watch), credits and caps, Review for machine
+  writes, run logs per plugin.
+- **Missing:** a typed step contract (one step's output as the next one's
+  input), stored workflow definitions, one run record per workflow with its
+  steps, conditions ("if outside the mandate").
+- **Could be, in order:** the step contract in the SDK · our own chains
+  (auto-enrich, a watch, find → enrich → mandate check) run as fixed
+  workflows, no builder · then a builder as a list of steps, not a canvas,
+  with an estimate before anything spends credits.
+- Every step keeps the existing rules: machine writes are suggestions, a
+  sensitive record never reaches an outside source, caps park a run. Not an
+  email-outreach sequence; deal flow is mostly inbound.
 
 ## Smaller open questions
 

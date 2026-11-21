@@ -83,7 +83,10 @@ Plus Zod leaves (project 37: every server-fn validator through `input()`, job pa
 
 ## Next, in order
 
-1. **The Ask set**, which the owner has not picked from yet.
+1. **Settings** — redesign and roll out. "Fewer settings pages" in `docs/considerations.md` is decided here, against the map in D81.
+2. **Ask** — redesign and roll out; the Ask set is picked as part of it.
+3. **Portfolio, then Mandate** and the other capital pages.
+4. **Onboarding** — the first run (D80) once the pages it leads into are settled.
 
 ## Owner calls
 
