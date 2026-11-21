@@ -9,6 +9,7 @@ import { Select } from '../ui/select'
 import { Layers } from '../icons'
 import { KindIcon } from '../kind-icon'
 import { FollowedRevisions } from './revision-ledger'
+import { useKeepCopy } from './keep-copy'
 import type { FilingEdge, RecordDocument } from './types'
 import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
 import {
@@ -99,6 +100,7 @@ export function FileViewerSidebar({
   const details = useDocumentDetails(doc.id)
   const sourceEmail = details?.email ?? null
   const [busy, setBusy] = useState(false)
+  const keeper = useKeepCopy()
 
   const run = useCallback(
     async (action: () => Promise<unknown>) => {
@@ -210,6 +212,23 @@ export function FileViewerSidebar({
         <p data-source-line className="text-label text-graphite">
           {sourceLine(doc, today)}
         </p>
+        {doc.remoteBytes === 'linked' ? (
+          <p data-source-keep className="mono text-micro text-graphite">
+            File in Gmail, text here ·{' '}
+            <button
+              type="button"
+              disabled={keeper.busy}
+              onClick={() => void keeper.keep(doc.id)}
+              className="focus-ring underline hover:text-foreground"
+            >
+              {keeper.busy ? 'Keeping a copy…' : 'Keep a copy'}
+            </button>
+          </p>
+        ) : doc.remoteBytes === 'gone' ? (
+          <p data-source-keep className="mono text-micro text-graphite">
+            Gmail disconnected, text here
+          </p>
+        ) : null}
         {doc.sourcePath === null ? null : (
           <p className="truncate mono text-micro text-graphite">
             From {doc.sourcePath}

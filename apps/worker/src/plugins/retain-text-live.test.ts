@@ -19,6 +19,7 @@ import { encryptBundle } from '@spaces/core/writes/connections/bundle'
 import { storage } from '@spaces/core/writes/storage'
 import { makeFakeDriveApi } from '@spaces/sdk/testing'
 import type { FakeDriveSeedItem } from '@spaces/sdk/testing'
+import { MailAttachments } from '#web/lib/arrival/mail-attachments'
 import { blobIsReferenced } from '#web/lib/documents/blob-refs'
 import { documentBytesProgram } from '#web/lib/documents/remote-bytes'
 import { searchAllProgram } from '#web/lib/search/query'
@@ -187,6 +188,7 @@ const wiredDrive = async () => {
     storageSourcesLayer(host, { fakes, pluginsRoot: root }),
     recording,
     pluginBreakerLayer(host),
+    MailAttachments.layer,
   )
   const sync = (bindingId: string) =>
     Effect.runPromiseExit(

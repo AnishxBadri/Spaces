@@ -27,6 +27,7 @@ import {
 import { bindStorageFolder } from './jobs/bind-storage-folder'
 import { rebindStorageFolder } from './jobs/rebind-storage-folder'
 import { fetchRemoteBytes, retainBackfill } from './jobs/restore-bytes'
+import { MailAttachments } from '#web/lib/arrival/mail-attachments'
 import { syncStorageBinding } from './jobs/sync-storage-binding'
 import {
   EXPORT_RETRY_DELAY_MAX_SECONDS,
@@ -257,9 +258,10 @@ async function main() {
       { batchSize: 1, includeMetadata: true },
       runJob(def, {
         host,
-        layer: Layer.merge(
+        layer: Layer.mergeAll(
           storageSourcesLayer(plugins, { fakes }),
           fetchStorageEnqueue,
+          MailAttachments.layer,
         ),
       }),
     )

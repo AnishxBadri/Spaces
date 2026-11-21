@@ -5,10 +5,12 @@ import {
   document,
   documentRevision,
   entity,
+  entitySpace,
   link,
   storageBinding,
 } from '@spaces/db/schema'
 import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
+import { remoteAttachmentSql } from '#/lib/arrival/mail-attachments'
 import { documentsQuery } from './query'
 
 /**
@@ -50,8 +52,20 @@ export const recordDocumentRowsProgram = Effect.fn('recordDocumentRows')(
           // folder's band. Null for everything else.
           bindingId: document.bindingId,
           // Follow is offered on a file a storage connection brought: it has a
-          // provider id and a connection to poll with.
-          followable: sql<boolean>`${document.connectionId} is not null and ${document.externalId} is not null`,
+          // provider id and a connection to poll with. A mailbox's attachment
+          // has both, and nothing to follow.
+          followable: sql<boolean>`${document.connectionId} is not null and ${document.externalId} is not null and not ${remoteAttachmentSql}`,
+          // An email attachment whose file stays in the mailbox:
+          // `linked` opens through Gmail and offers Keep a copy; `gone` is
+          // a disconnected mailbox, its text alone left. Null on every row
+          // whose bytes are here, or that never had any.
+          remoteBytes: sql<
+            'linked' | 'gone' | null
+          >`case when ${remoteAttachmentSql} then (case when ${document.externalStatus} = 'gone' or ${document.connectionId} is null then 'gone' else 'linked' end) end`,
+          // The folded `From email` band: such an attachment nobody filed by
+          // hand. A person's edge carries `created_by`; the filing on the
+          // participants' records does not.
+          fromEmail: sql<boolean>`(${remoteAttachmentSql} and not exists (select 1 from ${link} hand where hand.from_entity_id = ${document.entityId} and hand.relation = 'tagged_in' and hand.created_by is not null) and not exists (select 1 from ${entitySpace} hand where hand.entity_id = ${document.entityId} and hand.created_by is not null))`,
           // The provider's file id, for the revision ledger's foot.
           externalId: document.externalId,
           // A followed file's binding: null on every other row.

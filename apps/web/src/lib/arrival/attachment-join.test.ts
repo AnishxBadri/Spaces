@@ -422,9 +422,11 @@ describe('an attachment is private with its email’s body (D67)', () => {
     expect(await Effect.runPromise(countUnfiledProgram(OTHER))).toBe(0)
   })
 
-  it('shows it to a teammate who uploads the same deck to the same record, deduped onto it', async () => {
+  it('stays private when a teammate uploads the same deck to the same record: the upload is its own row', async () => {
     const { deck, doc } = await syncDeck('dedupe deck')
     const acme = await holderOf('domain', 'acme.io')
+    // The synced row holds no bytes, so there is nothing to dedupe onto:
+    // the teammate's upload is a row of its own, with its bytes.
     const born = await Effect.runPromise(
       birthDocumentProgram({
         blobSha: createHash('sha256').update(deck).digest('hex'),
@@ -439,11 +441,42 @@ describe('an attachment is private with its email’s body (D67)', () => {
         actor: { userId: TEAMMATE.id },
       }).pipe(Effect.provide(webEnqueue)),
     )
-    expect(born).toEqual({ id: doc, deduped: true })
-    // The uploader sees their own upload; a third member, who has neither
-    // the email nor an upload, does too: the bytes came from a person.
-    expect(await visibleTo(TEAMMATE, doc)).toBe(true)
-    expect(await visibleTo(OTHER, doc)).toBe(true)
+    expect(born.deduped).toBe(false)
+    expect(born.id).not.toBe(doc)
+    expect(await visibleTo(TEAMMATE, born.id)).toBe(true)
+    expect(await visibleTo(TEAMMATE, doc)).toBe(false)
+  })
+
+  it('lands a synced deck on the row an upload of the same bytes made, deduped onto it', async () => {
+    const deck = content('uploaded first')
+    await sync(message({}))
+    const acme = await holderOf('domain', 'acme.io')
+    const sha = createHash('sha256').update(deck).digest('hex')
+    await storage().put(sha, Buffer.from(deck), { mime: 'application/pdf' })
+    const uploaded = await Effect.runPromise(
+      birthDocumentProgram({
+        blobSha: sha,
+        filename: 'Quokkaplan.pdf',
+        mime: 'application/pdf',
+        sizeBytes: deck.length,
+        kind: 'other',
+        sourceClass: 'manual',
+        sourceRef: null,
+        provenance: {},
+        fileAgainst: [{ kind: 'record', entityId: acme }],
+        actor: { userId: TEAMMATE.id },
+      }).pipe(Effect.provide(webEnqueue)),
+    )
+    const m = message({
+      attachments: [
+        { filename: 'Quokkaplan.pdf', mime: 'application/pdf', content: deck },
+      ],
+    })
+    expect((await sync(m)).outcome).toBe('created')
+    expect(await db.select({ id: document.entityId }).from(document)).toEqual([
+      { id: uploaded.id },
+    ])
+    expect((await joins()).map((j) => j.documentId)).toEqual([uploaded.id])
   })
 
   it('shows it to the teammate once a forward of the thread shares the body', async () => {
@@ -567,6 +600,7 @@ describe('a failed join', () => {
           subject: 'Re: Seed round',
           records: [],
           privacy: { visibility: 'shared', authorId: null },
+          mailbox: null,
         },
       ),
     )

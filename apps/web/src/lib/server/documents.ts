@@ -524,17 +524,49 @@ export const deleteDocument = createServerFn({ method: 'POST' })
  * carries no `message`, so "merged away" would otherwise reach the UI empty.
  */
 
+/**
+ * File on… by hand. An email attachment whose file is still in the mailbox
+ * is kept here too, through `fileByHandProgram`.
+ */
 export const fileDocument = createServerFn({ method: 'POST' })
   .validator(input(Schema.Struct({ documentId: uuid, target: filingTarget })))
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const { fileDocumentProgram, documentRefileMessage } =
-      await import('../documents/refile')
+    const { documentRefileMessage } = await import('../documents/refile')
+    const { fileByHandProgram } = await import('../documents/keep-copy')
+    const { MailAttachments } = await import('../arrival/mail-attachments')
     const { effectFn } = await import('./effect')
     try {
-      return await effectFn(fileDocumentProgram)(u.id, data)
+      return await effectFn((userId: string, filing: typeof data) =>
+        fileByHandProgram(userId, filing).pipe(
+          Effect.provide(MailAttachments.layer),
+        ),
+      )(u.id, data)
     } catch (failure) {
       throw new Error(documentRefileMessage(failure))
+    }
+  })
+
+/**
+ * Keep a copy: an email attachment's file fetched from its mailbox and
+ * stored here. The work is `keepCopyProgram`.
+ */
+export const keepDocumentCopy = createServerFn({ method: 'POST' })
+  .validator(input(Schema.Struct({ documentId: uuid })))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { keepCopyProgram, keepCopyMessage } =
+      await import('../documents/keep-copy')
+    const { MailAttachments } = await import('../arrival/mail-attachments')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn((userId: string, documentId: string) =>
+        keepCopyProgram(userId, documentId).pipe(
+          Effect.provide(MailAttachments.layer),
+        ),
+      )(u.id, data.documentId)
+    } catch (failure) {
+      throw new Error(keepCopyMessage(failure))
     }
   })
 

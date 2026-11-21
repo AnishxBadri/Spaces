@@ -77,6 +77,7 @@ const fns = vi.hoisted(() => {
     'getDocumentText',
     'getEntitySensitivity',
     'isLaneRouted',
+    'keepDocumentCopy',
     'keyTermsStatus',
     'linkDriveFolder',
     'linkFetchStatus',
@@ -150,6 +151,8 @@ function doc(over: Partial<RecordDocument>): RecordDocument {
     filedIn: [here],
     replacedBy: null,
     email: null,
+    remoteBytes: null,
+    fromEmail: false,
     ...over,
   }
 }
@@ -887,5 +890,79 @@ describe('the revision ledger', () => {
     expect(html).not.toContain('role="menu')
     // Stopped, the ledger has no control at all.
     expect(render(null)).not.toContain('<button')
+  })
+})
+
+describe('email attachments whose file stays in Gmail', () => {
+  const attachment = (over: Partial<RecordDocument>) =>
+    doc({
+      sourceClass: 'integration',
+      sourceCapability: 'gmail',
+      blobSha: null,
+      remoteBytes: 'linked',
+      fromEmail: true,
+      ...over,
+    })
+  const docs = [
+    doc({ id: 'a1', filename: 'flent-seed-deck-v3.pdf', kind: 'deck' }),
+    attachment({ id: 'e1', filename: 'AtmosFlight_Investor_Deck.pdf' }),
+    attachment({
+      id: 'e2',
+      filename: 'Q3 MIS — ATMOS.pdf',
+      remoteBytes: 'gone',
+      externalStatus: 'gone',
+    }),
+  ]
+
+  it('sit last in a folded From email band with its own count', () => {
+    const html = markup(
+      <RecordFiles entityId={FLENT} recordName="Flent" documents={docs} />,
+    )
+    expect(html).toContain('label-caps text-graphite">From email 2</h3>')
+    expect(html).toContain('aria-expanded="false"')
+    expect(html.indexOf('From email 2')).toBeGreaterThan(
+      html.indexOf('flent-seed-deck-v3.pdf'),
+    )
+    // Folded: the rows are not drawn, and the kind band counts ours alone.
+    expect(html).not.toContain('AtmosFlight_Investor_Deck.pdf')
+    expect(html).toContain('label-caps text-graphite">Deck 1</h3>')
+  })
+
+  it('says a disconnected mailbox on the row, with no size or day', async () => {
+    await mountRow(docs[2])
+    const row = document.querySelector('[data-file="e2"]')
+    expect(row?.textContent).toContain('Gmail disconnected')
+    expect(row?.querySelector('[data-file-end]')?.textContent.trim()).toBe('')
+  })
+
+  it('offers Download, Keep a copy and File on… while the mailbox answers, and keeps the copy', async () => {
+    fns.keepDocumentCopy.mockResolvedValue({ _tag: 'kept' })
+    await mountRow(docs[1])
+    await openMenu('AtmosFlight_Investor_Deck.pdf')
+    const items = [...document.querySelectorAll('[role="menuitem"]')].map(
+      (el) => el.textContent.trim(),
+    )
+    expect(items).toEqual([
+      'Open',
+      'Download',
+      'Keep a copy',
+      'File on…',
+      'Change kind',
+      'Remove…',
+    ])
+    await click(byText('[role="menuitem"]', 'Keep a copy'))
+    expect(fns.keepDocumentCopy).toHaveBeenCalledWith({
+      data: { documentId: 'e1' },
+    })
+  })
+
+  it('offers neither once the mailbox is disconnected', async () => {
+    await mountRow(docs[2])
+    await openMenu('Q3 MIS — ATMOS.pdf')
+    const items = [...document.querySelectorAll('[role="menuitem"]')].map(
+      (el) => el.textContent.trim(),
+    )
+    expect(items).not.toContain('Keep a copy')
+    expect(items).not.toContain('Download')
   })
 })

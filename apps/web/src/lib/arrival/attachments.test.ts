@@ -127,7 +127,7 @@ describe('sorting a message’s parts', () => {
           {
             filename: 'dashboard.png',
             mime: 'image/png',
-            content: fillerBytes(50_000),
+            content: fillerBytes(80_000),
             disposition: 'inline',
             cid: 'dash@acme.io',
           },

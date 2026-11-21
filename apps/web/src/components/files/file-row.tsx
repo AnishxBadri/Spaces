@@ -10,6 +10,9 @@ import { FileGlyph } from './file-glyph'
 import { icon } from '#/components/icons'
 import { brandOf, ProviderMark } from '#/components/provider-mark'
 import { NewerVersionDialog } from './newer-version-dialog'
+import { FileOnDialog } from './file-on-dialog'
+import { keepCopyItems, useKeepCopy } from './keep-copy'
+import { bytesUrl } from '../document-preview'
 import type { FileAction, FilingEdge, RecordDocument } from './types'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import type { DocumentKind } from '@spaces/core/documents'
@@ -82,7 +85,24 @@ export function StateLane({ state }: { state: StateWord | null }) {
   )
 }
 
-export async function downloadDocument(id: string) {
+export async function downloadDocument(id: string, fromMailbox = false) {
+  // A file still in the mailbox is fetched first; the wait is said once.
+  if (fromMailbox) {
+    let told = false
+    const answer = await bytesUrl(
+      id,
+      () => true,
+      (from) => {
+        if (!told) toast.message(`Fetching from ${from}…`)
+        told = true
+      },
+    ).catch((err: unknown) => ({
+      unavailable: err instanceof Error ? err.message : 'Could not download',
+    }))
+    if ('url' in answer) window.location.href = answer.url
+    else toast.error(answer.unavailable)
+    return
+  }
   try {
     const { url } = await getDocumentDownloadUrl({ data: { id } })
     window.location.href = url
@@ -163,6 +183,8 @@ export function FileRow({
   const router = useRouter()
   const { remove, removeDialog } = useRemoveFile(recordId, recordName)
   const [versioning, setVersioning] = useState(false)
+  const [filingOn, setFilingOn] = useState(false)
+  const keeper = useKeepCopy()
   const follow = useFollow(recordId)
   const { today } = useClock()
   const followed = followLane(doc, today)
@@ -234,15 +256,27 @@ export function FileRow({
             icon: <icon.open />,
             onSelect: () => openFile(doc, onView),
           },
-          ...(doc.blobSha === null
+          ...(doc.blobSha === null && doc.remoteBytes !== 'linked'
             ? []
             : [
                 {
                   label: 'Download',
                   icon: <icon.download />,
-                  onSelect: () => void downloadDocument(doc.id),
+                  onSelect: () =>
+                    void downloadDocument(doc.id, doc.blobSha === null),
                 },
               ]),
+          ...keepCopyItems(doc, keeper),
+          ...(doc.fromEmail
+            ? [
+                {
+                  label: 'File on…',
+                  icon: <icon.fileOn />,
+                  opens: true,
+                  onSelect: () => setFilingOn(true),
+                },
+              ]
+            : []),
           ...(doc.externalUrl === null || where === null
             ? []
             : [
@@ -317,6 +351,9 @@ export function FileRow({
         ]}
       />
       {removeDialog}
+      {doc.fromEmail ? (
+        <FileOnDialog doc={doc} open={filingOn} onOpenChange={setFilingOn} />
+      ) : null}
       {older.length === 0 ? null : (
         <NewerVersionDialog
           doc={doc}

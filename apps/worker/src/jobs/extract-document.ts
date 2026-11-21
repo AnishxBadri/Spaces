@@ -6,6 +6,11 @@ import { db } from '@spaces/db'
 import { document } from '@spaces/db/schema'
 import { onDocumentExtracted } from '#web/lib/documents/on-extracted'
 import { dropBytesAfterExtraction } from '#web/lib/documents/retain'
+import {
+  MailAttachments,
+  mailAttachmentOf,
+  mailAttachmentRefusalMessage,
+} from '#web/lib/arrival/mail-attachments'
 import { storage } from '@spaces/core/writes/storage'
 import { linkTermMentionsInTx } from '#web/lib/glossary/link-terms'
 import { extractDocumentText } from '@spaces/core/documents/extract'
@@ -23,7 +28,10 @@ import type { JobDef } from '../run-job'
  * Failure mapping:
  * - blob unreadable → JobRetryable; only the final attempt writes 'failed',
  *   so the row reads "pending" mid-retry
- * - no stored blob → JobPermanent, 'unsupported'
+ * - no stored blob → an email attachment's file from its mailbox, read in
+ *   memory and never stored; anything else is JobPermanent,
+ *   'unsupported'. A mailbox that cannot answer now is retried like an
+ *   unreadable blob; a disconnected one is 'failed', with its reason.
  * - sha mismatch → JobPermanent, 'failed'
  * - extractor says unsupported/failed → JobPermanent, that status
  */
@@ -64,6 +72,48 @@ export class ExtractionFailed extends Schema.TaggedError<ExtractionFailed>()(
 ) {}
 
 /**
+ * `mailBytes` over a mailbox: the attachment's pointer, then its file. The
+ * live store hands it Gmail; a test hands a stub.
+ */
+export const mailBytesOf = Effect.fn('extractDocument.mailBytes')(function* (
+  documentId: string,
+): Effect.fn.Return<
+  Uint8Array | null,
+  StoreUnavailable | BlobUnreadable | ExtractionFailed,
+  MailAttachments
+> {
+  const target = yield* mailAttachmentOf(documentId).pipe(
+    Effect.mapError(
+      (e) =>
+        new StoreUnavailable({
+          operation: 'mailBytes',
+          message: messageOf(e.cause),
+        }),
+    ),
+  )
+  if (target._tag === 'not-remote') return null
+  if (target._tag !== 'target')
+    return yield* new ExtractionFailed({
+      status: 'failed',
+      reason: mailAttachmentRefusalMessage(target),
+    })
+  const mailboxes = yield* MailAttachments
+  const file = yield* mailboxes
+    .fetch({ connectionId: target.connectionId, pointer: target.pointer })
+    .pipe(
+      Effect.mapError((e) =>
+        e.retryable
+          ? new BlobUnreadable({
+              blobSha: target.pointer.sha,
+              message: e.reason,
+            })
+          : new ExtractionFailed({ status: 'failed', reason: e.reason }),
+      ),
+    )
+  return new Uint8Array(file.content)
+})
+
+/**
  * The job's I/O, split out so the retryable-versus-terminal mapping can be
  * tested without Postgres or a blob store.
  */
@@ -76,6 +126,16 @@ export class ExtractionStore extends Context.Service<
     readonly bytes: (
       blobSha: string,
     ) => Effect.Effect<Uint8Array, BlobUnreadable>
+    /**
+     * An email attachment's file, fetched once from its mailbox and held
+     * only in memory; null when the row is not one.
+     */
+    readonly mailBytes: (
+      documentId: string,
+    ) => Effect.Effect<
+      Uint8Array | null,
+      StoreUnavailable | BlobUnreadable | ExtractionFailed
+    >
     readonly markExtracted: (
       documentId: string,
       text: string,
@@ -128,6 +188,8 @@ export class ExtractionStore extends Context.Service<
           catch: (err) =>
             new BlobUnreadable({ blobSha, message: messageOf(err) }),
         }),
+      mailBytes: (documentId) =>
+        mailBytesOf(documentId).pipe(Effect.provide(MailAttachments.layer)),
       markExtracted: (documentId, text) =>
         Effect.tryPromise({
           try: () =>
@@ -211,18 +273,22 @@ function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-const program = Effect.fn('extractDocument')(function* (
-  data: ExtractDocumentData,
-) {
-  const { documentId } = data
-  const store = yield* ExtractionStore
-  const row = yield* store.read(documentId)
-
-  if (!row) {
-    console.warn(`[worker] document ${documentId} vanished before extraction`)
-    return
-  }
+/**
+ * The file to read: the stored blob, or an email attachment's file from its
+ * mailbox, held in memory and never stored. Null when the text stands
+ * and there is nothing to do.
+ */
+const bytesFor = Effect.fn('extractDocument.bytesFor')(function* (
+  store: ExtractionStore['Service'],
+  documentId: string,
+  row: DocumentForExtraction,
+): Effect.fn.Return<
+  Uint8Array | null,
+  StoreUnavailable | BlobUnreadable | ExtractionFailed
+> {
   if (!row.blobSha) {
+    const fetched = yield* store.mailBytes(documentId)
+    if (fetched !== null) return fetched
     return yield* new ExtractionFailed({
       status: 'unsupported',
       reason: 'No stored file to extract text from',
@@ -235,7 +301,7 @@ const program = Effect.fn('extractDocument')(function* (
     console.warn(
       `[worker] ${documentId}: bytes not held (retain text); extraction skipped`,
     )
-    return
+    return null
   }
 
   const bytes = yield* store.bytes(blobSha)
@@ -250,6 +316,22 @@ const program = Effect.fn('extractDocument')(function* (
       reason: `Blob integrity check failed: stored bytes hash ${digest.slice(0, 12)}, expected ${blobSha.slice(0, 12)}. The storage backend accepted a corrupt upload.`,
     })
   }
+  return bytes
+})
+
+const program = Effect.fn('extractDocument')(function* (
+  data: ExtractDocumentData,
+) {
+  const { documentId } = data
+  const store = yield* ExtractionStore
+  const row = yield* store.read(documentId)
+
+  if (!row) {
+    console.warn(`[worker] document ${documentId} vanished before extraction`)
+    return
+  }
+  const bytes = yield* bytesFor(store, documentId, row)
+  if (bytes === null) return
 
   // Deliberately Effect.promise, not tryPromise: an extractor that throws is
   // a bug, and the wrapper's defect path is where bugs belong.

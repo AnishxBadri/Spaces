@@ -30,6 +30,8 @@ export class SyncedMailFailed extends Schema.TaggedError<SyncedMailFailed>()(
 
 export type SyncedMailbox = {
   integrationId: string
+  /** The connection its attachments' files are fetched back through. */
+  connectionId: string
   ownerId: string
   address: string
   connectedAt: Date
@@ -45,6 +47,7 @@ export const syncedMailboxProgram = Effect.fn('syncedMailbox')(function* (
       db
         .select({
           config: integration.config,
+          connectionId: accountConnection.id,
           ownerId: accountConnection.userId,
           address: accountConnection.externalEmail,
           connectedAt: accountConnection.createdAt,
@@ -61,6 +64,7 @@ export const syncedMailboxProgram = Effect.fn('syncedMailbox')(function* (
   if (row === undefined) return null
   return {
     integrationId,
+    connectionId: row.connectionId,
     ownerId: row.ownerId,
     address: row.address,
     connectedAt: row.connectedAt,
@@ -114,6 +118,10 @@ export const logSyncedEmailProgram = Effect.fn('logSyncedEmail')(function* (
       visibility: box.settings.shareBodies ? 'shared' : 'private',
       labels: input.labels,
       mailboxOwner: box.ownerId,
+      mailbox: {
+        connectionId: box.connectionId,
+        providerMessageId: input.providerMessageId,
+      },
       ...(input.snippet === undefined ? {} : { snippet: input.snippet }),
     },
   ).pipe(Effect.mapError((e) => new SyncedMailFailed({ cause: e.cause })))

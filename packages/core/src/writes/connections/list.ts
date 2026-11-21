@@ -1,4 +1,4 @@
-import { and, asc, countDistinct, eq, ne } from 'drizzle-orm'
+import { and, asc, countDistinct, eq, ne, sql } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { accountConnection, document, integration } from '@spaces/db/schema'
 import { pauseBindingsOf } from '../bindings/health'
@@ -77,7 +77,9 @@ export async function countMembersConnected(
  * Deletes one of the user's connections and lets go of what pointed at it,
  * in one transaction. False when the user holds no such row.
  * - Documents that came through it keep their file; `connection_id` goes
- *   null, so they read as copies with no live source.
+ *   null, so they read as copies with no live source. One whose file was
+ *   never kept here (a synced email's attachment) turns
+ *   `external_status: gone`: its text stays, its file is out of reach.
  * - An integration bound to it loses its grant (`connection_id` null) and
  *   answers NotConnected until it is bound again.
  * - A folder binding on it pauses, naming who disconnected, until someone
@@ -103,9 +105,14 @@ export async function forgetConnection(
     ).at(0)
     if (owned === undefined) return false
     await pauseBindingsOf(tx, connectionId, new Date())
+    // A row with no bytes here could only be opened through this
+    // connection: its text stays, and it reads as gone.
     await tx
       .update(document)
-      .set({ connectionId: null })
+      .set({
+        connectionId: null,
+        externalStatus: sql`case when ${document.blobSha} is null then 'gone'::external_status else ${document.externalStatus} end`,
+      })
       .where(eq(document.connectionId, connectionId))
     await tx
       .update(integration)

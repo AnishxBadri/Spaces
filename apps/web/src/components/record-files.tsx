@@ -1,5 +1,6 @@
 import { useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Folder, icon } from './icons'
 import { Button } from './ui/button'
@@ -67,6 +68,8 @@ import type { VersionPick } from '#/lib/documents/newer-version'
  * - A superseded file is graphite and ends on its successor: `→ v3`.
  * - Follow, in a row's `···`, is offered on a file a storage connection
  *   brought: its row reads `rev n` and the viewer lists its revisions.
+ * - Email attachments nobody filed by hand sit last, in a folded
+ *   `From email` band with its own count.
  */
 
 type Documents = Array<RecordDocument>
@@ -324,7 +327,11 @@ export function RecordFiles({
   const held = new Set(
     picks.flatMap((p) => (p.newerId === null ? [] : [p.newerId])),
   )
-  const ours = documents.filter((d) => !inFolders.has(d.id) && !held.has(d.id))
+  const unheld = documents.filter(
+    (d) => !inFolders.has(d.id) && !held.has(d.id),
+  )
+  const ours = unheld.filter((d) => !d.fromEmail)
+  const fromEmail = unheld.filter((d) => d.fromEmail)
   const groups = KIND_ORDER.map((kind) => ({
     kind,
     uploads: pending.filter((p) => p.kind === kind),
@@ -504,6 +511,23 @@ export function RecordFiles({
         />
       ))}
 
+      {fromEmail.length === 0 ? null : (
+        <FromEmailBand
+          documents={fromEmail}
+          renderRow={(doc) => (
+            <FileRow
+              key={doc.id}
+              doc={doc}
+              recordId={entityId}
+              recordName={recordName}
+              actions={actionsFor(doc)}
+              older={ours.filter((d) => d.kind === doc.kind)}
+              onView={() => setViewingId(doc.id)}
+            />
+          )}
+        />
+      )}
+
       {dragging === null ? null : (
         <DropWash count={dragging} recordName={recordName} />
       )}
@@ -548,6 +572,42 @@ export function RecordFiles({
       />
       {removeDialog}
     </div>
+  )
+}
+
+/**
+ * The attachments nobody filed by hand: one folded band at the end,
+ * its own count, left out of the tab's. Filing one by hand, or keeping a
+ * copy, moves it into its kind's band.
+ */
+export function FromEmailBand({
+  documents,
+  renderRow,
+}: {
+  documents: Documents
+  renderRow: (doc: RecordDocument) => ReactNode
+}) {
+  const [open, setOpen] = useState(false)
+  return (
+    <section data-from-email>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="focus-ring-inset flex h-7 w-full shrink-0 items-center gap-2 border-b border-rule bg-bone px-(--inset) text-left"
+      >
+        <span
+          aria-hidden
+          className="w-3 shrink-0 mono text-micro text-graphite"
+        >
+          {open ? '⌄' : '›'}
+        </span>
+        <h3 className="min-w-0 truncate label-caps text-graphite">
+          {`From email ${String(documents.length)}`}
+        </h3>
+      </button>
+      {open ? <ul>{documents.map(renderRow)}</ul> : null}
+    </section>
   )
 }
 

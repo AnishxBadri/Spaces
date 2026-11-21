@@ -59,7 +59,8 @@ type TimelineRow =
 
 /**
  * Each tab's count: what the tab lists, so an empty one reads 0. Notes
- * counts each note once, Interactions each thread once.
+ * counts each note once, Interactions each thread once. Files leaves out
+ * the folded `From email` band, which carries its own count.
  */
 export function recordTabCounts({
   notes,
@@ -68,7 +69,7 @@ export function recordTabCounts({
 }: {
   notes: NoteLanes<{ id: string }>
   timeline: ReadonlyArray<TimelineRow>
-  documents: ReadonlyArray<unknown>
+  documents: ReadonlyArray<{ readonly fromEmail: boolean }>
 }): Record<CountedRecordTab, number> {
   const interactions = timeline.filter(
     (i): i is Extract<TimelineRow, { type: 'interaction' }> =>
@@ -77,7 +78,7 @@ export function recordTabCounts({
   return {
     notes: recordNotesCount(notes),
     interactions: threadCount(interactions),
-    files: documents.length,
+    files: documents.filter((d) => !d.fromEmail).length,
     history: timeline.length - interactions.length,
   }
 }

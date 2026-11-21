@@ -1,3 +1,4 @@
+import { Readable } from 'node:stream'
 import { Effect, Schema } from 'effect'
 import { uuid } from '../job-data'
 import type { Enqueue } from '@spaces/core/queue/enqueue'
@@ -8,15 +9,27 @@ import {
   restoreBytesProgram,
 } from '@spaces/core/writes/bindings/retain'
 import type { RestoreFailure } from '@spaces/core/writes/bindings/retain'
+import {
+  documentIntakeMessage,
+  putBlobProgram,
+} from '@spaces/core/writes/documents/intake'
+import {
+  MailAttachments,
+  mailAttachmentOf,
+  mailAttachmentRefusalMessage,
+} from '#web/lib/arrival/mail-attachments'
+import type { MailAttachmentTarget } from '#web/lib/arrival/mail-attachments'
 import { StorageSources } from './storage-sources'
 import { JobPermanent, JobRateLimited, JobRetryable } from '../run-job'
 import type { JobDef, JobFailure } from '../run-job'
 
 /**
  * A `remote` document's bytes fetched back through the connection it came
- * through (`retain: text`).
+ * through (`retain: text`), or an email attachment's from its mailbox.
  * - `storage.fetch-bytes` is the viewer's: the bytes land under their sha
  *   with a `pending_blob` intent, so the orphan sweep reclaims them again.
+ *   An attachment's row keeps its empty `blob_sha`; Keep a copy is what
+ *   stores it for good.
  * - `storage.retain-backfill` is a `text → full` flip's: the row turns
  *   `stored` and keeps them.
  * - Every refusal is a `JobPermanent` whose reason the viewer shows.
@@ -53,10 +66,50 @@ const fromRestore = (error: RestoreFailure): JobFailure => {
   }
 }
 
+/** The attachment's file from its mailbox, into the viewer's cache. */
+const cacheMailAttachment = Effect.fn('cacheMailAttachment')(function* (
+  target: MailAttachmentTarget,
+) {
+  const mailboxes = yield* MailAttachments
+  const file = yield* mailboxes
+    .fetch({ connectionId: target.connectionId, pointer: target.pointer })
+    .pipe(
+      Effect.mapError((e) =>
+        e.retryable
+          ? new JobRetryable({ reason: e.reason })
+          : new JobPermanent({ reason: e.reason }),
+      ),
+    )
+  const blob = yield* putBlobProgram({
+    stream: Readable.from([file.content]),
+    mime: file.mime,
+    preparedBy: null,
+  }).pipe(
+    Effect.mapError((e) =>
+      e._tag === 'DocumentTooLarge'
+        ? new JobPermanent({ reason: documentIntakeMessage(e) })
+        : new JobRetryable({ reason: 'could not store the file' }),
+    ),
+  )
+  return `fetched ${blob.sha.slice(0, 12)} from Gmail`
+})
+
 const program = (keep: boolean) =>
   Effect.fn(keep ? 'retainBackfill' : 'fetchRemoteBytes')(function* (
     data: RestoreBytesData,
   ) {
+    if (!keep) {
+      const mail = yield* mailAttachmentOf(data.documentId).pipe(
+        Effect.mapError(
+          () => new JobRetryable({ reason: 'document store unavailable' }),
+        ),
+      )
+      if (mail._tag === 'target') return yield* cacheMailAttachment(mail)
+      if (mail._tag !== 'not-remote')
+        return yield* new JobPermanent({
+          reason: mailAttachmentRefusalMessage(mail),
+        })
+    }
     const target = yield* remoteBytesOf(data.documentId).pipe(
       Effect.mapError(fromRestore),
     )
@@ -91,7 +144,7 @@ const retry = { limit: 2, delaySeconds: 30, backoff: true } as const
 
 export const fetchRemoteBytes: JobDef<
   RestoreBytesData,
-  StorageSources | Enqueue
+  StorageSources | Enqueue | MailAttachments
 > = {
   name: QUEUES.fetchRemoteBytes,
   schema: restoreBytesData,
@@ -102,7 +155,7 @@ export const fetchRemoteBytes: JobDef<
 
 export const retainBackfill: JobDef<
   RestoreBytesData,
-  StorageSources | Enqueue
+  StorageSources | Enqueue | MailAttachments
 > = {
   name: QUEUES.retainBackfill,
   schema: restoreBytesData,

@@ -171,6 +171,8 @@ function file(id: string, createdAt: string): RecordDocument {
     filedIn: [],
     replacedBy: null,
     email: null,
+    remoteBytes: null,
+    fromEmail: false,
   }
 }
 

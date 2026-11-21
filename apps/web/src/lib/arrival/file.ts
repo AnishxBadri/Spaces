@@ -28,7 +28,10 @@ import {
   fileAttachmentsProgram,
   rejoinAttachmentsProgram,
 } from './attachment-filing'
-import type { AttachmentOutcome } from './attachment-filing'
+import type {
+  AttachmentFilingContext,
+  AttachmentOutcome,
+} from './attachment-filing'
 
 /**
  * One arrival → one interaction, its body note and its edges. The write half
@@ -53,6 +56,8 @@ import type { AttachmentOutcome } from './attachment-filing'
  *   shared — forwarding is the consent; a synced one follows `FileOptions`.
  * - Attachments file only for a written interaction, after the commit,
  *   because intake commits on its own. A duplicate only rejoins missing links.
+ * - The stored MIME carries no attachment bodies (`ArrivalMessage.mime`):
+ *   each file is its own document, or stays in the mailbox.
  */
 
 export class ArrivalWriteFailed extends Schema.TaggedError<ArrivalWriteFailed>()(
@@ -81,12 +86,19 @@ export type FileOptions = {
   snippet?: string
   /** The synced mailbox's owner; null on the forwarded lane. */
   mailboxOwner: string | null
+  /**
+   * Where a synced message's files stay: the connection and the
+   * mailbox's own id for the message. Null on the forwarded lane, which
+   * stores them.
+   */
+  mailbox: AttachmentFilingContext['mailbox']
 }
 
 export const FORWARDED: FileOptions = {
   visibility: 'shared',
   labels: null,
   mailboxOwner: null,
+  mailbox: null,
 }
 
 /**
@@ -415,6 +427,7 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
       visibility: options.visibility,
       authorId: options.mailboxOwner,
     },
+    mailbox: options.mailbox,
   })
   // Its summary and categories, after the commit.
   yield* Effect.promise(() => enqueueSummarizeEmail(written.interactionId))

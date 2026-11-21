@@ -24,7 +24,7 @@ import { addMention, openAsk } from '#/lib/ask/dock-store'
 import { useAskSubject } from '#/lib/ask/page-scope'
 import type { AskScopeChip } from '#/lib/ask/types'
 import { fileType } from '#/lib/documents/files-tab'
-import type { FileType } from '#/lib/documents/files-tab'
+import type { FileType, RemoteBytes } from '#/lib/documents/files-tab'
 import { storageLinkProvider } from '#/lib/documents/storage-link'
 import { cn } from '#/lib/utils'
 
@@ -42,7 +42,9 @@ import { cn } from '#/lib/utils'
  *   source for Download — `getDocumentDownloadUrl` throws for a null
  *   `blob_sha`, and should.
  * - `remote` (text-only binding): `getDocumentBytes` fetches through the
- *   connection; a connection in error is said in the page, never blank.
+ *   connection; a connection in error is said in the page, never blank. An
+ *   email attachment still in its mailbox opens the same way, through
+ *   Gmail; one whose mailbox was disconnected opens its text.
  */
 
 type Doc = {
@@ -64,7 +66,16 @@ type Doc = {
   follow?: RecordDocument['follow'] | undefined
   externalUrl?: string | null | undefined
   externalStatus?: RecordDocument['externalStatus'] | undefined
+  /** An email attachment whose file stays in its mailbox. */
+  remoteBytes?: RemoteBytes | undefined
 }
+
+/**
+ * No file to fetch: a clip, or an attachment whose mailbox was
+ * disconnected. One still in the mailbox opens through it.
+ */
+const blobless = (doc: Doc) =>
+  doc.blobSha === null && doc.remoteBytes !== 'linked'
 
 const FOLLOWED_TYPE_WORD: Partial<Record<FileType, string>> = {
   'google-sheet': 'Sheet',
@@ -254,8 +265,8 @@ function PreviewBody({
 }) {
   const format = detectFormat(doc.filename, doc.mime)
   const asImage = imageType(doc)
-  const blobless = doc.blobSha === null
-  const isPdf = !blobless && format === 'pdf'
+  const noFile = blobless(doc)
+  const isPdf = !noFile && format === 'pdf'
   const [page, setPage] = useState(Math.max(1, startPage))
   const [pages, setPages] = useState(0)
   const [zoom, setZoom] = useState<Zoom>('fit')
@@ -380,7 +391,7 @@ function PreviewBody({
           </div>
         ) : null}
         <div className="flex shrink-0 items-center">
-          {blobless ? (
+          {noFile ? (
             doc.url === null ? null : (
               <Button size="sm" variant="outline" asChild>
                 <a
@@ -409,7 +420,7 @@ function PreviewBody({
 
       <div className="flex min-h-0 flex-1">
         <div className="min-h-0 min-w-0 flex-1 overflow-auto bg-bone">
-          {blobless ? (
+          {noFile ? (
             <TextPreview doc={doc} format={format} />
           ) : isPdf ? (
             <PdfPreview
@@ -490,7 +501,7 @@ const BYTES_POLLS = 80
  * A signed URL for the bytes, asking again while the worker fetches a
  * `remote` file from its provider; `unavailable` is the sentence why not.
  */
-async function bytesUrl(
+export async function bytesUrl(
   id: string,
   current: () => boolean,
   onFetching: (from: string) => void,
@@ -882,21 +893,23 @@ function TextPreview({
       .finally(() => runRef.current === run && setLoading(false))
   }, [doc.id])
 
-  const blobless = doc.blobSha === null
+  // A clipped page: no bytes, and its address is the document.
+  const clip = doc.blobSha === null && doc.url !== null
+  const noFile = blobless(doc)
 
   if (doc.extractionStatus === 'pending')
-    return (
-      <Working label={blobless ? 'Fetching the page…' : 'Extracting text…'} />
-    )
+    return <Working label={clip ? 'Fetching the page…' : 'Extracting text…'} />
   if (loading) return <Working label="Loading…" />
 
   if (!text) {
     return (
       <Notice>
         {doc.extractionError ??
-          (blobless
+          (clip
             ? 'No text was read from this page — open the source to read it.'
-            : 'No preview for this file type — download it to open.')}
+            : noFile
+              ? 'No text was read from this file, and only its text is kept here.'
+              : 'No preview for this file type — download it to open.')}
       </Notice>
     )
   }
@@ -905,7 +918,7 @@ function TextPreview({
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-6">
-      {blobless && doc.url !== null ? (
+      {clip && doc.url !== null ? (
         <a
           href={doc.url}
           target="_blank"

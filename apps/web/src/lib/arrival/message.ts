@@ -10,8 +10,9 @@ import {
 import type { Address, ForwardedBlock } from './forwarded'
 import { refusal } from './noise'
 import type { Refusal } from './noise'
-import { sortAttachments } from './attachments'
+import { referencedCids, sortAttachments } from './attachments'
 import type { SortedAttachments } from './attachments'
+import { stripAttachmentBodies } from './strip-mime'
 
 /**
  * One fetched message → what the poll writes, or why it writes nothing.
@@ -68,7 +69,11 @@ export type ArrivalMessage = {
    * attachments.
    */
   attachments: SortedAttachments
-  /** The raw RFC 5322 bytes as fetched — the wrapper's on a true forward. */
+  /**
+   * The raw RFC 5322 bytes as stored — the wrapper's on a true forward:
+   * headers, text and HTML parts and inline `cid:` images as fetched, each
+   * attachment part's body dropped (`stripAttachmentBodies`).
+   */
   mime: Buffer
 }
 
@@ -153,6 +158,7 @@ export function toArrival(
     }
 
   const attachments = sortAttachments(parsed.attachments, parsed.html)
+  const stored = stripAttachmentBodies(mime, referencedCids(parsed.html))
   const mailbox = opts.mailboxAddress.trim().toLowerCase()
   const notMailbox = (a: Address) => a.email !== mailbox
   const to = (original !== null ? original.to : addresses(parsed.to)).filter(
@@ -184,7 +190,7 @@ export function toArrival(
         body: text.trim(),
         forwarded: false,
         attachments,
-        mime,
+        mime: stored,
       },
     }
   }
@@ -211,7 +217,7 @@ export function toArrival(
       body: text.trim(),
       forwarded: true,
       attachments,
-      mime,
+      mime: stored,
     },
   }
 }

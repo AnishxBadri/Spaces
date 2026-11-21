@@ -126,7 +126,16 @@ type Laned = Typed & {
   readonly sourcePath: string | null
   /** The readable email it came attached to; omitted by lists that have none. */
   readonly email?: { readonly mailbox: string | null } | null
+  /** An attachment whose file stays in the mailbox; omitted by other lists. */
+  readonly remoteBytes?: RemoteBytes
 }
+
+/**
+ * An email attachment whose file stays in the mailbox: `linked`
+ * opens through it, `gone` is a disconnected mailbox. Null when the bytes
+ * are here or were never anyone's.
+ */
+export type RemoteBytes = 'linked' | 'gone' | null
 
 /**
  * The mono end lane: `from <path> · 4.1 MB · 2 Sep · via gmail`.
@@ -135,6 +144,7 @@ type Laned = Typed & {
  * - An email attachment is `42 KB · 9 Oct · via Gmail`: the mailbox it came
  *   through, never the subject the mailbox filed it under.
  * - A superseded file ends on its successor's version: `· → v3`.
+ * - A disconnected mailbox's attachment has none: its state word says it.
  */
 export function endLane(
   doc: Laned,
@@ -142,6 +152,7 @@ export function endLane(
   inFolder = false,
   successor: number | null = null,
 ): string {
+  if (doc.remoteBytes === 'gone') return ''
   const via =
     doc.email != null
       ? `via ${doc.email.mailbox ?? 'email'}`
@@ -215,6 +226,7 @@ type Stated = Typed & {
   readonly extractionError: string | null
   readonly externalStatus: 'linked' | 'gone' | null
   readonly sourceCapability: string | null
+  readonly remoteBytes?: RemoteBytes
   readonly lastRun: {
     readonly attempt: number
     readonly durationMs: number | null
@@ -239,6 +251,12 @@ export function stateWord(doc: Stated): StateWord | null {
     return doc.url !== null && doc.blobSha === null
       ? word('fetching.', 'ink')
       : word('reading text.', 'ink')
+  // The mailbox, not the file, is what went: the text stays readable.
+  if (doc.remoteBytes === 'gone')
+    return {
+      ...word('Gmail disconnected', 'graphite', 'Only its text is kept here.'),
+      wide: true,
+    }
   if (doc.externalStatus === 'gone')
     return word('■ gone', 'warning', 'Deleted in the source. Our copy stays.')
   if (doc.extractionStatus === 'failed')

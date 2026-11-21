@@ -6,6 +6,7 @@ import { runJob } from '../run-job'
 import type { JobHost, JobOutcome, JobRunLedger } from '../run-job'
 import {
   BlobUnreadable,
+  ExtractionFailed,
   ExtractionStore,
   StoreUnavailable,
   extractDocument,
@@ -65,6 +66,8 @@ function fakeStore(options: {
   bytes?: Uint8Array
   blobError?: string
   readError?: string
+  /** An email attachment's file from its mailbox; unset is no attachment. */
+  mail?: Uint8Array | { retry: string } | { refused: string }
 }): { layer: Layer.Layer<ExtractionStore>; writes: Array<Write> } {
   const writes: Array<Write> = []
   const layer = Layer.succeed(
@@ -85,6 +88,21 @@ function fakeStore(options: {
           : Effect.fail(
               new BlobUnreadable({ blobSha, message: options.blobError }),
             ),
+      mailBytes: () => {
+        const mail = options.mail
+        if (mail === undefined) return Effect.succeed(null)
+        if (mail instanceof Uint8Array) return Effect.succeed(mail)
+        return 'retry' in mail
+          ? Effect.fail(
+              new BlobUnreadable({
+                blobSha: 'a'.repeat(64),
+                message: mail.retry,
+              }),
+            )
+          : Effect.fail(
+              new ExtractionFailed({ status: 'failed', reason: mail.refused }),
+            )
+      },
       markExtracted: (documentId, text) =>
         Effect.sync(() => {
           writes.push({ op: 'extracted', documentId, text })
@@ -206,6 +224,49 @@ describe('extractDocument — the happy path still completes', () => {
 
     expect(writes).toEqual([])
     expect(calls.map((c) => c.call)).toEqual(['complete'])
+  })
+})
+
+describe('extractDocument — an email attachment is read from its mailbox', () => {
+  const attachment: DocumentForExtraction = {
+    blobSha: null,
+    bytesState: 'stored',
+    filename: 'terms.txt',
+    mime: 'text/plain',
+  }
+
+  it('reads the fetched file, stores its text and nothing else', async () => {
+    const { calls, writes } = await run(
+      fakeStore({ row: attachment, mail: bytes }),
+    )
+    expect(writes).toEqual([
+      {
+        op: 'extracted',
+        documentId,
+        text: 'Series A term sheet. 20% discount.',
+      },
+      { op: 'on-extracted', documentId },
+    ])
+    expect(calls.map((c) => c.call)).toEqual(['complete'])
+  })
+
+  it('retries a mailbox that cannot answer now', async () => {
+    const { calls, writes } = await run(
+      fakeStore({ row: attachment, mail: { retry: 'Gmail answered 503' } }),
+    )
+    expect(writes).toEqual([])
+    expect(calls.map((c) => c.call)).toEqual(['fail'])
+  })
+
+  it('records a disconnected mailbox on the row, once', async () => {
+    const reason = 'Gmail was disconnected; only this file’s text is kept here'
+    const { calls, writes } = await run(
+      fakeStore({ row: attachment, mail: { refused: reason } }),
+    )
+    expect(writes).toEqual([
+      { op: 'failed', documentId, status: 'failed', reason },
+    ])
+    expect(calls.map((c) => c.call)).toEqual(['failTerminal'])
   })
 })
 
