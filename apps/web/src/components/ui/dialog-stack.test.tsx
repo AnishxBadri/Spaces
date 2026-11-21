@@ -273,7 +273,7 @@ describe('a window opened from a window', () => {
     expect(parent.className.split(' ')).toContain('translate-y-[-50%]')
     const [under, over] = overlays()
     expect(under.split(' ')).toContain('bg-hairline/50')
-    expect(over.split(' ')).toContain('bg-hairline/30')
+    expect(over.split(' ')).toContain('bg-hairline/20')
     expect(over.split(' ')).not.toContain('bg-hairline/50')
   })
 

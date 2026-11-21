@@ -13,6 +13,7 @@ import {
 import { storage } from '@spaces/core/writes/storage'
 import { db } from '@spaces/db'
 import {
+  accountConnection,
   document,
   entity,
   entityAlias,
@@ -24,7 +25,7 @@ import {
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { sanitizeEmailHtml } from '#/lib/email/sanitize'
-import { sentBy, viewerSelf } from '#/lib/timeline/record'
+import { viewerSelf } from '#/lib/timeline/record'
 import { emailPrivacyProgram } from './email-privacy'
 import type { EmailPrivacy } from './email-privacy'
 
@@ -61,6 +62,8 @@ export type EmailParticipant = {
   email: string
   /** The person record the address is an alias of; null when none. */
   name: string | null
+  /** One of the reader's own addresses: the line prints it as `you`. */
+  you: boolean
 }
 
 export type EmailBody =
@@ -84,13 +87,12 @@ export type EmailAttachment = {
   addedAt: string
 }
 
-/** An earlier message of the thread, folded to one line. */
+/** An earlier message of the thread, as its folded card prints it. */
 export type EmailThreadLine = {
   id: string
-  /** The sender, or the first recipient on a message the viewer sent. */
-  who: string
-  /** The viewer sent it: the line reads `To <who>`. */
-  sent: boolean
+  from: EmailParticipant | null
+  to: Array<EmailParticipant>
+  cc: Array<EmailParticipant>
   /** The summary, the snippet or the body's start; null when the body is not the reader's. */
   preview: string | null
   attachments: number
@@ -117,6 +119,8 @@ export type EmailDetail = {
   bcc: Array<EmailParticipant>
   /** Whose mailbox it came through: the body note's author. */
   via: string | null
+  /** The folded card's line, as an earlier message's; null when the body is not the reader's. */
+  preview: string | null
   body: EmailBody
   attachments: Array<EmailAttachment>
   /** Who reads a body private by default; null for a shared one. */
@@ -147,7 +151,11 @@ const namesOf = Effect.fn('emailNames')(function* (
   emails: ReadonlyArray<string>,
 ) {
   const keys = [
-    ...new Set(emails.map((e) => normalizeEmail(e)).filter((e) => e !== null)),
+    ...new Set(
+      emails
+        .map((e) => normalizeEmail(bareAddress(e)))
+        .filter((e) => e !== null),
+    ),
   ]
   if (keys.length === 0) return new Map<string, string>()
   const rows = yield* query(() =>
@@ -203,6 +211,7 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
         noteId: interaction.noteId,
         messageId: interaction.messageId,
         lane: integration.capabilityId,
+        mailbox: accountConnection.externalEmail,
         bodyMd: note.bodyMd,
         visibility: note.visibility,
         authorId: note.authorId,
@@ -213,6 +222,10 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
       .leftJoin(note, eq(note.entityId, interaction.noteId))
       .leftJoin(user, eq(user.id, note.authorId))
       .leftJoin(integration, eq(integration.id, interaction.sourceRef))
+      .leftJoin(
+        accountConnection,
+        eq(accountConnection.id, integration.connectionId),
+      )
       .where(and(eq(interaction.id, id), eq(interaction.kind, 'email'))),
   )).at(0)
   if (!row) return yield* new EmailNotFound({ id })
@@ -220,16 +233,18 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
   const meta = row.meta?.kind === 'email' ? row.meta : null
   // A Bcc is the sending mailbox's own: nobody else sees it.
   const bcc = row.authorId === viewer.id ? (meta?.bcc ?? []) : []
-  const names = yield* namesOf([
+  const to = withMailbox(meta, row.mailbox)
+  const found = yield* namesOf([
     ...(meta?.from ? [meta.from] : []),
-    ...(meta?.to ?? []),
+    ...to,
     ...(meta?.cc ?? []),
     ...bcc,
   ])
-  const participant = (email: string): EmailParticipant => ({
-    email,
-    name: names.get(normalizeEmail(email) ?? '') ?? null,
-  })
+  const names = mailboxNamed(found, row.mailbox, row.authorName)
+  const own = yield* viewerSelf(viewer.id).pipe(
+    Effect.mapError((cause) => new EmailReadFailed({ cause })),
+  )
+  const participant = participantOf(names, own.addresses)
 
   const readable = canRead(viewer, {
     visibility: row.visibility,
@@ -296,7 +311,8 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
         ).pipe(Effect.mapError((e) => new EmailReadFailed({ cause: e.cause })))
       : null
 
-  const thread = yield* threadOf(viewer, row, names)
+  const thread = yield* threadOf(viewer, row, names, own.addresses)
+  const listing = emailListing(row.meta, readable)
   const record =
     recordId === null
       ? undefined
@@ -326,14 +342,20 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
     subject: row.subject,
     occurredAt: row.occurredAt.toISOString(),
     from: meta?.from ? participant(meta.from) : null,
-    to: (meta?.to ?? []).map(participant),
+    to: to.map(participant),
     cc: (meta?.cc ?? []).map(participant),
     bcc: bcc.map(participant),
     via: row.authorName,
+    preview: readable
+      ? clean(
+          listing.summary ?? listing.snippet ?? row.bodyMd ?? undefined,
+          PREVIEW_MAX,
+        )
+      : null,
     body,
     attachments,
     privacy,
-    categories: emailListing(row.meta, readable).categories,
+    categories: listing.categories,
     thread,
     record: record === undefined ? null : { ...record, linked },
     gmailUrl: row.lane === 'gmail' ? gmailUrl(row.messageId) : null,
@@ -350,6 +372,53 @@ export function gmailUrl(messageId: string | null): string | null {
   return `https://mail.google.com/mail/#search/rfc822msgid%3A${encodeURIComponent(bare)}`
 }
 
+/**
+ * An address as a card's line prints it: its person's name when it is a
+ * known alias, and `you` when it is one of the reader's own.
+ */
+const participantOf =
+  (names: ReadonlyMap<string, string>, self: ReadonlySet<string>) =>
+  (email: string): EmailParticipant => {
+    const key = normalizeEmail(bareAddress(email)) ?? ''
+    return { email, name: names.get(key) ?? null, you: self.has(key) }
+  }
+
+/**
+ * To, with the synced mailbox's own address put back first: arrival drops
+ * it from To and Cc, so a message in the reader's mailbox would otherwise
+ * never read `→ you`. Not for mail sent from the mailbox, nor when the
+ * address is still on the message; a forwarded message has no mailbox here.
+ */
+function withMailbox(
+  meta: { from: string; to: Array<string>; cc: Array<string> } | null,
+  mailbox: string | null,
+): Array<string> {
+  const to = meta?.to ?? []
+  if (meta === null || mailbox === null) return to
+  const key = normalizeEmail(mailbox)
+  const on = [meta.from, ...meta.to, ...meta.cc].some(
+    (a) => normalizeEmail(bareAddress(a)) === key,
+  )
+  return key === null || on ? to : [mailbox, ...to]
+}
+
+/** The names, with the mailbox's address named for its member when no person holds it. */
+function mailboxNamed(
+  names: ReadonlyMap<string, string>,
+  mailbox: string | null,
+  owner: string | null,
+): ReadonlyMap<string, string> {
+  const key = mailbox === null ? null : normalizeEmail(mailbox)
+  if (key === null || owner === null || names.has(key)) return names
+  return new Map([...names, [key, owner]])
+}
+
+/** The address inside a header value: `Ana <ana@x.com>` → `ana@x.com`. */
+function bareAddress(header: string): string {
+  const angled = /<([^>]+)>/.exec(header)
+  return (angled?.[1] ?? header).trim()
+}
+
 /** How long a thread line's preview runs before it is cut on a word. */
 const PREVIEW_MAX = 140
 
@@ -362,6 +431,7 @@ const threadOf = Effect.fn('emailThread')(function* (
   viewer: { id: string },
   row: { id: string; threadId: string | null; occurredAt: Date },
   known: ReadonlyMap<string, string>,
+  self: ReadonlySet<string>,
 ) {
   const alone: EmailThread = { messages: 1, earlier: [] }
   if (row.threadId === null) return alone
@@ -372,9 +442,11 @@ const threadOf = Effect.fn('emailThread')(function* (
         id: interaction.id,
         occurredAt: interaction.occurredAt,
         meta: interaction.meta,
+        mailbox: accountConnection.externalEmail,
         bodyMd: note.bodyMd,
         visibility: note.visibility,
         authorId: note.authorId,
+        authorName: user.name,
         widened: noteWidenedSql(viewer.id),
         attachments: sql<number>`(
           select count(*)::int from ${interactionDocument}
@@ -384,6 +456,12 @@ const threadOf = Effect.fn('emailThread')(function* (
       })
       .from(interaction)
       .leftJoin(note, eq(note.entityId, interaction.noteId))
+      .leftJoin(user, eq(user.id, note.authorId))
+      .leftJoin(integration, eq(integration.id, interaction.sourceRef))
+      .leftJoin(
+        accountConnection,
+        eq(accountConnection.id, integration.connectionId),
+      )
       .where(
         and(
           eq(interaction.threadId, threadId),
@@ -394,32 +472,31 @@ const threadOf = Effect.fn('emailThread')(function* (
       .orderBy(asc(interaction.occurredAt)),
   )
   if (siblings.length === 0) return alone
-  const own = yield* viewerSelf(viewer.id).pipe(
-    Effect.mapError((cause) => new EmailReadFailed({ cause })),
-  )
   const earlier = siblings.filter((s) => s.occurredAt <= row.occurredAt)
   const metas = earlier.map((s) => (s.meta?.kind === 'email' ? s.meta : null))
+  const tos = earlier.map((s, i) => withMailbox(metas.at(i) ?? null, s.mailbox))
   const more = yield* namesOf(
-    metas.flatMap((m) => (m === null ? [] : [m.from, ...m.to])),
+    metas.flatMap((m, i) =>
+      m === null ? [] : [m.from, ...(tos.at(i) ?? []), ...m.cc],
+    ),
   )
-  const nameOf = (email: string) => {
-    const key = normalizeEmail(email) ?? ''
-    return known.get(key) ?? more.get(key) ?? email
-  }
   const lines = earlier.map((s, i): EmailThreadLine => {
     const meta = metas.at(i) ?? null
+    const participant = participantOf(
+      mailboxNamed(new Map([...more, ...known]), s.mailbox, s.authorName),
+      self,
+    )
     const readable = canRead(viewer, {
       visibility: s.visibility,
       authorId: s.authorId,
       widened: s.widened,
     })
-    const first = meta?.to.at(0)
-    const sent = first !== undefined && sentBy(s.meta, own.addresses)
     const listing = emailListing(s.meta, readable)
     return {
       id: s.id,
-      who: sent ? nameOf(first) : meta === null ? 'Unknown' : nameOf(meta.from),
-      sent,
+      from: meta?.from ? participant(meta.from) : null,
+      to: (tos.at(i) ?? []).map(participant),
+      cc: (meta?.cc ?? []).map(participant),
       preview: readable
         ? clean(
             listing.summary ?? listing.snippet ?? s.bodyMd ?? undefined,

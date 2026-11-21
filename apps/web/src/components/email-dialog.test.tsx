@@ -13,11 +13,13 @@ import type {
 import { EmailModal } from './email-dialog'
 
 /**
- * The email window opened from `?modal=email&id=`: the
- * sandboxed frame, the remote-image count printed once, a private body as
- * a bone panel, a foot of Done, `···` and Reply with Done dropping the two
- * params, who reads a private body at the foot's left with its widen
- * window in the `···`, and the thread's earlier messages unfolding in place.
+ * The email window opened from `?modal=email&id=`: the thread as message
+ * cards (earlier ones folded, the newest open, an earlier one unfolding in
+ * place), each header sender → recipients with its address block, the
+ * sandboxed frame, quoted history behind a chip, files as cards, a foot of
+ * Done, `···` and Reply with Done dropping the two params, the foot's note
+ * only when the body is shared past its default, and the reply as the last
+ * card — from the window's Reply or one message's own `···`.
  */
 
 await vi.hoisted(async () => {
@@ -48,6 +50,7 @@ await vi.hoisted(async () => {
     'KeyboardEvent',
     'FocusEvent',
     'MutationObserver',
+    'DOMParser',
     'ResizeObserver',
     'DOMRect',
     'getComputedStyle',
@@ -96,11 +99,16 @@ const HTML: EmailDetail = {
   id: ID,
   subject: 'Acme Robotics — Q3 update',
   occurredAt: '2026-10-01T09:14:00.000Z',
-  from: { email: 'jane@acme-robotics.example', name: 'Jane Founder' },
-  to: [{ email: 'anish@fund.example', name: null }],
+  from: {
+    email: 'jane@acme-robotics.example',
+    name: 'Jane Founder',
+    you: false,
+  },
+  to: [{ email: 'anish@fund.example', name: null, you: true }],
   cc: [],
   bcc: [],
   via: 'Anish',
+  preview: 'Q3 closed.',
   body: {
     kind: 'html',
     srcdoc: '<!doctype html><html><body><p>Q3 closed.</p></body></html>',
@@ -184,28 +192,76 @@ const buttons = (label: string) =>
     (b) => b.textContent.trim() === label,
   )
 
+/** Opens a `···` by its trigger's label and reads its items, `—` for a rule. */
+async function openMenu(label: string) {
+  const trigger = document.querySelector(`[aria-label="${label}"]`)
+  if (trigger === null) throw new Error(`no ··· ${label}`)
+  act(() => {
+    trigger.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+    )
+  })
+  await settle()
+  const menu = document.querySelector('[role="menu"]')
+  if (menu === null) throw new Error('no menu')
+  return [...menu.children].map((el) =>
+    el.getAttribute('role') === 'separator' ? '—' : el.textContent.trim(),
+  )
+}
+
+async function choose(item: string) {
+  const el = [...document.querySelectorAll('[role="menuitem"]')].find(
+    (m) => m.textContent.trim() === item,
+  )
+  if (!(el instanceof HTMLElement)) throw new Error(`no ${item}`)
+  act(() => el.click())
+  await settle()
+}
+
+/** The cards of the thread in order: `folded <id>` or `open <id>`. */
+const cards = () =>
+  [...document.querySelectorAll('[data-card]')].map(
+    (c) =>
+      `${c.hasAttribute('data-folded') ? 'folded' : 'open'} ${c.getAttribute('data-card') ?? ''}`,
+  )
+
 describe('the email window', () => {
-  it('opens from ?modal=email&id= with the subject, the date and the participants', async () => {
+  it('opens from ?modal=email&id= on the message as an open card: sender → recipients and the stamp', async () => {
     await open()
     expect(fns.getEmail).toHaveBeenCalledWith({
       data: { id: ID, recordId: null },
     })
     const text = dialog()?.textContent ?? ''
     expect(text).toContain('Acme Robotics — Q3 update')
-    expect(text).toContain('Jane Founder')
-    expect(text).toContain('anish@fund.example')
-    expect(text).toContain('acme-q3.pdf')
+    const line = dialog()?.querySelector(
+      `[data-message="${ID}"] [data-sender-line]`,
+    )
+    expect(line?.textContent).toBe('Jane Founder → you')
+    // The address is a tooltip on the name, never printed.
+    expect(text).not.toContain('jane@acme-robotics.example')
+    expect(
+      line?.querySelector('[data-address="jane@acme-robotics.example"]'),
+    ).not.toBeNull()
   })
 
-  it('shows the sender their Bcc, each chip read as hidden', async () => {
+  it('opens the address block on bone from the line: From, To, and the sender’s own Bcc', async () => {
     fns.getEmail.mockResolvedValue({
       ...HTML,
-      bcc: [{ email: 'priya@fund.example', name: 'Priya Nair' }],
+      cc: [{ email: 'legal@acme-robotics.example', name: null, you: false }],
+      bcc: [{ email: 'priya@fund.example', name: 'Priya Nair', you: false }],
     })
     await open()
-    const chip = dialog()?.querySelector('[data-bcc="priya@fund.example"]')
-    expect(chip?.textContent).toContain('Priya Nair')
-    expect(chip?.textContent).toContain('hidden')
+    expect(dialog()?.querySelector('[data-address-block]')).toBeNull()
+    const line = dialog()?.querySelector<HTMLElement>('[data-sender-line]')
+    act(() => line?.click())
+    const block = dialog()?.querySelector('[data-address-block]')
+    const lane = (label: string) =>
+      block?.querySelector(`[data-address-lane="${label}"]`)?.textContent
+    expect(lane('From')).toBe('FromJane Founder')
+    expect(lane('To')).toBe('Toyou')
+    // An address with no name prints as the address.
+    expect(lane('Cc')).toBe('Cclegal@acme-robotics.example')
+    expect(lane('Bcc')).toBe('BccPriya Nair')
   })
 
   it('renders the body in a frame sandboxed with no scripts and no forms', async () => {
@@ -226,26 +282,133 @@ describe('the email window', () => {
     expect(lines[0]?.textContent).toBe('2 remote images not loaded')
   })
 
-  it('lists an attachment with its type glyph, size and lane, and opens it in the preview, not a download', async () => {
+  it('cuts a Gmail quote block out of an HTML body until the chip unfolds it', async () => {
+    fns.getEmail.mockResolvedValue({
+      ...HTML,
+      body: {
+        kind: 'html',
+        srcdoc:
+          '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src \'none\'"></head><body><p>Numbers attached.</p><div class="gmail_quote"><p>On Tue, Jane wrote:</p><blockquote>Send the Q2 pack</blockquote></div></body></html>',
+        remoteImages: 0,
+      },
+    })
+    await open()
+    const frame = () =>
+      dialog()?.querySelector('iframe')?.getAttribute('srcdoc') ?? ''
+    expect(frame()).toContain('Numbers attached.')
+    expect(frame()).not.toContain('Send the Q2 pack')
+    // The cut copy keeps its head, so the policy still holds.
+    expect(frame()).toContain('Content-Security-Policy')
+    act(() =>
+      dialog()?.querySelector<HTMLElement>('[data-quoted-chip]')?.click(),
+    )
+    expect(frame()).toContain('Send the Q2 pack')
+  })
+
+  it('folds quoted history to a chip that unfolds it', async () => {
+    fns.getEmail.mockResolvedValue({
+      ...HTML,
+      body: {
+        kind: 'text',
+        text: 'Numbers attached.\n\nOn Tue, Jane wrote:\n> Send the Q2 pack',
+      },
+    })
+    await open()
+    const card = () => dialog()?.querySelector(`[data-message="${ID}"]`)
+    expect(card()?.textContent).toContain('Numbers attached.')
+    expect(card()?.textContent).not.toContain('Send the Q2 pack')
+    const chip = card()?.querySelector<HTMLElement>('[data-quoted-chip]')
+    act(() => chip?.click())
+    expect(card()?.textContent).toContain('Send the Q2 pack')
+  })
+
+  it('lists a message’s files as cards with the type glyph and size, and opens one in the viewer over the thread', async () => {
     fns.getDocumentPreview.mockResolvedValue(null)
     await open()
-    const row = [...document.querySelectorAll('button')].find((b) =>
-      b.textContent.includes('acme-q3.pdf'),
+    // The band is gone: the files sit under the message's rule.
+    expect(dialog()?.textContent).not.toContain('Attachments ·')
+    const fileCard = dialog()?.querySelector(
+      `[data-files-of="${ID}"] [data-file-card="d1"]`,
     )
-    if (row === undefined) throw new Error('no attachment row')
-    expect(row.querySelector('[data-glyph]')?.getAttribute('data-glyph')).toBe(
-      'pdf',
+    if (fileCard === null || fileCard === undefined)
+      throw new Error('no file card')
+    expect(
+      fileCard.querySelector('[data-glyph]')?.getAttribute('data-glyph'),
+    ).toBe('pdf')
+    expect(fileCard.querySelector('[data-file-size]')?.textContent).toBe(
+      '2.0 KB',
     )
-    expect(row.querySelector('[data-attachment-lane]')?.textContent).toMatch(
-      /^2\.0 KB · Anish · 1 Oct( 2026)?$/,
-    )
-    act(() => row.click())
+    expect(
+      fileCard.querySelector('[aria-label="More for acme-q3.pdf"]'),
+    ).not.toBeNull()
+    act(() => fileCard.querySelector('button')?.click())
     await settle()
     expect(fns.getDocumentPreview).toHaveBeenCalledWith({ data: { id: 'd1' } })
     expect(fns.getDocumentDownloadUrl).not.toHaveBeenCalled()
   })
 
-  it('says a private body in one line and lists no attachment', async () => {
+  it('stacks the viewer as a second window that steps through the message’s files and ends on Done', async () => {
+    const second = {
+      ...HTML.attachments[0],
+      documentId: 'd2',
+      name: 'cap-table.xlsx',
+      filename: 'cap-table.xlsx',
+      mime: null,
+    }
+    fns.getEmail.mockResolvedValue({
+      ...HTML,
+      attachments: [HTML.attachments[0], second],
+    })
+    const doc = (id: string, filename: string) => ({
+      id,
+      filename,
+      mime: 'text/plain',
+      sizeBytes: 10,
+      extractionStatus: 'done',
+      extractionError: null,
+      blobSha: null,
+      url: null,
+    })
+    fns.getDocumentPreview.mockImplementation(
+      ({ data }: { data: { id: string } }) =>
+        Promise.resolve(
+          data.id === 'd1'
+            ? doc('d1', 'acme-q3.pdf')
+            : doc('d2', 'cap-table.xlsx'),
+        ),
+    )
+    fns.getDocumentText.mockResolvedValue({ text: 'rows' })
+    await open()
+    act(() =>
+      document
+        .querySelector<HTMLElement>('[data-file-card="d1"] button')
+        ?.click(),
+    )
+    await settle()
+    const viewer = document.querySelector('[data-window-depth="2"]')
+    expect(viewer).not.toBeNull()
+    const stepper = viewer?.querySelector('[data-file-stepper]')
+    expect(stepper?.textContent).toBe('‹File 1 of 2›')
+    const foot = viewer?.querySelector('[data-slot="dialog-footer"]')
+    expect(
+      [...(foot?.querySelectorAll('button') ?? [])].map((b) =>
+        b.textContent.trim(),
+      ),
+    ).toEqual(['Ask about this', '‹', '›', 'Done'])
+    act(() =>
+      stepper?.querySelector<HTMLElement>('[aria-label="Next file"]')?.click(),
+    )
+    await settle()
+    expect(fns.getDocumentPreview).toHaveBeenLastCalledWith({
+      data: { id: 'd2' },
+    })
+    expect(
+      document.querySelector('[data-window-depth="2"] [data-file-stepper]')
+        ?.textContent,
+    ).toBe('‹File 2 of 2›')
+  })
+
+  it('says a private body in one line and lists no file', async () => {
     fns.getEmail.mockResolvedValue({
       ...HTML,
       body: { kind: 'private' },
@@ -304,24 +467,7 @@ describe('who reads it', () => {
   const footNote = () =>
     dialog()?.querySelector('[data-slot="dialog-footer"] > span.mono')
       ?.textContent ?? null
-
-  async function openMore() {
-    const trigger = document.querySelector(
-      '[aria-label="More for Acme Robotics — Q3 update"]',
-    )
-    if (trigger === null) throw new Error('no ···')
-    act(() => {
-      trigger.dispatchEvent(
-        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
-      )
-    })
-    await settle()
-    const menu = document.querySelector('[role="menu"]')
-    if (menu === null) throw new Error('no menu')
-    return [...menu.children].map((el) =>
-      el.getAttribute('role') === 'separator' ? '—' : el.textContent.trim(),
-    )
-  }
+  const windowMenu = () => openMenu('More for Acme Robotics — Q3 update')
 
   it('says nothing at the foot for a shared (forwarded) body, its label chip kept', async () => {
     fns.getEmail.mockResolvedValue({ ...HTML, categories: ['pitch'] })
@@ -330,47 +476,34 @@ describe('who reads it', () => {
     expect(
       dialog()?.querySelector('[data-category="pitch"]')?.textContent,
     ).toBe('Pitch')
-    expect(await openMore()).toEqual([
-      'Forward',
-      'Copy link',
-      'File on a deal…',
-    ])
+    expect(await windowMenu()).toEqual(['Copy link', 'File on a deal…'])
   })
 
-  it('reads Visible to you at the foot while the owner’s body is private', async () => {
+  it('says nothing at the foot for the owner’s own private mail', async () => {
     fns.getEmail.mockResolvedValue(OWN)
     await open(RECORD)
     expect(fns.getEmail).toHaveBeenCalledWith({
       data: { id: ID, recordId: RECORD },
     })
-    expect(footNote()).toBe('Visible to you')
-    expect(dialog()?.querySelector('[data-privacy]')).toBeNull()
+    expect(footNote()).toBeNull()
   })
 
-  it('names the owner and offers no widen to anyone else', async () => {
+  it('says nothing for someone else’s private body, and offers no widen', async () => {
     fns.getEmail.mockResolvedValue({
       ...OWN,
       body: { kind: 'private' },
       attachments: [],
-      privacy: {
-        owner: { id: 'u-anish', name: 'Anish' },
-        mine: false,
-        workspace: false,
-        grantees: [],
-        record: null,
-      },
+      privacy: { ...MINE, mine: false, record: null },
     })
     await open(RECORD)
-    expect(footNote()).toBe('Visible to Anish')
-    expect(await openMore()).not.toContain('Who can read this…')
-    // Private: the From lane appears, and the body is a bone panel.
-    expect(dialog()?.textContent).toContain('From')
+    expect(footNote()).toBeNull()
+    expect(await windowMenu()).not.toContain('Who can read this…')
     expect(dialog()?.querySelector('[data-body-private]')?.textContent).toBe(
       'Private to Anish’s mailbox',
     )
   })
 
-  it('reads the grantees, and nothing once an override opens it to the workspace', async () => {
+  it('says who it is shared with once the owner opens it up, and by whom to the reader it reaches', async () => {
     fns.getEmail.mockResolvedValue({
       ...OWN,
       privacy: {
@@ -379,7 +512,8 @@ describe('who reads it', () => {
       },
     })
     await open(RECORD)
-    expect(footNote()).toBe('Visible to you, Maya')
+    expect(footNote()).toBe('Shared with Maya')
+
     act(() => root.unmount())
     root = createRoot(host)
     fns.getEmail.mockResolvedValue({
@@ -387,18 +521,26 @@ describe('who reads it', () => {
       privacy: { ...MINE, workspace: true },
     })
     await open(RECORD)
-    expect(footNote()).toBeNull()
+    expect(footNote()).toBe('Shared with the workspace')
+
+    act(() => root.unmount())
+    root = createRoot(host)
+    fns.getEmail.mockResolvedValue({
+      ...OWN,
+      privacy: { ...MINE, mine: false, workspace: true, record: null },
+    })
+    await open(RECORD)
+    expect(footNote()).toBe('Shared by Anish')
   })
 
-  it('holds Forward, Open in Gmail, Copy link, File on a deal…, Who can read this…, then Unlink', async () => {
+  it('holds Open in Gmail, Copy link, File on a deal…, Who can read this…, then Unlink', async () => {
     fns.getEmail.mockResolvedValue({
       ...OWN,
       gmailUrl: 'https://mail.google.com/mail/#search/rfc822msgid%3Aq3%40acme',
       record: { id: RECORD, name: 'Flent', linked: true },
     })
     await open(RECORD)
-    expect(await openMore()).toEqual([
-      'Forward',
+    expect(await windowMenu()).toEqual([
       'Open in Gmail',
       'Copy link',
       'File on a deal…',
@@ -406,62 +548,6 @@ describe('who reads it', () => {
       '—',
       'Unlink from Flent…',
     ])
-  })
-
-  it('forwards from the ···: the draft opens in its forward mode', async () => {
-    fns.openEmailReply.mockResolvedValue({
-      draft: null,
-      modes: {
-        reply: {
-          mode: 'reply',
-          inReplyToId: ID,
-          to: [],
-          cc: [],
-          bcc: [],
-          subject: 'Re: Acme',
-          bodyMd: '',
-          attachments: [],
-        },
-        reply_all: {
-          mode: 'reply_all',
-          inReplyToId: ID,
-          to: [],
-          cc: [],
-          bcc: [],
-          subject: 'Re: Acme',
-          bodyMd: '',
-          attachments: [],
-        },
-        forward: {
-          mode: 'forward',
-          inReplyToId: ID,
-          to: [],
-          cc: [],
-          bcc: [],
-          subject: 'Fwd: Acme',
-          bodyMd: '---------- Forwarded message ----------',
-          attachments: [],
-        },
-      },
-    })
-    await open()
-    await openMore()
-    const forward = [...document.querySelectorAll('[role="menuitem"]')].find(
-      (el) => el.textContent.trim() === 'Forward',
-    )
-    if (!(forward instanceof HTMLElement)) throw new Error('no Forward')
-    act(() => forward.click())
-    await settle()
-    expect(
-      document.querySelector<HTMLTextAreaElement>(
-        'textarea[aria-label="Message"]',
-      )?.value,
-    ).toBe('---------- Forwarded message ----------')
-    expect(
-      [...document.querySelectorAll('[role="radio"]')].find(
-        (t) => t.getAttribute('aria-checked') === 'true',
-      )?.textContent,
-    ).toBe('Forward')
   })
 
   it('widens in "Who can read this": the owner, the grantees with ×, every email with the record', async () => {
@@ -479,13 +565,8 @@ describe('who reads it', () => {
     ])
     fns.setEmailAudience.mockResolvedValue({ ok: true })
     await open(RECORD)
-    await openMore()
-    const who = [...document.querySelectorAll('[role="menuitem"]')].find(
-      (el) => el.textContent.trim() === 'Who can read this…',
-    )
-    if (!(who instanceof HTMLElement)) throw new Error('no Who can read this…')
-    act(() => who.click())
-    await settle()
+    await windowMenu()
+    await choose('Who can read this…')
     const widen = [...document.querySelectorAll('[role="dialog"]')].find(
       (d) =>
         d.querySelector('[data-slot="dialog-title"]')?.textContent ===
@@ -526,13 +607,20 @@ describe('who reads it', () => {
 })
 
 describe('the thread', () => {
+  const JANE = {
+    email: 'jane@acme-robotics.example',
+    name: 'Jane Founder',
+    you: false,
+  }
+  const ME = { email: 'anish@fund.example', name: 'Anish', you: true }
   const line = (
     id: string,
     over: Partial<EmailThreadLine> = {},
   ): EmailThreadLine => ({
     id,
-    who: 'Jane Founder',
-    sent: false,
+    from: JANE,
+    to: [ME],
+    cc: [],
     preview: 'Q2 numbers attached',
     attachments: 0,
     occurredAt: '2026-09-02T18:40:00.000Z',
@@ -547,7 +635,7 @@ describe('the thread', () => {
       messages: 4,
       earlier: [
         line(B1),
-        line(B2, { who: 'Jane Founder', sent: true, preview: null }),
+        line(B2, { from: ME, to: [JANE], preview: null }),
         line(B3, { attachments: 2 }),
       ],
     },
@@ -558,6 +646,8 @@ describe('the thread', () => {
       ? {
           ...HTML,
           id: B2,
+          from: ME,
+          to: [JANE],
           body: { kind: 'text', text: 'Sending the Q2 pack.' },
           attachments: [],
         }
@@ -577,41 +667,35 @@ describe('the thread', () => {
           }
         : THREADED
 
-  const lineButton = (id: string) => {
-    const el = document.querySelector<HTMLElement>(`[data-thread-line="${id}"]`)
-    if (el === null) throw new Error(`no line ${id}`)
+  const card = (id: string) => {
+    const el = document.querySelector<HTMLElement>(`[data-card="${id}"]`)
+    if (el === null) throw new Error(`no card ${id}`)
     return el
   }
 
-  it('heads with the count and folds the oldest past two, a sent line reading To <name>', async () => {
+  it('heads with the count, folds every earlier message oldest first and opens the newest last', async () => {
     fns.getEmail.mockResolvedValue(THREADED)
     await open()
     expect(
       dialog()?.querySelector('[data-slot="dialog-description"]')?.textContent,
     ).toBe('4 messages')
-    expect(dialog()?.querySelector('[data-folded-earlier]')?.textContent).toBe(
-      '1 earlier message',
-    )
-    const shown = [...document.querySelectorAll('[data-thread-line]')]
-    expect(shown.map((l) => l.getAttribute('data-thread-line'))).toEqual([
-      B2,
-      B3,
+    expect(cards()).toEqual([
+      `folded ${B1}`,
+      `folded ${B2}`,
+      `folded ${B3}`,
+      `open ${ID}`,
     ])
-    expect(shown[0]?.textContent).toContain('To Jane Founder')
-    expect(shown[1]?.querySelector('[aria-label="Attachments"]')).not.toBeNull()
-    act(() =>
-      document.querySelector<HTMLElement>('[data-folded-earlier]')?.click(),
-    )
-    expect(document.querySelectorAll('[data-thread-line]')).toHaveLength(3)
+    expect(dialog()?.querySelector('iframe')).not.toBeNull()
   })
 
-  it('opens the newest message, and every earlier one folded to its line', async () => {
+  it('writes every folded line one way: sender → recipients, yours as You', async () => {
     fns.getEmail.mockResolvedValue(THREADED)
     await open()
-    expect(document.querySelector(`[data-message="${ID}"]`)).not.toBeNull()
-    expect(dialog()?.querySelector('iframe')).not.toBeNull()
-    expect(document.querySelector(`[data-message="${B3}"]`)).toBeNull()
-    expect(lineButton(B3).getAttribute('aria-expanded')).toBe('false')
+    const lineOf = (id: string) =>
+      card(id).querySelector('[data-sender-line]')?.textContent
+    expect(lineOf(B1)).toBe('Jane Founder → you')
+    expect(lineOf(B2)).toBe('You → Jane Founder')
+    expect(card(B3).querySelector('[aria-label="Attachments"]')).not.toBeNull()
   })
 
   it('unfolds an earlier message in place, with its own files, and keeps the open one', async () => {
@@ -619,32 +703,26 @@ describe('the thread', () => {
       Promise.resolve(byId(data.id)),
     )
     await open()
-    act(() => lineButton(B3).click())
+    act(() => card(B3).click())
     await settle()
     expect(fns.getEmail).toHaveBeenLastCalledWith({
       data: { id: B3, recordId: null },
     })
-    const unfolded = document.querySelector(`[data-message="${B3}"]`)
-    expect(unfolded?.textContent).toContain('Jane Founder')
-    expect(unfolded?.textContent).toContain('Q2 numbers attached.')
+    expect(cards()).toEqual([
+      `folded ${B1}`,
+      `folded ${B2}`,
+      `open ${B3}`,
+      `open ${ID}`,
+    ])
+    const unfolded = card(B3)
+    expect(unfolded.textContent).toContain('Q2 numbers attached.')
     // Its files sit under it, the open message keeps its own.
     expect(
-      unfolded?.querySelector(`[data-files-of="${B3}"]`)?.textContent,
+      unfolded.querySelector(`[data-files-of="${B3}"]`)?.textContent,
     ).toContain('acme-q2.pdf')
     expect(
       document.querySelector(`[data-files-of="${ID}"]`)?.textContent,
     ).toContain('acme-q3.pdf')
-    expect(document.querySelector(`[data-message="${ID}"]`)).not.toBeNull()
-    expect(lineButton(B3).getAttribute('aria-expanded')).toBe('true')
-
-    // A second one opens beside it; a click on an open line folds it.
-    act(() => lineButton(B2).click())
-    await settle()
-    expect(document.querySelector(`[data-message="${B2}"]`)).not.toBeNull()
-    expect(document.querySelector(`[data-message="${B3}"]`)).not.toBeNull()
-    act(() => lineButton(B3).click())
-    expect(document.querySelector(`[data-message="${B3}"]`)).toBeNull()
-    expect(document.querySelector(`[data-message="${B2}"]`)).not.toBeNull()
   })
 })
 
@@ -715,7 +793,7 @@ describe('a reply (E3)', () => {
       'textarea[aria-label="Message"]',
     )?.value
 
-  it('grows under the folded message with the sender prefilled', async () => {
+  it('grows the draft as the last card, in ink, under the message folded', async () => {
     fns.getEmail.mockResolvedValue({
       ...HTML,
       body: { kind: 'text', text: 'Q3 closed ahead of plan.' },
@@ -727,18 +805,86 @@ describe('a reply (E3)', () => {
     expect(fns.openEmailReply).toHaveBeenCalledWith({
       data: { parentId: ID },
     })
-    const folded = dialog()?.querySelector('[data-folded-message]')
-    expect(folded?.textContent).toMatch(/^Jane Founderwrote (at|on) .+·Show$/)
+    expect(cards()).toEqual([`folded ${ID}`])
+    const draft = dialog()?.querySelector('[data-draft-card]')
+    expect(draft?.getAttribute('class')).toContain('border-hairline')
+    // The draft follows the message it answers.
+    const folded = dialog()?.querySelector(`[data-card="${ID}"]`)
+    expect(
+      folded !== null &&
+        folded !== undefined &&
+        draft !== null &&
+        draft !== undefined &&
+        folded.compareDocumentPosition(draft) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
     expect(dialog()?.querySelector('iframe')).toBeNull()
     expect(
-      dialog()?.querySelector('[data-chip="jane@acme-robotics.example"]'),
+      draft?.querySelector('[data-chip="jane@acme-robotics.example"]'),
     ).not.toBeNull()
     const modes = [...document.querySelectorAll('[role="radio"]')].map(
       (t) => t.textContent,
     )
     expect(modes).toEqual(['Reply', 'Reply all', 'Forward'])
-    // The composer's own foot: its Cancel is the one close.
+    expect(draft?.querySelector('[data-tool-row]')?.textContent).toContain(
+      'Attach',
+    )
+    // The composer's own foot: Cancel and Send.
     expect(buttons('Cancel')).toHaveLength(1)
+    expect(buttons('Send')).toHaveLength(1)
+  })
+
+  it('forwards an earlier message from its own ···, the earlier cards kept', async () => {
+    const B1 = '00000000-0000-4000-8000-0000000000b1'
+    const earlier: EmailDetail = {
+      ...HTML,
+      id: B1,
+      body: { kind: 'text', text: 'The Q2 pack.' },
+      attachments: [],
+    }
+    fns.getEmail.mockImplementation(({ data }: { data: { id: string } }) =>
+      Promise.resolve(
+        data.id === B1
+          ? earlier
+          : {
+              ...HTML,
+              thread: {
+                messages: 2,
+                earlier: [
+                  {
+                    id: B1,
+                    from: HTML.from,
+                    to: HTML.to,
+                    cc: [],
+                    preview: 'The Q2 pack.',
+                    attachments: 0,
+                    occurredAt: '2026-09-02T18:40:00.000Z',
+                  },
+                ],
+              },
+            },
+      ),
+    )
+    fns.openEmailReply.mockResolvedValue(OPENING)
+    await open()
+    act(() =>
+      document.querySelector<HTMLElement>(`[data-card="${B1}"]`)?.click(),
+    )
+    await settle()
+    expect(await openMenu('More for message from Jane Founder')).toEqual([
+      'Reply',
+      'Reply all',
+      'Forward',
+    ])
+    await choose('Forward')
+    expect(fns.openEmailReply).toHaveBeenCalledWith({ data: { parentId: B1 } })
+    expect(body()).toBe('---------- Forwarded message ----------')
+    expect(
+      [...document.querySelectorAll('[role="radio"]')].find(
+        (t) => t.getAttribute('aria-checked') === 'true',
+      )?.textContent,
+    ).toBe('Forward')
+    expect(cards()).toEqual([`folded ${B1}`, `folded ${ID}`])
   })
 
   it('switching to Forward keeps what was written and brings the files', async () => {

@@ -159,6 +159,7 @@ export function DocumentPreview({
   onOpenChange,
   sidebar = null,
   foot = null,
+  steps = null,
 }: {
   doc: Doc | null
   /** The 1-based page a PDF opens at; the first when omitted. */
@@ -168,6 +169,11 @@ export function DocumentPreview({
   sidebar?: ReactNode
   /** Foot actions, left of Cancel. */
   foot?: ReactNode
+  /**
+   * The files of one message, stepped from the foot (`‹ File 1 of 2 ›`),
+   * which then ends on Done: opened over its thread, it has nothing to cancel.
+   */
+  steps?: ViewerSteps | null
 }) {
   // An open file is Ask's default chip while it is on screen.
   useAskSubject(doc === null ? null : fileChip(doc))
@@ -176,14 +182,57 @@ export function DocumentPreview({
       <DialogContent size="viewer" className="gap-0 overflow-hidden">
         {doc ? (
           <PreviewBody
+            key={doc.id}
             doc={doc}
             startPage={page ?? 1}
             sidebar={sidebar}
             foot={foot}
+            steps={steps}
           />
         ) : null}
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** Where the viewer stands among the files it steps through. */
+type ViewerSteps = {
+  /** 0-based. */
+  at: number
+  of: number
+  onStep: (to: number) => void
+}
+
+/** `‹ File 1 of 2 ›` in the foot; nothing for a single file. */
+function FileStepper({ at, of, onStep }: ViewerSteps) {
+  if (of < 2) return null
+  return (
+    <div
+      data-file-stepper
+      className="mr-2 flex h-[1.625rem] shrink-0 items-stretch border border-rule bg-paper mono text-micro"
+    >
+      <button
+        type="button"
+        aria-label="Previous file"
+        disabled={at <= 0}
+        onClick={() => onStep(at - 1)}
+        className="focus-ring w-6 border-r border-rule hover:bg-bone disabled:text-graphite"
+      >
+        ‹
+      </button>
+      <span className="tabular flex items-center px-2">
+        File {at + 1} of {of}
+      </span>
+      <button
+        type="button"
+        aria-label="Next file"
+        disabled={at >= of - 1}
+        onClick={() => onStep(at + 1)}
+        className="focus-ring w-6 border-l border-rule hover:bg-bone disabled:text-graphite"
+      >
+        ›
+      </button>
+    </div>
   )
 }
 
@@ -195,11 +244,13 @@ function PreviewBody({
   startPage,
   sidebar,
   foot,
+  steps,
 }: {
   doc: Doc
   startPage: number
   sidebar: ReactNode
   foot: ReactNode
+  steps: ViewerSteps | null
 }) {
   const format = detectFormat(doc.filename, doc.mime)
   const asImage = imageType(doc)
@@ -398,8 +449,11 @@ function PreviewBody({
           </Button>
         </DialogClose>
         {foot}
+        {steps === null ? null : <FileStepper {...steps} />}
         <DialogClose asChild>
-          <Button variant="outline">Cancel</Button>
+          <Button variant="outline">
+            {steps === null ? 'Cancel' : 'Done'}
+          </Button>
         </DialogClose>
       </DialogFooter>
     </>

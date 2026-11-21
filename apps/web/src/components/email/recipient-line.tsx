@@ -13,8 +13,8 @@ import { searchEmailRecipients } from '#/lib/server-fns'
 import type { DraftRecipient, RecipientMatch } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
-/** The address block's label lane: `TO`, `CC`, `BCC`, `SUBJECT`. */
-const ADDRESS_LANE = 'w-16 shrink-0 field-label text-graphite'
+/** The address block's label lane: `To`, `Cc`, `Bcc`, `Subject`. */
+const ADDRESS_LANE = 'w-14 shrink-0 text-label text-graphite'
 
 /** One row of the address block: label, then what it holds, then its trail. */
 export function AddressRow({
@@ -29,7 +29,7 @@ export function AddressRow({
   children: ReactNode
 }) {
   return (
-    <div className="flex min-h-10 items-center gap-3 border-b border-rule px-4 py-1.5">
+    <div className="flex min-h-9 items-center gap-3 border-b border-rule px-4 py-1.5">
       <label htmlFor={htmlFor} className={ADDRESS_LANE}>
         {label}
       </label>

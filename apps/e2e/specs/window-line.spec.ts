@@ -5,11 +5,12 @@ import { expect, test } from '../harness/fixtures.ts'
 
 /**
  * A window's text stands on one 16px line (E3), measured in a real Chromium
- * at 1280px: the meeting window's head, its Linked records label, the
- * linked record's row and the pin row all start 16px inside the sheet's 1px
- * frame; a head or a row led by a mark stands the mark on the line. The
- * company and the meeting are written straight into the instance's own
- * database, since this suite imports nothing internal.
+ * at 1280px: the meeting window's head and its write-up start 16px inside
+ * the sheet's 1px frame, and on its rail the Records label, the linked
+ * record's row and the pin row start 16px inside the rail's rule; a head or
+ * a row led by a mark stands the mark on the line. The company and the
+ * meeting are written straight into the instance's own database, since this
+ * suite imports nothing internal.
  */
 
 async function addLinkedMeeting(
@@ -70,16 +71,22 @@ test('the meeting window stands its head and its rows on one line', async ({
   )
   const win = adminPage.locator('[data-slot="dialog-content"]')
   await expect(win).toBeVisible()
-  const linked = win.locator('section[aria-label="Linked records"]')
+  const rail = win.locator('[data-meeting-rail]')
+  const linked = rail.locator('section[aria-label="Records"]')
   await expect(linked).toContainText('Line Co')
 
   const line = (await leftOf(win)) + 1 + 16
   const head = win.locator('[data-slot="dialog-header"] > *').first()
+  // A filled row is a box: its edge stands on the line.
+  const writeUp = win.locator('section[aria-label="Write-up"] > *').first()
+  for (const [name, box] of Object.entries({ head, writeUp }))
+    expect(Math.round((await leftOf(box)) - line), name).toBe(0)
+
+  const railLine = (await leftOf(rail)) + 1 + 16
   const label = linked.locator('[data-label-head] h2')
   // The row's leading kind mark stands on the line, its name after it.
   const row = linked.locator('li').first().locator('> *').first()
   const pin = linked.locator('li').last().locator('span').first()
-  const boxes = { head, label, row, pin }
-  for (const [name, box] of Object.entries(boxes))
-    expect(Math.round((await leftOf(box)) - line), name).toBe(0)
+  for (const [name, box] of Object.entries({ label, row, pin }))
+    expect(Math.round((await leftOf(box)) - railLine), name).toBe(0)
 })

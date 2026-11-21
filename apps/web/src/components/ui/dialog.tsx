@@ -137,7 +137,7 @@ function DialogContent({
   return (
     <DialogPortal data-slot="dialog-portal">
       <DialogOverlay
-        className={cn(nested && 'bg-hairline/30', overlayClassName)}
+        className={cn(nested && 'bg-hairline/20', overlayClassName)}
       />
       <DialogPrimitive.Content
         ref={sheetRef}

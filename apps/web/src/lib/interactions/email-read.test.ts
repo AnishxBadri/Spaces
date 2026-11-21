@@ -219,6 +219,11 @@ describe('the email window', () => {
       via: FIXTURE_ACTOR.name,
       body: { kind: 'html', remoteImages: 2 },
     })
+    // Arrival drops the mailbox's own address; the read puts it back as `you`.
+    expect(email.to).toEqual([
+      { email: OWNER, name: FIXTURE_ACTOR.name, you: true },
+    ])
+    expect(email.preview).not.toBeNull()
     if (email.body.kind !== 'html') throw new Error('no html')
     expect(email.body.srcdoc).toContain('Q3 closed ahead of plan.')
     expect(email.body.srcdoc).not.toContain(TRACKER)
@@ -313,8 +318,16 @@ describe('the email window', () => {
     const [private_, readable] = email.thread.earlier
     // Headers stay visible to all; the body's preview does not.
     expect(private_).toMatchObject({
-      who: 'Jane Founder',
-      sent: false,
+      from: {
+        email: 'jane@acme-robotics.example',
+        name: 'Jane Founder',
+        you: false,
+      },
+      // Priya's mailbox is put back first, named for her; the reader is `you`.
+      to: [
+        { email: TEAMMATE.email, name: TEAMMATE.name, you: false },
+        { email: OWNER, you: true },
+      ],
       preview: null,
       attachments: 0,
     })

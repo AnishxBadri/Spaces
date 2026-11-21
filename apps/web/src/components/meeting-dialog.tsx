@@ -15,6 +15,11 @@ import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import { MoreMenu } from '#/components/ui/more-menu'
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '#/components/ui/tooltip'
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -89,7 +94,7 @@ export function applyPrepEvent(state: PrepState, event: PrepEvent): PrepState {
   }
 }
 
-/** An answer as the participants lane prints it: `✓ Accepted`. */
+/** An answer in words, in the participant row's tooltip: `Accepted · ana@flent.io`. */
 const RSVP_LABEL: Record<
   MeetingDetail['participants'][number]['rsvp'],
   string
@@ -124,28 +129,39 @@ export function writeUpLine(
     .join(' · ')
 }
 
-/** A group inside the window: a mono caps label on a hairline. */
+/** The head and foot run to the flush sheet's edges, the columns between. */
+const EDGE = 'mx-0 mt-0 mb-0 shrink-0'
+
+/**
+ * A group inside the window: a mono caps label on a hairline, standing on
+ * its column's own 16px line; on the rail the bone shows through.
+ */
 function Group({
   label,
   action,
+  rail = false,
   children,
 }: {
   label: string
   action?: ReactNode
+  rail?: boolean
   children: ReactNode
 }) {
   return (
     <section aria-label={label} className="flex flex-col">
-      <LabelHead label={label}>{action}</LabelHead>
+      <LabelHead label={label} className={cn('px-0', rail && 'bg-transparent')}>
+        {action}
+      </LabelHead>
       <ol>{children}</ol>
     </section>
   )
 }
 
+/** A record's name on the rail, the row its link. */
 const rowLink =
-  'focus-ring-inset -mx-(--inset) flex h-full min-w-0 flex-1 items-center gap-3 px-(--inset) text-left hover:bg-bone'
+  'focus-ring-inset flex h-full min-w-0 flex-1 items-center text-left hover:underline'
 
-/** A task the meeting proposed: its due day, then Skip and Add task. */
+/** A task the meeting proposed: its due day, then Add task and Skip. */
 function ActionItem({
   s,
   today,
@@ -168,22 +184,13 @@ function ActionItem({
     }
   }
   return (
-    <LedgerRow>
-      <span className="min-w-0 flex-1 truncate text-body">{s.summary}</span>
+    <LedgerRow className="px-0 last:border-b-0">
+      <span className="min-w-0 flex-1 truncate text-ui">{s.summary}</span>
       {s.due === null ? null : (
         <span className="shrink-0 mono text-micro text-graphite">
           {formatDay(s.due, today)}
         </span>
       )}
-      <Button
-        variant="ghost"
-        size="sm"
-        pending={pending === 'reject'}
-        disabled={pending !== null}
-        onClick={() => void decide('reject')}
-      >
-        Skip
-      </Button>
       <Button
         variant="outline"
         size="sm"
@@ -192,6 +199,15 @@ function ActionItem({
         onClick={() => void decide('accept')}
       >
         Add task
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        pending={pending === 'reject'}
+        disabled={pending !== null}
+        onClick={() => void decide('reject')}
+      >
+        Skip
       </Button>
     </LedgerRow>
   )
@@ -203,7 +219,7 @@ function PrepBody({ prep }: { prep: PrepState }) {
       return null
     case 'refused':
       return (
-        <LedgerRow last className="h-auto py-2.5">
+        <LedgerRow last className="h-auto px-0 py-2.5">
           <span data-prep-refused className="text-ui text-warning">
             {prep.line}
           </span>
@@ -211,7 +227,7 @@ function PrepBody({ prep }: { prep: PrepState }) {
       )
     case 'failed':
       return (
-        <LedgerRow last className="h-auto py-2.5">
+        <LedgerRow last className="h-auto px-0 py-2.5">
           <span className="text-ui text-destructive">{prep.message}</span>
         </LedgerRow>
       )
@@ -219,7 +235,7 @@ function PrepBody({ prep }: { prep: PrepState }) {
     case 'done': {
       const text = prep.phase === 'done' ? prep.markdown : prep.text
       return (
-        <li className="flex flex-col gap-2 px-(--inset) py-2.5">
+        <li className="flex flex-col gap-2 py-2.5">
           {prep.line === null ? (
             <Twinkle size={14} />
           ) : (
@@ -388,7 +404,7 @@ export function MeetingDialog({
 }) {
   return (
     <Dialog open={id !== null} onOpenChange={onOpenChange}>
-      <DialogContent size="l">
+      <DialogContent size="note">
         {id === null ? null : (
           <MeetingWindow
             key={id}
@@ -560,21 +576,21 @@ function MeetingWindow({
   if (meeting === null)
     return (
       <>
-        <DialogHeader>
-          <Meeting aria-hidden className="size-5 self-center text-graphite" />
+        <DialogHeader className={cn(EDGE, 'items-center')}>
+          <Meeting aria-hidden className="size-5 text-graphite" />
           <DialogTitle>Meeting</DialogTitle>
         </DialogHeader>
         <DialogDescription className="sr-only">
           The meeting is being read
         </DialogDescription>
-        {error === null ? (
-          <div className="flex min-h-48 flex-1 items-center justify-center">
+        <div className="flex min-h-48 flex-1 items-center justify-center px-4">
+          {error === null ? (
             <Twinkle size={29} />
-          </div>
-        ) : (
-          <p className="text-ui text-destructive">{error}</p>
-        )}
-        <DialogFooter>
+          ) : (
+            <p className="text-ui text-destructive">{error}</p>
+          )}
+        </div>
+        <DialogFooter className={EDGE}>
           <Button variant="outline" onClick={onClose}>
             Done
           </Button>
@@ -593,20 +609,38 @@ function MeetingWindow({
   const writeUpNote = meeting.note
   const done = prep.phase === 'done' && prep.markdown !== ''
 
+  const carriedRows = carried ? (
+    <ul className="flex flex-col gap-1.5">
+      {sharedNotes.map((n) => (
+        <NoteRow key={n.id} n={n} onOpenNote={onOpenNote} />
+      ))}
+      {sharedArtifacts.map((a) => (
+        <ArtifactRow
+          key={a.documentId}
+          a={a}
+          onOpen={(x) => void openArtifact(x)}
+        />
+      ))}
+    </ul>
+  ) : null
+
   return (
     <>
-      <DialogHeader>
+      <DialogHeader className={cn(EDGE, 'flex-nowrap items-center')}>
         <Meeting
           data-window-mark
           aria-hidden
-          className="size-5 self-center text-graphite"
+          className="size-5 shrink-0 text-graphite"
         />
         <DialogTitle
-          className={cn(meeting.cancelled && 'text-graphite line-through')}
+          className={cn(
+            'min-w-0 truncate',
+            meeting.cancelled && 'text-graphite line-through',
+          )}
         >
           {meeting.title ?? 'Meeting'}
         </DialogTitle>
-        <DialogDescription>
+        <DialogDescription className="ml-auto shrink-0">
           {formatDay(meeting.startsAt, today)} ·{' '}
           {timeSpan(meeting.startsAt, meeting.endsAt)}
           {meeting.cancelled ? ' · Cancelled' : ''}
@@ -617,7 +651,7 @@ function MeetingWindow({
             target="_blank"
             rel="noreferrer"
             title="Opens the call in a new tab"
-            className="focus-ring ml-auto text-ui text-primary hover:underline"
+            className="focus-ring shrink-0 text-ui text-primary hover:underline"
           >
             Join call ›
           </a>
@@ -628,7 +662,7 @@ function MeetingWindow({
             variant="head"
             label={meeting.title ?? 'Meeting'}
             forceMenu
-            className={cn('-my-1 self-center', !joinable && 'ml-auto')}
+            className="-my-1 shrink-0"
             items={[
               {
                 label: 'Open in Google',
@@ -641,193 +675,215 @@ function MeetingWindow({
         )}
       </DialogHeader>
 
-      <div className="-mx-4 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4">
-        {meeting.participants.length === 0 ? null : (
-          <Group
-            label="Participants"
-            action={
-              <a
-                href={googleDayUrl(meeting.startsAt)}
-                target="_blank"
-                rel="noreferrer"
-                title="Answers change in Google Calendar"
-                className="focus-ring shrink-0 text-label text-foreground hover:underline"
-              >
-                Open in Google ›
-              </a>
-            }
+      {/* Two columns from about 900px — the write-up, then a bone rail of
+          who came and what it is filed on — stacked below that. */}
+      <div className="@container flex min-h-0 flex-1 flex-col">
+        <div
+          data-meeting-body
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto @4xl:flex-row @4xl:overflow-hidden"
+        >
+          <div
+            data-meeting-main
+            className="flex min-w-0 shrink-0 flex-col gap-6 p-4 @4xl:flex-1 @4xl:shrink @4xl:overflow-y-auto"
           >
-            {meeting.participants.map((p) => (
-              <LedgerRow key={p.email}>
-                <span
-                  data-participant={p.email}
-                  title={p.email}
-                  className="min-w-0 flex-1 truncate text-body"
-                >
-                  {participantName(p)}
-                </span>
-                <span
-                  data-rsvp={p.rsvp}
-                  className="w-24 shrink-0 text-right mono text-micro text-graphite"
-                >
-                  {RSVP_MARK[p.rsvp]} {RSVP_LABEL[p.rsvp]}
-                </span>
-              </LedgerRow>
-            ))}
-          </Group>
-        )}
-
-        <Group label="Linked records">
-          {meeting.records.map((r) => {
-            const to = recordPath(r)
-            return (
-              <LedgerRow key={r.id}>
-                <KindIcon of={{ kind: r.kind }} />
-                {to === null ? (
-                  <span className="min-w-0 flex-1 truncate text-body">
-                    {r.name}
+            {writeUpNote === null ? (
+              <section aria-label="Write-up" className="flex flex-col gap-2">
+                {/* A filled row is a box: its edge stands on the window's
+                    line and its text pads inside the fill (E3). */}
+                <EmptyRow
+                  name="Write-up"
+                  className="px-3"
+                  disabled={writing}
+                  onAdd={() => void writeUp()}
+                />
+                {carriedRows}
+              </section>
+            ) : (
+              <section aria-label="Write-up" className="flex flex-col">
+                <LabelHead label="Write-up" className="px-0">
+                  <span
+                    data-write-up-line
+                    className="shrink-0 mono text-micro text-graphite"
+                  >
+                    {writeUpLine(writeUpNote.via, writeUpNote.at, today)}
                   </span>
-                ) : (
-                  <Link to={to} className={rowLink}>
-                    <span className="min-w-0 truncate text-body">{r.name}</span>
-                  </Link>
-                )}
-              </LedgerRow>
-            )
-          })}
-          <li className="px-(--inset)">
-            <DetailsPickRow
-              label="Pin a record…"
-              placeholder="Company, person or deal…"
-              search={searchRecords}
-              onPick={async (hit) => {
-                await pinMeetingRecord({
-                  data: { interactionId: id, entityId: hit.id },
-                })
-                changed()
-              }}
-            />
-          </li>
-        </Group>
+                  <OpenIn link={writeUpNote.openIn} />
+                </LabelHead>
+                <div className="flex flex-col gap-3 pt-3">
+                  {writeUpNote.title === null ? (
+                    <p className="text-ui text-graphite">
+                      Private to its author.
+                    </p>
+                  ) : (
+                    <>
+                      <NoteLink
+                        id={writeUpNote.id}
+                        onOpenNote={onOpenNote}
+                        className="focus-ring self-start text-ui text-foreground hover:underline"
+                      >
+                        {writeUpNote.title}
+                      </NoteLink>
+                      {writeUpNote.body === null ||
+                      writeUpNote.body.trim() === '' ? null : (
+                        <div
+                          data-write-up-body
+                          className="text-prose font-serif leading-6.75 whitespace-pre-wrap text-foreground"
+                        >
+                          {writeUpNote.body}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {carriedRows}
+                </div>
+              </section>
+            )}
 
-        {writeUpNote === null ? (
-          <section aria-label="Write-up" className="flex flex-col gap-2">
-            {/* A filled row is a box: its edge stands on the window's line
-                and its text pads inside the fill (E3). */}
-            <EmptyRow
-              name="Write-up"
-              className="px-3"
-              disabled={writing}
-              onAdd={() => void writeUp()}
-            />
-            {carried ? (
-              <ul className="flex flex-col gap-1.5">
-                {sharedNotes.map((n) => (
-                  <NoteRow key={n.id} n={n} onOpenNote={onOpenNote} />
-                ))}
-                {sharedArtifacts.map((a) => (
-                  <ArtifactRow
-                    key={a.documentId}
-                    a={a}
-                    onOpen={(x) => void openArtifact(x)}
+            {tasks.length === 0 ? null : (
+              <Group
+                label="Action items"
+                action={
+                  <span className="shrink-0 mono text-micro text-graphite">
+                    {tasks.length} in Review
+                  </span>
+                }
+              >
+                {tasks.map((s) => (
+                  <ActionItem
+                    key={s.id}
+                    s={s}
+                    today={today}
+                    onDecided={changed}
                   />
                 ))}
-              </ul>
-            ) : null}
-          </section>
-        ) : (
-          <section aria-label="Write-up" className="flex flex-col">
-            <LabelHead label="Write-up">
-              <span
-                data-write-up-line
-                className="shrink-0 mono text-micro text-graphite"
-              >
-                {writeUpLine(writeUpNote.via, writeUpNote.at, today)}
-              </span>
-              <OpenIn link={writeUpNote.openIn} />
-            </LabelHead>
-            <div className="flex flex-col gap-3 px-(--inset) py-3">
-              {writeUpNote.title === null ? (
-                <p className="text-ui text-graphite">Private to its author.</p>
-              ) : (
-                <>
-                  <NoteLink
-                    id={writeUpNote.id}
-                    onOpenNote={onOpenNote}
-                    className="focus-ring self-start text-ui text-foreground hover:underline"
-                  >
-                    {writeUpNote.title}
-                  </NoteLink>
-                  {writeUpNote.body === null ||
-                  writeUpNote.body.trim() === '' ? null : (
-                    <div
-                      data-write-up-body
-                      className="text-prose font-serif leading-6.75 whitespace-pre-wrap text-foreground"
-                    >
-                      {writeUpNote.body}
-                    </div>
-                  )}
-                </>
-              )}
-              {carried ? (
-                <ul className="flex flex-col gap-1.5">
-                  {sharedNotes.map((n) => (
-                    <NoteRow key={n.id} n={n} onOpenNote={onOpenNote} />
-                  ))}
-                  {sharedArtifacts.map((a) => (
+              </Group>
+            )}
+
+            {privateNotes.length + privateArtifacts.length === 0 ? null : (
+              <section aria-label="Private to you" className="flex flex-col">
+                <LabelHead label="Private to you" className="px-0" />
+                <ul className="flex flex-col gap-1.5 pt-2">
+                  {privateArtifacts.map((a) => (
                     <ArtifactRow
                       key={a.documentId}
                       a={a}
                       onOpen={(x) => void openArtifact(x)}
                     />
                   ))}
+                  {privateNotes.map((n) => (
+                    <NoteRow key={n.id} n={n} onOpenNote={onOpenNote} />
+                  ))}
                 </ul>
-              ) : null}
-            </div>
-          </section>
-        )}
+              </section>
+            )}
 
-        {tasks.length === 0 ? null : (
-          <Group
-            label="Action items"
-            action={
-              <span className="shrink-0 mono text-micro text-graphite">
-                {tasks.length} in Review
-              </span>
-            }
+            {ahead && prep.phase !== 'idle' ? (
+              <Group label="Prep">
+                <PrepBody prep={prep} />
+              </Group>
+            ) : null}
+          </div>
+
+          <aside
+            data-meeting-rail
+            aria-label="Participants and records"
+            className="flex shrink-0 flex-col gap-6 border-t border-rule bg-bone p-4 @4xl:w-68 @4xl:overflow-y-auto @4xl:border-t-0 @4xl:border-l"
           >
-            {tasks.map((s) => (
-              <ActionItem key={s.id} s={s} today={today} onDecided={changed} />
-            ))}
-          </Group>
-        )}
+            {meeting.participants.length === 0 ? null : (
+              <Group
+                label="Participants"
+                rail
+                action={
+                  <a
+                    href={googleDayUrl(meeting.startsAt)}
+                    target="_blank"
+                    rel="noreferrer"
+                    title="Answers change in Google Calendar"
+                    className="focus-ring shrink-0 text-label text-foreground hover:underline"
+                  >
+                    Google Calendar ›
+                  </a>
+                }
+              >
+                {meeting.participants.map((p) => (
+                  <li
+                    key={p.email}
+                    className="flex h-row items-center border-b border-rule last:border-b-0"
+                  >
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span
+                          data-participant={p.email}
+                          className="flex min-w-0 flex-1 items-center gap-3"
+                        >
+                          <span className="min-w-0 flex-1 truncate text-ui">
+                            {participantName(p)}
+                          </span>
+                          <span
+                            data-rsvp={p.rsvp}
+                            className="w-4 shrink-0 text-center mono text-micro text-graphite"
+                          >
+                            <span aria-hidden>{RSVP_MARK[p.rsvp]}</span>
+                            <span className="sr-only">
+                              {RSVP_LABEL[p.rsvp]}
+                            </span>
+                          </span>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        {RSVP_LABEL[p.rsvp]} · {p.email}
+                      </TooltipContent>
+                    </Tooltip>
+                  </li>
+                ))}
+              </Group>
+            )}
 
-        {privateNotes.length + privateArtifacts.length === 0 ? null : (
-          <section aria-label="Private to you" className="flex flex-col">
-            <LabelHead label="Private to you" />
-            <ul className="flex flex-col gap-1.5 pt-2">
-              {privateArtifacts.map((a) => (
-                <ArtifactRow
-                  key={a.documentId}
-                  a={a}
-                  onOpen={(x) => void openArtifact(x)}
+            <Group label="Records" rail>
+              {meeting.records.map((r) => {
+                const to = recordPath(r)
+                return (
+                  <li
+                    key={r.id}
+                    className="flex h-row items-center gap-3 border-b border-rule"
+                  >
+                    <KindIcon of={{ kind: r.kind }} />
+                    {to === null ? (
+                      <span className="min-w-0 flex-1 truncate text-ui">
+                        {r.name}
+                      </span>
+                    ) : (
+                      <Link to={to} className={rowLink}>
+                        <span className="min-w-0 truncate text-ui">
+                          {r.name}
+                        </span>
+                      </Link>
+                    )}
+                  </li>
+                )
+              })}
+              <li>
+                <DetailsPickRow
+                  label="Pin a record…"
+                  placeholder="Company, person or deal…"
+                  search={searchRecords}
+                  onPick={async (hit) => {
+                    await pinMeetingRecord({
+                      data: { interactionId: id, entityId: hit.id },
+                    })
+                    changed()
+                  }}
                 />
-              ))}
-              {privateNotes.map((n) => (
-                <NoteRow key={n.id} n={n} onOpenNote={onOpenNote} />
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {ahead && prep.phase !== 'idle' ? (
-          <Group label="Prep">
-            <PrepBody prep={prep} />
-          </Group>
-        ) : null}
+              </li>
+            </Group>
+          </aside>
+        </div>
       </div>
 
-      <DialogFooter {...(done ? { note: 'Not kept unless saved' } : {})}>
+      <DialogFooter
+        className={EDGE}
+        {...(done ? { note: 'Not kept unless saved' } : {})}
+      >
         <Button variant="outline" onClick={onClose}>
           Done
         </Button>

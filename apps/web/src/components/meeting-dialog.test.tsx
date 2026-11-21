@@ -173,17 +173,19 @@ const buttons = (label: string) =>
   )
 
 describe('the meeting window', () => {
-  it('shows RSVPs and never offers to change them; Open in Google is the way', async () => {
+  it('shows RSVPs and never offers to change them; Google Calendar is the way', async () => {
     await open()
     const text = dialog()?.textContent ?? ''
     expect(text).toContain('Flent intro')
     expect(text).toContain('Ana Reyes')
-    expect(text).toContain('✓ Accepted')
     expect(text).toContain('ben@flent.io')
-    expect(text).toContain('? Maybe')
+    expect(
+      dialog()?.querySelector('[data-participant="ben@flent.io"] [data-rsvp]')
+        ?.textContent,
+    ).toBe('?Maybe')
     expect(dialog()?.querySelector('select, input[type="radio"]')).toBeNull()
     const google = [...document.querySelectorAll('a')].find(
-      (a) => a.textContent === 'Open in Google ›',
+      (a) => a.textContent === 'Google Calendar ›',
     )
     expect(google?.getAttribute('href')).toContain('calendar.google.com')
     expect(
@@ -252,19 +254,36 @@ describe('the meeting window', () => {
     expect(mark?.getAttribute('class')).toContain('size-5')
   })
 
-  it('reads a participant as a name and an answer, the address a tooltip', async () => {
+  it('reads a participant as a name and a mark on the rail, the answer and address a tooltip', async () => {
     await open()
-    const ana = dialog()?.querySelector('[data-participant="ana@flent.io"]')
-    expect(ana?.textContent).toBe('Ana Reyes')
-    expect(ana?.getAttribute('title')).toBe('ana@flent.io')
-    const row = ana?.parentElement
-    expect(row?.textContent).toBe('Ana Reyes✓ Accepted')
-    expect(row?.querySelectorAll('.mono')).toHaveLength(1)
+    const rail = dialog()?.querySelector('[data-meeting-rail]')
+    const ana = rail?.querySelector('[data-participant="ana@flent.io"]')
+    const mark = ana?.querySelector('[data-rsvp]')
+    expect(mark?.querySelector('[aria-hidden]')?.textContent).toBe('✓')
+    // The answer in words is for a screen reader; the address is never printed.
+    expect(ana?.textContent).toBe('Ana Reyes✓Accepted')
+    expect(rail?.textContent).not.toContain('ana@flent.io')
+  })
+
+  it('lays the write-up left and a rail of Participants and Records right, with no When block', async () => {
+    await open()
+    const main = dialog()?.querySelector('[data-meeting-main]')
+    const rail = dialog()?.querySelector('[data-meeting-rail]')
+    expect(main?.querySelector('[aria-label="Write-up"]')).not.toBeNull()
+    expect(
+      [...(rail?.querySelectorAll('section') ?? [])].map((g) =>
+        g.getAttribute('aria-label'),
+      ),
+    ).toEqual(['Participants', 'Records'])
+    expect(rail?.getAttribute('class')).toContain('@4xl:w-68')
+    expect(rail?.getAttribute('class')).toContain('bg-bone')
+    expect(dialog()?.textContent).not.toContain('When')
+    expect(rail?.textContent).toContain('Pin a record…')
   })
 
   it('leads a linked record on its kind icon, never the kind word', async () => {
     await open()
-    const linked = dialog()?.querySelector('[aria-label="Linked records"]')
+    const linked = dialog()?.querySelector('[aria-label="Records"]')
     const icon = linked?.querySelector('[data-kind-icon="company"]')
     expect(icon?.getAttribute('aria-label')).toBe('Company')
     expect(linked?.textContent).not.toMatch(/company/i)

@@ -1,18 +1,15 @@
 import { useNavigate, useRouter, useSearch } from '@tanstack/react-router'
-import { Attachment, Email, icon } from '#/components/icons'
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { ReactNode } from 'react'
+import { Email, icon } from '#/components/icons'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { formatBytes } from '@spaces/core/documents'
-import { dayKey, formatDay, formatTime } from '@spaces/core/format'
 import { DocumentPreview } from '#/components/document-preview'
 import { DraftComposer } from '#/components/email/draft-composer'
-import { FileGlyph } from '#/components/files/file-glyph'
-import { downloadDocument } from '#/components/files/file-row'
+import type { FileActions, ReplyMode } from '#/components/email/message-card'
+import { EmailThread } from '#/components/email/thread'
 import { NewerVersionDialog } from '#/components/files/newer-version-dialog'
 import { FilingPickers } from '#/components/files/viewer-sidebar'
 import type { RecordDocument } from '#/components/files/types'
-import { LabelHead, LedgerRow } from '#/components/ledger-section'
+import { LedgerRow } from '#/components/ledger-section'
 import { PickPopover } from '#/components/record/details-add'
 import { ProviderMark } from '#/components/provider-mark'
 import { Twinkle } from '#/components/twinkle'
@@ -44,37 +41,29 @@ import {
 } from '#/lib/server-fns'
 import type {
   EmailAttachment,
-  EmailBody,
   EmailDetail,
-  EmailParticipant,
   EmailPrivacy,
-  EmailThreadLine,
   ReplyOpening,
 } from '#/lib/server-fns'
 import { draftStateOf } from '#/lib/email/compose'
 import type { DraftState } from '#/lib/email/compose'
-import { fileType } from '#/lib/documents/files-tab'
 import { openModalId } from '#/lib/modal-search'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
 /**
  * The email window: the email glyph, the subject and the thread's size in
- * the bone head, then the earlier messages one line each, and the message
- * itself open with its body and files. The foot is Done, the `···` and
- * Reply; Done is the one close.
- * - The body is the server's sanitized document in an iframe sandboxed with
- *   no scripts and no forms; popups are allowed so a link opens a new tab.
- * - Same-origin lets the window size the frame to its content; with no
- *   scripts in the frame and a CSP refusing every load, it grants nothing.
+ * the bone head; the thread as message cards on bone (`EmailThread`); a
+ * foot of Done, the thread's `···` and Reply. Done is the one close.
  * - A body private to someone else is a bone panel, never fetched.
- * - A body private by default says who reads it at the foot's left; its
- *   owner widens it from `Who can read this…`, for `recordId` (the record
- *   it was opened from) or members.
- * - An earlier message's line unfolds it in place, with its own files;
- *   several can be open at once.
- * - Reply is the foot's primary: the draft grows under the message,
- *   which folds to one line. Forward is the same draft in its forward mode.
+ * - The foot's note says who reads the body only when that is not the
+ *   default (`privacyNote`); its owner widens it from `Who can read this…`,
+ *   for `recordId` (the record it was opened from) or members.
+ * - Reply grows the draft as the last card, in ink, every message folded
+ *   above it; the foot turns to the composer's Cancel and Send. Each open
+ *   message's own `···` replies to, or forwards, that message.
+ * - A file opens the viewer as a second window, stepping through the files
+ *   of its message.
  */
 export function EmailDialog({
   id,
@@ -87,7 +76,7 @@ export function EmailDialog({
 }) {
   return (
     <Dialog open={id !== null} onOpenChange={onOpenChange}>
-      <DialogContent size="l">
+      <DialogContent size="l" flush className="h-[85vh]">
         {id === null ? null : (
           <EmailWindow
             key={id}
@@ -125,135 +114,26 @@ export function EmailModal({ recordId = null }: { recordId?: string | null }) {
   )
 }
 
-/** `10:42` on the reader's day, else `13 Oct, 18:40`. */
-export function messageStamp(iso: string, today: string): string {
-  return dayKey(iso) === today
-    ? formatTime(iso)
-    : `${formatDay(iso, today)}, ${formatTime(iso)}`
-}
-
 const plural = (n: number, noun: string) =>
   `${String(n)} ${noun}${n === 1 ? '' : 's'}`
 
-/** A lane of the open message: `To`, `Cc`, `Via`, in sans 12 graphite. */
-function Lane({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-baseline gap-3 text-label text-graphite">
-      <span className="w-10 shrink-0">{label}</span>
-      <span className="flex min-w-0 flex-1 flex-wrap gap-x-3 gap-y-0.5">
-        {children}
-      </span>
-    </div>
-  )
-}
-
-function Who({ p }: { p: EmailParticipant }) {
-  return <span>{p.name ?? p.email}</span>
-}
-
-/** The sandboxed body, sized to what it holds. */
-export function EmailFrame({ srcdoc }: { srcdoc: string }) {
-  const frame = useRef<HTMLIFrameElement>(null)
-  const [height, setHeight] = useState(240)
-  const measure = useCallback(() => {
-    const doc = frame.current?.contentDocument
-    if (doc) setHeight(doc.documentElement.scrollHeight)
-  }, [])
-  return (
-    <iframe
-      ref={frame}
-      title="Email body"
-      sandbox="allow-popups allow-popups-to-escape-sandbox allow-same-origin"
-      referrerPolicy="no-referrer"
-      srcDoc={srcdoc}
-      onLoad={measure}
-      style={{ height }}
-      className="block w-full border-0 bg-paper"
-    />
-  )
-}
-
-function Body({ body, owner }: { body: EmailBody; owner: string }) {
-  switch (body.kind) {
-    case 'html':
-      return (
-        <div className="border border-rule p-4">
-          <EmailFrame srcdoc={body.srcdoc} />
-        </div>
-      )
-    case 'text':
-      return (
-        <div className="border border-rule p-4 text-body whitespace-pre-wrap">
-          {body.text}
-        </div>
-      )
-    case 'private':
-      return (
-        <p
-          data-body-private
-          className="border border-rule bg-bone px-4 py-6 text-center text-ui text-graphite"
-        >
-          Private to {owner}&rsquo;s mailbox
-        </p>
-      )
-    case 'none':
-      return null
-  }
-}
-
-function remoteLine(body: EmailBody): string | null {
-  if (body.kind !== 'html' || body.remoteImages === 0) return null
-  const n = body.remoteImages
-  return `${String(n)} remote image${n === 1 ? '' : 's'} not loaded`
-}
-
-/** An attachment's mono end lane: `4.2 MB · Anish · 13 Oct`. */
-export function attachmentLane(
-  a: Pick<EmailAttachment, 'sizeBytes' | 'uploader' | 'addedAt'>,
-  today: string,
-): string {
-  return [
-    formatBytes(a.sizeBytes) || null,
-    a.uploader,
-    formatDay(a.addedAt, today),
-  ]
-    .filter((part) => part !== null && part !== '')
-    .join(' · ')
-}
-
 /**
- * Who reads a body private by default, as the foot's left says it:
- * `Visible to you`, `Visible to you, Maya`, `Visible to Anish`. Null for a
- * body the workspace reads (a shared one, or one its owner opened up),
- * which says nothing.
+ * The foot's note on who reads the body, only when that is not the
+ * default: your own private mail says nothing, mail its owner opened up
+ * says so — `Shared with the workspace`, `Shared with Maya` to its owner,
+ * `Shared by Priya Raman` to the members it reaches. `Who can read this…`
+ * holds the full state.
  */
 export function privacyNote(p: EmailPrivacy | null): string | null {
-  if (p === null || p.workspace) return null
-  const names = [
-    p.mine ? 'you' : p.owner.name,
-    ...p.grantees.filter((g) => !(p.mine && g.you)).map((g) => g.name),
-  ]
-  return `Visible to ${names.join(', ')}`
-}
-
-const CATEGORY_WORD = (c: string) => c.charAt(0).toUpperCase() + c.slice(1)
-
-/** The classify lane's labels, as chips over the thread. */
-function Categories({ categories }: { categories: ReadonlyArray<string> }) {
-  if (categories.length === 0) return null
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      {categories.map((c) => (
-        <span
-          key={c}
-          data-category={c}
-          className="flex h-5 items-center rounded-md border border-rule px-1.5 text-label text-graphite"
-        >
-          {CATEGORY_WORD(c)}
-        </span>
-      ))}
-    </div>
-  )
+  if (p === null) return null
+  if (p.mine) {
+    if (p.workspace) return 'Shared with the workspace'
+    if (p.grantees.length === 0) return null
+    return `Shared with ${p.grantees.map((g) => g.name).join(', ')}`
+  }
+  return p.workspace || p.grantees.some((g) => g.you)
+    ? `Shared by ${p.owner.name}`
+    : null
 }
 
 /** The message in this window's own address, for Copy link. */
@@ -416,325 +296,6 @@ export function WidenDialog({
   )
 }
 
-/** How many of the earliest lines fold, with more than two before the message. */
-const SHOWN_EARLIER = 2
-
-/** What a message's files do: open the viewer, file it, mark it a newer version. */
-type FileActions = {
-  recordId: string | null
-  onOpen: (a: EmailAttachment) => void
-  onFileOn: (a: EmailAttachment) => void
-  onNewer: (a: EmailAttachment) => void
-}
-
-/** A message's sender, their address and its stamp, on one line. */
-function Sender({ email, today }: { email: EmailDetail; today: string }) {
-  return (
-    <div className="flex items-baseline gap-2">
-      {email.from === null ? (
-        <span className="text-ui text-graphite">Unknown sender</span>
-      ) : (
-        <>
-          <span className="text-ui">{email.from.name ?? email.from.email}</span>
-          {email.from.name === null ? null : (
-            <span className="min-w-0 truncate mono text-micro text-graphite">
-              {email.from.email}
-            </span>
-          )}
-        </>
-      )}
-      <span className="ml-auto shrink-0 mono text-micro text-graphite">
-        {messageStamp(email.occurredAt, today)}
-      </span>
-    </div>
-  )
-}
-
-/** The body as the window prints it, with its remote-image line. */
-function MessageBody({ email }: { email: EmailDetail }) {
-  if (email.body.kind === 'none') return null
-  const remote = remoteLine(email.body)
-  const owner = email.privacy?.owner.name ?? email.via ?? 'its owner'
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Body body={email.body} owner={owner} />
-      {remote === null ? null : (
-        <span data-remote-images className="mono text-micro text-graphite">
-          {remote}
-        </span>
-      )}
-    </div>
-  )
-}
-
-/** The files a message came with, under it. */
-function MessageFiles({
-  email,
-  today,
-  actions,
-}: {
-  email: EmailDetail
-  today: string
-  actions: FileActions
-}) {
-  if (email.attachments.length === 0) return null
-  return (
-    <section
-      aria-label="Attachments"
-      data-files-of={email.id}
-      className="flex flex-col"
-    >
-      <LabelHead label={`Attachments · ${String(email.attachments.length)}`} />
-      <ol>
-        {email.attachments.map((a, i) => (
-          <AttachmentRow
-            key={a.documentId}
-            a={a}
-            last={i === email.attachments.length - 1}
-            today={today}
-            recordId={actions.recordId}
-            onOpen={() => actions.onOpen(a)}
-            onFileOn={() => actions.onFileOn(a)}
-            onNewer={() => actions.onNewer(a)}
-          />
-        ))}
-      </ol>
-    </section>
-  )
-}
-
-/** An earlier message unfolded under its line: its sender, body and files. */
-function EarlierMessage({
-  id,
-  today,
-  actions,
-}: {
-  id: string
-  today: string
-  actions: FileActions
-}) {
-  const [email, setEmail] = useState<EmailDetail | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const recordId = actions.recordId
-  useEffect(() => {
-    let live = true
-    getEmail({ data: { id, recordId } })
-      .then((e) => {
-        if (live) setEmail(e)
-      })
-      .catch((err: unknown) => {
-        if (live)
-          setError(
-            err instanceof Error ? err.message : 'Could not read the email',
-          )
-      })
-    return () => {
-      live = false
-    }
-  }, [id, recordId])
-  return (
-    <div
-      data-message={id}
-      className="flex flex-col gap-3 border-b border-rule px-(--inset) py-3"
-    >
-      {email === null ? (
-        error === null ? (
-          <Twinkle size={14} />
-        ) : (
-          <p className="text-ui text-destructive">{error}</p>
-        )
-      ) : (
-        <>
-          <Sender email={email} today={today} />
-          <MessageBody email={email} />
-          <MessageFiles email={email} today={today} actions={actions} />
-        </>
-      )}
-    </div>
-  )
-}
-
-/**
- * An earlier message: who, a graphite preview, its files and the stamp on
- * one line, which unfolds the message under it and folds it again.
- */
-function ThreadLine({
-  line,
-  today,
-  open,
-  onToggle,
-  actions,
-}: {
-  line: EmailThreadLine
-  today: string
-  open: boolean
-  onToggle: () => void
-  actions: FileActions
-}) {
-  return (
-    <li>
-      <button
-        type="button"
-        data-thread-line={line.id}
-        aria-expanded={open}
-        onClick={onToggle}
-        className={cn(
-          'focus-ring-inset flex h-9 w-full items-center gap-3 border-b border-rule px-(--inset) text-left hover:bg-bone',
-          open && 'bg-bone',
-        )}
-      >
-        <span className="w-40 shrink-0 truncate text-ui">
-          {line.sent ? `To ${line.who}` : line.who}
-        </span>
-        <span className="min-w-0 flex-1 truncate text-ui text-graphite">
-          {line.preview ?? ''}
-        </span>
-        {line.attachments > 0 ? (
-          <span className="flex shrink-0 items-center gap-1 mono text-micro text-graphite">
-            <Attachment aria-label="Attachments" className="size-4" />
-            {line.attachments}
-          </span>
-        ) : null}
-        <span className="shrink-0 mono text-micro text-graphite">
-          {messageStamp(line.occurredAt, today)}
-        </span>
-      </button>
-      {open ? (
-        <EarlierMessage id={line.id} today={today} actions={actions} />
-      ) : null}
-    </li>
-  )
-}
-
-/**
- * The messages before the open one, oldest first, each one line until it
- * is unfolded; past two, the earliest fold to `N earlier messages`.
- */
-function Thread({
-  earlier,
-  today,
-  actions,
-}: {
-  earlier: ReadonlyArray<EmailThreadLine>
-  today: string
-  actions: FileActions
-}) {
-  const [unfolded, setUnfolded] = useState(false)
-  const [open, setOpen] = useState<ReadonlySet<string>>(new Set())
-  const toggle = (id: string) =>
-    setOpen((prev) => {
-      const next = new Set(prev)
-      if (!next.delete(id)) next.add(id)
-      return next
-    })
-  if (earlier.length === 0) return null
-  const folded =
-    !unfolded && earlier.length > SHOWN_EARLIER
-      ? earlier.length - SHOWN_EARLIER
-      : 0
-  return (
-    <ol aria-label="Earlier messages" className="border-t border-rule">
-      {folded === 0 ? null : (
-        <li>
-          <button
-            type="button"
-            data-folded-earlier
-            onClick={() => setUnfolded(true)}
-            className="focus-ring-inset flex h-9 w-full items-center border-b border-rule px-(--inset) text-left text-ui text-graphite hover:bg-bone hover:text-foreground"
-          >
-            {plural(folded, 'earlier message')}
-          </button>
-        </li>
-      )}
-      {earlier.slice(folded).map((line) => (
-        <ThreadLine
-          key={line.id}
-          line={line}
-          today={today}
-          open={open.has(line.id)}
-          onToggle={() => toggle(line.id)}
-          actions={actions}
-        />
-      ))}
-    </ol>
-  )
-}
-
-/**
- * One attachment: the row opens the viewer over this window; its `···` has
- * Open, Download, File on… and — opened from a record — Newer version of….
- */
-function AttachmentRow({
-  a,
-  last,
-  today,
-  recordId,
-  onOpen,
-  onFileOn,
-  onNewer,
-}: {
-  a: EmailAttachment
-  last: boolean
-  today: string
-  recordId: string | null
-  onOpen: () => void
-  onFileOn: () => void
-  onNewer: () => void
-}) {
-  return (
-    <LedgerRow last={last}>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="focus-ring-inset -mx-(--inset) flex h-full min-w-0 flex-1 items-center gap-3 px-(--inset) text-left hover:bg-bone"
-      >
-        <FileGlyph
-          type={fileType({
-            filename: a.filename,
-            mime: a.mime,
-            externalUrl: null,
-          })}
-        />
-        <span className="min-w-0 flex-1 truncate text-body">{a.name}</span>
-        <span
-          data-attachment-lane
-          className="shrink-0 mono text-micro text-graphite"
-        >
-          {attachmentLane(a, today)}
-        </span>
-      </button>
-      <MoreMenu
-        variant="row"
-        label={a.name}
-        items={[
-          { label: 'Open', icon: <icon.open />, opens: true, onSelect: onOpen },
-          {
-            label: 'Download',
-            icon: <icon.download />,
-            onSelect: () => void downloadDocument(a.documentId),
-          },
-          {
-            label: 'File on…',
-            icon: <icon.fileOn />,
-            opens: true,
-            onSelect: onFileOn,
-          },
-          ...(recordId === null
-            ? []
-            : [
-                {
-                  label: 'Newer version of…',
-                  icon: <icon.version />,
-                  opens: true,
-                  onSelect: onNewer,
-                },
-              ]),
-        ]}
-      />
-    </LedgerRow>
-  )
-}
-
 /** `File on…` for an attachment: the record search and the space tree. */
 function FileOnDialog({
   attachment,
@@ -785,6 +346,19 @@ function FileOnDialog({
   )
 }
 
+/** The head and foot run to the flush sheet's edges, the thread between. */
+const EDGE = 'mx-0 mt-0 mb-0 shrink-0'
+
+/** The bone ground the message cards stand on, 8px apart. */
+const GROUND = 'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto bg-bone p-3'
+
+/** The viewer over the thread: the files of one message, and which is open. */
+type Viewing = {
+  files: ReadonlyArray<EmailAttachment>
+  at: number
+  doc: NonNullable<Awaited<ReturnType<typeof getDocumentPreview>>>
+}
+
 function EmailWindow({
   id,
   recordId,
@@ -799,9 +373,7 @@ function EmailWindow({
   const { confirm, confirmDialog } = useConfirm()
   const [email, setEmail] = useState<EmailDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [viewer, setViewer] = useState<Awaited<
-    ReturnType<typeof getDocumentPreview>
-  > | null>(null)
+  const [viewer, setViewer] = useState<Viewing | null>(null)
   const [widening, setWidening] = useState(false)
   const [filing, setFiling] = useState<EmailAttachment | null>(null)
   const [filingDeal, setFilingDeal] = useState(false)
@@ -816,7 +388,6 @@ function EmailWindow({
     savedAt: string | null
   } | null>(null)
   const [replyError, setReplyError] = useState<string | null>(null)
-  const [unfolded, setUnfolded] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -843,9 +414,11 @@ function EmailWindow({
     [recordId],
   )
 
-  async function openAttachment(a: EmailAttachment) {
+  async function view(files: ReadonlyArray<EmailAttachment>, at: number) {
+    const a = files.at(at)
+    if (a === undefined) return
     const doc = await getDocumentPreview({ data: { id: a.documentId } })
-    if (doc) setViewer(doc)
+    if (doc) setViewer({ files, at, doc })
   }
 
   /** The record's other files of this kind, for `Newer version of…`. */
@@ -873,17 +446,19 @@ function EmailWindow({
 
   const actions: FileActions = {
     recordId,
-    onOpen: (a) => void openAttachment(a),
+    onOpen: (a, files) => void view(files, files.indexOf(a)),
     onFileOn: setFiling,
     onNewer: (a) => void newerVersion(a),
   }
 
-  /** Reply, or Forward from the `···`; a draft held on the email reopens as it was. */
-  async function startDraft(mode: 'reply' | 'forward') {
+  /**
+   * Reply, Reply all or Forward from one message; a draft held on that
+   * message reopens as it was.
+   */
+  async function startDraft(parentId: string, mode: ReplyMode) {
     setReplyError(null)
     try {
-      const opened = await openEmailReply({ data: { parentId: id } })
-      setUnfolded(false)
+      const opened = await openEmailReply({ data: { parentId } })
       setReply(
         opened.draft === null
           ? {
@@ -901,9 +476,9 @@ function EmailWindow({
       setReplyError(
         err instanceof Error
           ? err.message
-          : mode === 'reply'
-            ? 'Could not reply'
-            : 'Could not forward',
+          : mode === 'forward'
+            ? 'Could not forward'
+            : 'Could not reply',
       )
     }
   }
@@ -926,16 +501,11 @@ function EmailWindow({
     }
   }
 
+  /** The thread's own acts; replying to one message is that card's `···`. */
   const menu: Array<MoreMenuEntry> =
     email === null
       ? []
       : [
-          {
-            label: 'Forward',
-            icon: <icon.forward />,
-            opens: true,
-            onSelect: () => void startDraft('forward'),
-          },
           ...(email.gmailUrl === null
             ? []
             : [
@@ -986,7 +556,7 @@ function EmailWindow({
   const note =
     replyError ?? (email === null ? null : privacyNote(email.privacy))
   const foot = (
-    <DialogFooter {...(note === null ? {} : { note })}>
+    <DialogFooter className={EDGE} {...(note === null ? {} : { note })}>
       <Button variant="outline" onClick={onClose}>
         Done
       </Button>
@@ -1012,7 +582,9 @@ function EmailWindow({
               void router.invalidate()
             }}
           />
-          <Button onClick={() => void startDraft('reply')}>Reply</Button>
+          <Button onClick={() => void startDraft(email.id, 'reply')}>
+            Reply
+          </Button>
         </>
       )}
     </DialogFooter>
@@ -1021,90 +593,52 @@ function EmailWindow({
   if (email === null)
     return (
       <>
-        <DialogHeader>
-          <Email aria-hidden className="size-5 self-center text-graphite" />
+        <DialogHeader className={cn(EDGE, 'items-center')}>
+          <Email aria-hidden className="size-5 text-graphite" />
           <DialogTitle>Email</DialogTitle>
         </DialogHeader>
         <DialogDescription className="sr-only">
           The email is being read
         </DialogDescription>
-        {error === null ? (
-          <div className="flex min-h-48 flex-1 items-center justify-center">
+        <div className="flex min-h-48 flex-1 items-center justify-center bg-bone px-4">
+          {error === null ? (
             <Twinkle size={29} />
-          </div>
-        ) : (
-          <p className="text-ui text-destructive">{error}</p>
-        )}
+          ) : (
+            <p className="text-ui text-destructive">{error}</p>
+          )}
+        </div>
         {foot}
       </>
     )
 
-  const isPrivate = email.body.kind === 'private'
-  const message = (
-    <>
-      <Categories categories={email.categories} />
-
-      <Thread earlier={email.thread.earlier} today={today} actions={actions} />
-
-      <section
-        aria-label="Message"
-        data-message={email.id}
-        className="flex flex-col gap-3"
-      >
-        <div className="flex flex-col gap-1">
-          <Sender email={email} today={today} />
-          {isPrivate && email.from !== null ? (
-            <Lane label="From">
-              <Who p={email.from} />
-            </Lane>
-          ) : null}
-          {email.to.length === 0 ? null : (
-            <Lane label="To">
-              {email.to.map((p) => (
-                <Who key={p.email} p={p} />
-              ))}
-            </Lane>
-          )}
-          {email.cc.length === 0 ? null : (
-            <Lane label="Cc">
-              {email.cc.map((p) => (
-                <Who key={p.email} p={p} />
-              ))}
-            </Lane>
-          )}
-          {email.bcc.length === 0 ? null : (
-            <Lane label="Bcc">
-              {email.bcc.map((p) => (
-                <span
-                  key={p.email}
-                  data-bcc={p.email}
-                  className="inline-flex items-baseline gap-1.5"
-                >
-                  <Who p={p} />
-                  <span className="mono text-micro">hidden</span>
-                </span>
-              ))}
-            </Lane>
-          )}
-          {email.via === null || isPrivate ? null : (
-            <Lane label="Via">
-              <span>{email.via}</span>
-            </Lane>
-          )}
-        </div>
-        <MessageBody email={email} />
-      </section>
-
-      <MessageFiles email={email} today={today} actions={actions} />
-    </>
+  const thread = (
+    <EmailThread
+      // Starting a draft folds every card; ending it opens the newest again.
+      key={reply === null ? 'read' : 'draft'}
+      email={email}
+      recordId={recordId}
+      today={today}
+      drafting={reply !== null}
+      actions={actions}
+      onDraft={(messageId, mode) => void startDraft(messageId, mode)}
+    />
   )
   const extras = (
     <>
       <DocumentPreview
-        doc={viewer}
+        doc={viewer?.doc ?? null}
         onOpenChange={(open) => {
           if (!open) setViewer(null)
         }}
+        steps={
+          viewer === null
+            ? null
+            : {
+                at: viewer.at,
+                of: viewer.files.length,
+                onStep: (to) => void view(viewer.files, to),
+              }
+        }
       />
       <FileOnDialog
         attachment={filing}
@@ -1135,14 +669,21 @@ function EmailWindow({
     </>
   )
   const head = (
-    <DialogHeader>
+    <DialogHeader className={cn(EDGE, 'flex-nowrap items-center')}>
       <Email
         data-window-mark
         aria-hidden
-        className="size-5 self-center text-graphite"
+        className="size-5 shrink-0 text-graphite"
       />
-      <DialogTitle>{email.subject || 'Untitled'}</DialogTitle>
-      <DialogDescription className={cn(email.thread.messages < 2 && 'sr-only')}>
+      <DialogTitle className="min-w-0 truncate">
+        {email.subject || 'Untitled'}
+      </DialogTitle>
+      <DialogDescription
+        className={cn(
+          'ml-auto shrink-0',
+          email.thread.messages < 2 && 'sr-only',
+        )}
+      >
         {plural(email.thread.messages, 'message')}
       </DialogDescription>
     </DialogHeader>
@@ -1154,25 +695,14 @@ function EmailWindow({
         {head}
         <DraftComposer
           key={reply.draft.id}
+          card
           initial={reply.draft}
           savedAt={reply.savedAt}
           modes={reply.modes}
           recordId={recordId}
           recordName={email.record?.name ?? null}
           onClose={() => setReply(null)}
-          above={
-            unfolded ? (
-              <div className="flex flex-col gap-6 border-b border-rule px-4 py-4">
-                {message}
-              </div>
-            ) : (
-              <QuotedParent
-                email={email}
-                today={today}
-                onShow={() => setUnfolded(true)}
-              />
-            )
-          }
+          above={thread}
         />
         {extras}
       </>
@@ -1181,38 +711,11 @@ function EmailWindow({
   return (
     <>
       {head}
-      <div className="-mx-4 flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto px-4">
-        {message}
+      <div data-thread className={GROUND}>
+        {thread}
       </div>
       {foot}
       {extras}
     </>
-  )
-}
-
-/** The message a reply answers, folded to one line: `<name> wrote at 10:42 · Show`. */
-function QuotedParent({
-  email,
-  today,
-  onShow,
-}: {
-  email: EmailDetail
-  today: string
-  onShow: () => void
-}) {
-  const name = email.from?.name ?? email.from?.email ?? 'Someone'
-  const at = messageStamp(email.occurredAt, today)
-  return (
-    <button
-      type="button"
-      data-folded-message
-      onClick={onShow}
-      className="focus-ring-inset flex min-h-10 w-full shrink-0 items-center gap-2 border-b border-rule px-4 text-left text-ui text-graphite hover:bg-bone"
-    >
-      <span className="text-foreground">{name}</span>
-      wrote {dayKey(email.occurredAt) === today ? 'at' : 'on'} {at}
-      <span aria-hidden>·</span>
-      <span className="text-foreground underline">Show</span>
-    </button>
   )
 }

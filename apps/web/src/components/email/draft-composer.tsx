@@ -1,4 +1,4 @@
-import { icon } from '#/components/icons'
+import { Attachment, icon } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -135,6 +135,7 @@ export function DraftComposer({
   recordId = null,
   recordName = null,
   above,
+  card = false,
   onSaved,
   onClose,
 }: {
@@ -147,8 +148,13 @@ export function DraftComposer({
   recordId?: string | null
   /** That record's name, for `or a file from <record>`. */
   recordName?: string | null
-  /** What sits over the address block: the quoted parent, inline. */
+  /** What sits over the draft: the thread's cards, inline. */
   above?: ReactNode
+  /**
+   * The draft as the last card of a thread, in ink on the bone ground of a
+   * flush window, rather than edge to edge in a window of its own.
+   */
+  card?: boolean
   onSaved?: (at: string) => void
   onClose: () => void
 }) {
@@ -387,7 +393,8 @@ export function DraftComposer({
     <>
       <div
         className={cn(
-          '-mx-4 flex min-h-0 flex-1 flex-col overflow-y-auto',
+          'flex min-h-0 flex-1 flex-col overflow-y-auto',
+          card ? 'gap-2 bg-bone p-3' : '-mx-4',
           sending && 'pointer-events-none opacity-50',
         )}
         {...(sending ? { 'aria-busy': true } : {})}
@@ -399,155 +406,178 @@ export function DraftComposer({
         }}
       >
         {review === null ? above : null}
-        {modes === null || draft.mode === 'new' ? null : (
-          <div className="flex h-11 shrink-0 items-center gap-3 border-b border-rule px-4">
-            <Segmented
-              label="Reply mode"
-              value={draft.mode}
-              options={MODE_OPTIONS}
-              onChange={pickMode}
-            />
-            {saved === null ? null : (
-              <span
-                data-saved
-                className="ml-auto mono text-micro text-graphite"
-              >
-                {saved}
-              </span>
-            )}
-          </div>
-        )}
-        {review === null ? null : (
-          <ReviewPanes
-            review={review}
-            choices={choices}
-            onChange={setChoices}
-            subject={draft.subject}
-            bodyMd={draft.bodyMd}
-          />
-        )}
         <div
+          {...(card ? { 'data-draft-card': '' } : {})}
           className={
-            review === null ? 'flex min-h-0 flex-1 flex-col' : 'hidden'
+            card
+              ? 'flex shrink-0 flex-col border border-hairline bg-paper'
+              : 'contents'
           }
         >
-          <section aria-label="Addresses" className="flex flex-col">
-            <RecipientLine
-              label="To"
-              value={draft.to}
-              onChange={(to) => edit({ to })}
-              autoFocus={draft.to.length === 0}
-              trail={
-                ccOpen && bccOpen ? undefined : (
-                  <span className="flex shrink-0 items-center gap-2.5 text-label text-graphite">
-                    {ccOpen ? null : (
-                      <button
-                        type="button"
-                        onClick={() => setCcOpen(true)}
-                        className="focus-ring hover:text-foreground"
-                      >
-                        Cc
-                      </button>
-                    )}
-                    {bccOpen ? null : (
-                      <button
-                        type="button"
-                        onClick={() => setBccOpen(true)}
-                        className="focus-ring hover:text-foreground"
-                      >
-                        Bcc
-                      </button>
-                    )}
-                  </span>
-                )
-              }
-            />
-            {ccOpen ? (
-              <RecipientLine
-                label="Cc"
-                value={draft.cc}
-                onChange={(cc) => edit({ cc })}
+          {modes === null || draft.mode === 'new' ? null : (
+            <div className="flex h-11 shrink-0 items-center gap-3 border-b border-rule px-4">
+              <Segmented
+                label="Reply mode"
+                value={draft.mode}
+                options={MODE_OPTIONS}
+                onChange={pickMode}
               />
-            ) : null}
-            {bccOpen ? (
-              <RecipientLine
-                label="Bcc"
-                value={draft.bcc}
-                onChange={(bcc) => edit({ bcc })}
-                blind
-              />
-            ) : null}
-            <AddressRow label="Subject" htmlFor={`subject-${draft.id}`}>
-              <input
-                id={`subject-${draft.id}`}
-                value={draft.subject}
-                onChange={(e) => edit({ subject: e.target.value })}
-                className="h-6 w-full bg-transparent text-ui outline-none"
-              />
-            </AddressRow>
-          </section>
-          <textarea
-            ref={body}
-            aria-label="Message"
-            value={draft.bodyMd}
-            autoFocus={draft.to.length > 0}
-            onChange={(e) => edit({ bodyMd: e.target.value })}
-            className="text-prose min-h-48 w-full flex-1 resize-none bg-paper px-4 py-4 font-serif leading-6.75 outline-none"
-          />
-          <Attachments
-            files={draft.attachments}
-            fromOriginal={fromOriginal}
-            recordId={recordId}
-            recordName={recordName}
-            onChange={(attachments) => edit({ attachments })}
-          />
-          <div
-            data-tool-row
-            className="flex h-9 shrink-0 items-center gap-1 border-t border-rule px-4"
-          >
-            <TemplatePicker
-              kind="email"
-              context="email"
-              align="start"
-              onPick={(t) => void applyTemplate(t)}
-              trigger={
-                <button
-                  type="button"
-                  className="focus-ring flex h-7 items-center rounded-md px-2 text-label text-graphite hover:bg-bone hover:text-foreground"
+              {saved === null ? null : (
+                <span
+                  data-saved
+                  className="ml-auto mono text-micro text-graphite"
                 >
-                  Template
-                </button>
-              }
+                  {saved}
+                </span>
+              )}
+            </div>
+          )}
+          {review === null ? null : (
+            <ReviewPanes
+              review={review}
+              choices={choices}
+              onChange={setChoices}
+              subject={draft.subject}
+              bodyMd={draft.bodyMd}
             />
-            <VariablePicker onPick={insertVariable} />
-            <MoreMenu
-              variant="row"
-              label="this draft"
-              items={[
-                {
-                  label: 'Save as template…',
-                  icon: <icon.template />,
-                  opens: true,
-                  onSelect: () => setTemplating(true),
-                },
-                {
-                  label: 'Delete draft…',
-                  icon: <icon.delete />,
-                  opens: true,
-                  destructive: true,
-                  onSelect: () => void deleteDraft(),
-                },
-              ]}
+          )}
+          <div
+            className={
+              review !== null
+                ? 'hidden'
+                : card
+                  ? 'flex flex-col'
+                  : 'flex min-h-0 flex-1 flex-col'
+            }
+          >
+            <section aria-label="Addresses" className="flex flex-col">
+              <RecipientLine
+                label="To"
+                value={draft.to}
+                onChange={(to) => edit({ to })}
+                autoFocus={draft.to.length === 0}
+                trail={
+                  ccOpen && bccOpen ? undefined : (
+                    <span className="flex shrink-0 items-center gap-2.5 text-label text-graphite">
+                      {ccOpen ? null : (
+                        <button
+                          type="button"
+                          onClick={() => setCcOpen(true)}
+                          className="focus-ring hover:text-foreground"
+                        >
+                          Cc
+                        </button>
+                      )}
+                      {bccOpen ? null : (
+                        <button
+                          type="button"
+                          onClick={() => setBccOpen(true)}
+                          className="focus-ring hover:text-foreground"
+                        >
+                          Bcc
+                        </button>
+                      )}
+                    </span>
+                  )
+                }
+              />
+              {ccOpen ? (
+                <RecipientLine
+                  label="Cc"
+                  value={draft.cc}
+                  onChange={(cc) => edit({ cc })}
+                />
+              ) : null}
+              {bccOpen ? (
+                <RecipientLine
+                  label="Bcc"
+                  value={draft.bcc}
+                  onChange={(bcc) => edit({ bcc })}
+                  blind
+                />
+              ) : null}
+              <AddressRow label="Subject" htmlFor={`subject-${draft.id}`}>
+                <input
+                  id={`subject-${draft.id}`}
+                  value={draft.subject}
+                  onChange={(e) => edit({ subject: e.target.value })}
+                  className="h-6 w-full bg-transparent text-ui outline-none"
+                />
+              </AddressRow>
+            </section>
+            <textarea
+              ref={body}
+              aria-label="Message"
+              value={draft.bodyMd}
+              autoFocus={draft.to.length > 0}
+              onChange={(e) => edit({ bodyMd: e.target.value })}
+              className={cn(
+                'text-prose w-full resize-none bg-paper px-4 py-4 font-serif leading-6.75 outline-none',
+                card ? 'min-h-36' : 'min-h-48 flex-1',
+              )}
             />
+            <AttachedFiles
+              files={draft.attachments}
+              fromOriginal={fromOriginal}
+              onChange={(attachments) => edit({ attachments })}
+            />
+            <div
+              data-tool-row
+              className="flex h-9 shrink-0 items-center gap-1 border-t border-rule px-3"
+            >
+              <AttachPicker
+                files={draft.attachments}
+                recordId={recordId}
+                recordName={recordName}
+                onChange={(attachments) => edit({ attachments })}
+              />
+              <TemplatePicker
+                kind="email"
+                context="email"
+                align="start"
+                onPick={(t) => void applyTemplate(t)}
+                trigger={
+                  <button
+                    type="button"
+                    className="focus-ring flex h-7 items-center rounded-md px-2 text-label text-graphite hover:bg-bone hover:text-foreground"
+                  >
+                    Template
+                  </button>
+                }
+              />
+              <VariablePicker onPick={insertVariable} />
+              <MoreMenu
+                variant="row"
+                label="this draft"
+                items={[
+                  {
+                    label: 'Save as template…',
+                    icon: <icon.template />,
+                    opens: true,
+                    onSelect: () => setTemplating(true),
+                  },
+                  {
+                    label: 'Delete draft…',
+                    icon: <icon.delete />,
+                    opens: true,
+                    destructive: true,
+                    onSelect: () => void deleteDraft(),
+                  },
+                ]}
+              />
+            </div>
           </div>
+          {error === null ? null : (
+            <p role="alert" className="px-4 pb-3 text-ui text-destructive">
+              {error}
+            </p>
+          )}
         </div>
-        {error === null ? null : (
-          <p role="alert" className="px-4 pb-3 text-ui text-destructive">
-            {error}
-          </p>
-        )}
       </div>
-      <DialogFooter note={note}>
+      <DialogFooter
+        note={note}
+        {...(card ? { className: 'mx-0 mt-0 mb-0 shrink-0' } : {})}
+      >
         {review === null ? (
           <Button
             type="button"
@@ -687,19 +717,72 @@ function VariablePicker({ onPick }: { onPick: (path: string) => void }) {
 }
 
 /**
- * The files the draft carries — a glyph, the name and a mono size, `From
- * original` on a forward's own — and Attach: one of the record's files, or
- * an upload, filed on that record when there is one.
+ * The files the draft carries: a glyph, the name and a mono size, `From
+ * original` on a forward's own, each with its ×. Nothing while there are none.
  */
-function Attachments({
+function AttachedFiles({
   files,
   fromOriginal,
+  onChange,
+}: {
+  files: ReadonlyArray<DraftDocument>
+  fromOriginal: ReadonlySet<string>
+  onChange: (next: Array<DraftDocument>) => void
+}) {
+  if (files.length === 0) return null
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 px-4 pb-4">
+      {files.map((f) => (
+        <span
+          key={f.documentId}
+          data-attachment={f.documentId}
+          className="flex h-6 items-center gap-1.5 border border-rule bg-paper px-2 text-ui"
+        >
+          <FileGlyph
+            type={fileType({
+              filename: f.name,
+              mime: f.mime,
+              externalUrl: null,
+            })}
+          />
+          {f.name}
+          {f.sizeBytes === null ? null : (
+            <span className="mono text-micro text-graphite">
+              {formatBytes(f.sizeBytes)}
+            </span>
+          )}
+          {fromOriginal.has(f.documentId) ? (
+            <span data-from-original className="mono text-micro text-graphite">
+              From original
+            </span>
+          ) : null}
+          <button
+            type="button"
+            aria-label={`Remove ${f.name}`}
+            onClick={() =>
+              onChange(files.filter((a) => a.documentId !== f.documentId))
+            }
+            className="focus-ring text-graphite hover:text-foreground"
+          >
+            <icon.close className="size-4" />
+          </button>
+        </span>
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Attach, the tool row's first: one of the record's files, or an upload,
+ * filed on that record when there is one.
+ */
+function AttachPicker({
+  files,
   recordId,
   recordName,
   onChange,
 }: {
   files: ReadonlyArray<DraftDocument>
-  fromOriginal: ReadonlySet<string>
   recordId: string | null
   recordName: string | null
   onChange: (next: Array<DraftDocument>) => void
@@ -768,63 +851,33 @@ function Attachments({
   )
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5 px-4 pb-4">
-      {files.map((f) => (
-        <span
-          key={f.documentId}
-          data-attachment={f.documentId}
-          className="flex h-6 items-center gap-1.5 border border-rule bg-paper px-2 text-ui"
-        >
-          <FileGlyph
-            type={fileType({
-              filename: f.name,
-              mime: f.mime,
-              externalUrl: null,
-            })}
-          />
-          {f.name}
-          {f.sizeBytes === null ? null : (
-            <span className="mono text-micro text-graphite">
-              {formatBytes(f.sizeBytes)}
-            </span>
-          )}
-          {fromOriginal.has(f.documentId) ? (
-            <span data-from-original className="mono text-micro text-graphite">
-              From original
-            </span>
-          ) : null}
-          <button
-            type="button"
-            aria-label={`Remove ${f.name}`}
-            onClick={() =>
-              onChange(files.filter((a) => a.documentId !== f.documentId))
-            }
-            className="focus-ring text-graphite hover:text-foreground"
-          >
-            <icon.close className="size-4" />
-          </button>
-        </span>
-      ))}
+    <>
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
             disabled={uploading}
-            className="focus-ring flex h-6 items-center gap-1 border border-dashed border-rule px-2 text-ui text-graphite hover:text-foreground"
+            className="focus-ring flex h-7 items-center gap-1.5 rounded-md px-2 text-label text-graphite hover:bg-bone hover:text-foreground"
           >
             {uploading ? (
               <>
                 <Twinkle size={14} />
                 Uploading
               </>
-            ) : recordName === null ? (
-              '+ Attach'
             ) : (
-              `+ Attach · or a file from ${recordName}`
+              <>
+                <Attachment aria-hidden className="size-4" />
+                Attach
+              </>
             )}
           </button>
         </PopoverTrigger>
         <PopoverContent align="start" className="flex flex-col gap-1 p-1">
+          {offered.length === 0 || recordName === null ? null : (
+            <span className="flex h-7 items-center px-2 label-caps text-graphite">
+              {recordName}
+            </span>
+          )}
           {offered.map((f) => (
             <button
               key={f.documentId}
@@ -860,6 +913,6 @@ function Attachments({
           if (file) void upload(file)
         }}
       />
-    </div>
+    </>
   )
 }

@@ -525,8 +525,9 @@ company head went from sixteen things to seven by this rule.
   is filled, neither carries an icon or a printed key. There is one commit; a variant
   is a toggle beside it. The note is for cost, privacy or irreversibility only, and it
   wraps rather than truncates. A window with nothing pending to cancel ends on `Done`
-  instead (D108); the email window's foot is `Done · ··· · Reply`, with `Visible to
-you` as its note while the body is private (D109).
+  instead (D108); the email window's foot is `Done · ··· · Reply`, its note saying who
+  reads the email only when that is not the default (`Shared with the workspace`,
+  `Shared by Priya Raman`) (D109).
 - **A7 · State is never a control.** No disabled button or menu item announces a
   missing setup; a `···` with no enabled item does not render; a menu of one frequent
   verb is that verb as a button, while a lone rare verb stays in the menu
