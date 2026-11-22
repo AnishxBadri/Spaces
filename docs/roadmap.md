@@ -43,13 +43,10 @@ Plus Zod leaves (project 37: every server-fn validator through `input()`, job pa
 ## Open
 
 - `SPA-389` `ai-b` — the mandate in every judging lane, and cached tokens on the ledger. Project 31; `migration`, `hitl`: the owner confirms AI column answers may change under the mandate.
-- `SPA-429` `interactions-4` — email threads as message cards with one sender line, reply as the last card, the meeting window in two columns (D109). `afk`.
-- `SPA-430` `attachments-text` — email attachments keep their text and stay in Gmail until someone keeps them; raw MIME without attachment bodies; a folded `From email` band on the Files tab (D110). `afk`.
 - `SPA-460` `email-1` — the Email page: Threads and Drafts in two panes, the sidebar row always there (D111). Project 35; `afk`, after SPA-429.
 - `SPA-461` `email-2` — New email ⌄ in a record's Interactions toolbar, the composer as a window over the record, To filled (D111). Project 35; `afk`, after SPA-429.
 - `SPA-464` `email-3` — every send passes Review, shown as the message card it will become (D111). Project 35; `afk`, after SPA-461.
 - `SPA-466` `email-4` — a failed send keeps its window with Retry, Reconnect Gmail returns to the draft, `Not sent` on Drafts and Today (D111). Project 35; `afk`, `migration`, after SPA-460 and SPA-464.
-- `SPA-462` `email-5` — sync skips threads with nobody outside the workspace; the exclude lists become chips (D111). Project 35; `afk`.
 - `SPA-463` `email-6` — Who can read this says when the body is already open wider, and saves (D111). Project 35; `afk`, after SPA-429.
 - `SPA-465` `email-7` — a member's email signature, added once to new emails and replies (D111). Project 35; `afk`, `migration`, after SPA-461.
 - `SPA-437` `heads-2` — an index page's head is 48px and never folds; a page about one thing keeps 104 (D114). `afk`.
@@ -95,6 +92,9 @@ Plus Zod leaves (project 37: every server-fn validator through `input()`, job pa
 
 ## Unticketed follow-ups
 
+- Email thread, after `interactions-4`: a card reads `→ you` among To even when the reader was only cc'd or bcc'd, because arrival drops the mailbox's own address and the read puts it back first in To; a member's address that no person record holds prints as the address; the email window is 85vh tall, not the board's 680px; the meeting write-up's source reads `Via Granola` in words, not the mark; the meeting rail's Participants and the quoted-history fold were not seen on a live screen (no such rows in the dev database).
+- Attachments, after `attachments-text`: the thread viewer's column holds Text and Source only (no Kind, Filed on, Versions); forgetting a connection now turns every document that came through it with no bytes to `gone`, a Drive `retain: text` row included; a teammate's upload of a file no longer merges onto a synced row that has no bytes; forwarded mail still stores its attachments; opening, downloading, `Keep a copy` and the worker's extraction fetch were tested against a stubbed Gmail only, and the `From email` band was not seen on a live screen.
+- Mail sync, after `email-5`: the chip lists were not seen on a live screen (the dev database has no connected mailbox); a bad sender entry is refused on Save with a toast, not in the field; the row's label sits centred beside the chips, since the page's row was kept; at 390px Settings › Email & calendar runs to 557px with no account connected.
 - Icons, after `icons-2`: the space page's parent-space row and Enrichment's move buttons still print `↑`/`↓` as text; the stored `OBJECT_ICONS` keys (`boxes`, `kanban`, …) keep their Lucide names, since renaming them needs a data migration.
 - Export, after `export-1`: interactions are not exported; a record's identity cell holds its first domain or email only (Import reads one); the zip's bytes go with the nightly orphan sweep, so 24 to 48 hours after export; S3 `put` now streams when given a size, untested against real S3.
 - Data layer, after `data-1`: setting an FX rate, the base currency or renaming a company does not invalidate the Portfolio keys, so Portfolio opened afterwards paints the cached figures until the loader's background read lands; Today's mark window refreshes Today through an `onSaved` callback, since Today still reads through its loader.
