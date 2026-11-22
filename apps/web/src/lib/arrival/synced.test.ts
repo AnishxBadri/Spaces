@@ -290,6 +290,65 @@ describe('a synced message', () => {
   })
 })
 
+/**
+ * The calendar's `internal` rule over synced mail: members are the
+ * fixture user and Priya, and the mailbox's own address counts as ours too.
+ */
+describe('a synced message with nobody outside the workspace', () => {
+  const PRIYA = `Priya <${TEAMMATE.email}>`
+
+  it('is refused when every participant is a member, and nothing is stored', async () => {
+    const before = await notes()
+    const sent = message({
+      labelIds: ['SENT'],
+      from: `Anish <${OWNER_ADDRESS}>`,
+      to: [PRIYA],
+      cc: [`Fixture <${FIXTURE_ACTOR.email}>`],
+      subject: 'Monday partner meeting',
+      body: 'Agenda attached by Friday.',
+    })
+    expect(await sync(sent, ['Sent'])).toEqual({
+      outcome: 'refused',
+      reason: 'internal: nobody from outside the workspace',
+    })
+    const received = message({ from: PRIYA, cc: [], subject: 'Lunch?' })
+    expect((await sync(received)).outcome).toBe('refused')
+    expect(await rowOf(sent.messageId ?? '')).toBeNull()
+    expect(await rowOf(received.messageId ?? '')).toBeNull()
+    expect(await notes()).toBe(before)
+  })
+
+  it('is synced when a member copies someone from outside', async () => {
+    const m = message({
+      from: PRIYA,
+      cc: ['Jane Founder <jane@acme-robotics.example>'],
+      subject: 'Acme follow-up',
+    })
+    expect((await sync(m)).outcome).toBe('created')
+    expect(await companyOf('acme-robotics.example')).not.toBeNull()
+  })
+
+  it('is synced when a member forwarded it, even between members', async () => {
+    const m = message({
+      from: PRIYA,
+      cc: [],
+      subject: 'Fwd: Monday partner meeting',
+      body: [
+        'Worth keeping.',
+        '',
+        '---------- Forwarded message ---------',
+        `From: Fixture <${FIXTURE_ACTOR.email}>`,
+        'Date: Mon, Sep 21, 2026 at 10:04 AM',
+        'Subject: Monday partner meeting',
+        `To: ${PRIYA}`,
+        '',
+        'Agenda attached by Friday.',
+      ].join('\n'),
+    })
+    expect((await sync(m)).outcome).toBe('created')
+  })
+})
+
 describe('the forwarding mailbox and the synced one', () => {
   const forward = async (messageId: string) => {
     const core = (

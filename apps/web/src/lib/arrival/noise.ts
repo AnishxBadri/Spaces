@@ -6,8 +6,9 @@ import type { ParticipantDecision } from './participants'
  * judgement over invitations, and because a refusal has to be provable
  * without a database.
  *
- * Four refusals from `refusal`, in the order they are checked, and a fifth,
- * `excluded`, from `mailExclusion` for a connected mailbox's exclude list:
+ * Four refusals from `refusal`, in the order they are checked, and two the
+ * synced lane adds: `excluded`, from `mailExclusion` for a connected
+ * mailbox's exclude list, and `internal`, from `internalMailRefusal`:
  *
  * - **no Message-ID** — the RFC Message-ID is the dedupe key. A message
  *   without one cannot be written idempotently, so it is not written at all.
@@ -29,7 +30,12 @@ import type { ParticipantDecision } from './participants'
  */
 
 export type NoiseReason =
-  'no-message-id' | 'auto-submitted' | 'list-mail' | 'role-sender' | 'excluded'
+  | 'no-message-id'
+  | 'auto-submitted'
+  | 'list-mail'
+  | 'role-sender'
+  | 'excluded'
+  | 'internal'
 
 export type NoiseInput = {
   /** The message's own Message-ID header, or null when it has none. */
@@ -121,6 +127,15 @@ export function refusal(input: NoiseInput): Refusal | null {
 }
 
 /**
+ * Nobody from outside: no participant the participants module would make a
+ * record for. The one predicate behind the calendar's and the synced
+ * mailbox's `internal`.
+ */
+const noneOutside = (
+  decisions: ReadonlyArray<Pick<ParticipantDecision, 'action'>>,
+): boolean => !decisions.some((d) => d.action === 'create')
+
+/**
  * The calendar's refusals: which events are not meetings the workspace keeps.
  * Checked in this order, and only before a meeting is first written — one
  * already held follows its event, a cancellation included.
@@ -152,9 +167,27 @@ export function meetingRefusal(
     return { reason: 'cancelled', detail: 'cancelled before it was synced' }
   if (input.selfRsvp === 'declined')
     return { reason: 'declined', detail: 'declined by the calendar owner' }
-  if (!input.decisions.some((d) => d.action === 'create'))
+  if (noneOutside(input.decisions))
     return { reason: 'internal', detail: 'no attendee from outside' }
   return null
+}
+
+export type InternalMailInput = {
+  /** A true forward: the original's headers are the ones decided. */
+  forwarded: boolean
+  /** `decideParticipants` over the message's From, To and Cc. */
+  decisions: ReadonlyArray<Pick<ParticipantDecision, 'action'>>
+}
+
+/**
+ * The synced mailbox's `internal` refusal: a message between members only is
+ * the workspace talking to itself, not a thread to file — the calendar's
+ * rule over mail. A forward is exempt, since a member forwarded it on
+ * purpose; the forwarding mailbox never asks.
+ */
+export function internalMailRefusal(input: InternalMailInput): Refusal | null {
+  if (input.forwarded || !noneOutside(input.decisions)) return null
+  return { reason: 'internal', detail: 'nobody from outside the workspace' }
 }
 
 /**

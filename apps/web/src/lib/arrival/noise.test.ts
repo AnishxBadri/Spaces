@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   DEFAULT_MAIL_EXCLUDE,
+  internalMailRefusal,
   isRoleSender,
   mailExclusion,
   meetingRefusal,
@@ -239,6 +240,69 @@ describe('meetingRefusal — the calendar table', () => {
     expect(meetingRefusal({ ...external, ...input })?.reason ?? null).toBe(
       verdict,
     )
+  })
+})
+
+/**
+ * The synced mailbox's `internal` refusal over the same decisions, a message's
+ * From, To and Cc as the synced lane hands them over; the fund is
+ * `fund.example` with one member on Gmail.
+ */
+describe('internalMailRefusal — a synced message with nobody outside', () => {
+  const decisions = (from: string, to: Array<string>, cc: Array<string> = []) =>
+    decideParticipants({
+      from: { email: from, name: null },
+      to: to.map((email) => ({ email, name: null })),
+      cc: cc.map((email) => ({ email, name: null })),
+      ownDomains: ['fund.example'],
+      memberEmails: ['anish@fund.example', 'a.partner@gmail.com'],
+    })
+
+  it('refuses a message between members only', () => {
+    expect(
+      internalMailRefusal({
+        forwarded: false,
+        decisions: decisions('anish@fund.example', ['a.partner@gmail.com']),
+      }),
+    ).toEqual({
+      reason: 'internal',
+      detail: 'nobody from outside the workspace',
+    })
+  })
+
+  it('refuses one copied only to the fund’s own domain and a machine', () => {
+    expect(
+      internalMailRefusal({
+        forwarded: false,
+        decisions: decisions(
+          'a.partner@gmail.com',
+          ['ops@fund.example'],
+          ['notifications@docsend.example'],
+        ),
+      })?.reason,
+    ).toBe('internal')
+  })
+
+  it('keeps a member’s message with an outside cc', () => {
+    expect(
+      internalMailRefusal({
+        forwarded: false,
+        decisions: decisions(
+          'anish@fund.example',
+          ['a.partner@gmail.com'],
+          ['jane@acme-robotics.io'],
+        ),
+      }),
+    ).toBeNull()
+  })
+
+  it('keeps a forward between members: a member forwarded it on purpose', () => {
+    expect(
+      internalMailRefusal({
+        forwarded: true,
+        decisions: decisions('anish@fund.example', ['a.partner@gmail.com']),
+      }),
+    ).toBeNull()
   })
 })
 

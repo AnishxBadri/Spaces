@@ -9,7 +9,9 @@ import type {
 } from '@spaces/core/writes/interactions/email-lane'
 import { fileArrivalProgram } from './file'
 import { arrivalFromSource } from './message'
-import { mailExclusion } from './noise'
+import { internalMailRefusal, mailExclusion } from './noise'
+import { workspaceIdentity } from './participant-records'
+import { decideParticipants } from './participants'
 import { syncedMailSettingsOf } from './synced-settings'
 import type { SyncedMailSettings } from './synced-settings'
 
@@ -20,7 +22,8 @@ import type { SyncedMailSettings } from './synced-settings'
  * - The bound connection decides: its owner authors the body, its address
  *   is never a participant, and its settings say who reads the body.
  * - Refused before anything is stored: mail received before the connection
- *   (forward-only), noise, and whatever the exclude list names.
+ *   (forward-only), noise, whatever the exclude list names, and a message
+ *   with nobody outside the workspace on it. Mail already held stays.
  */
 
 export class SyncedMailFailed extends Schema.TaggedError<SyncedMailFailed>()(
@@ -110,6 +113,25 @@ export const logSyncedEmailProgram = Effect.fn('logSyncedEmail')(function* (
   )
   if (excluded !== null)
     return refused(`${excluded.reason}: ${excluded.detail}`)
+
+  // Who "we" are is the participants module's, read now; the mailbox's own
+  // address is ours even when it is not the owner's sign-in address.
+  const identity = yield* Effect.tryPromise({
+    try: () => workspaceIdentity(box.integrationId),
+    catch: (cause) => new SyncedMailFailed({ cause }),
+  })
+  const internal = internalMailRefusal({
+    forwarded: message.forwarded,
+    decisions: decideParticipants({
+      from: message.from,
+      to: message.to,
+      cc: message.cc,
+      ownDomains: identity.ownDomains,
+      memberEmails: [...identity.memberEmails, box.address],
+    }),
+  })
+  if (internal !== null)
+    return refused(`${internal.reason}: ${internal.detail}`)
 
   const filed = yield* fileArrivalProgram(
     message,

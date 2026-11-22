@@ -411,9 +411,24 @@ describe('an attachment is private with its email’s body (D67)', () => {
   })
 
   it('keeps an unfiled private attachment out of a teammate’s unfiled inbox and count', async () => {
+    // A forward between members: nobody on it becomes a record, and the
+    // forward is what lets mail with nobody from outside be synced.
+    const original = `${randomUUID()}@spaces.test`
     const { doc } = await syncDeck('unfiled deck', {
+      messageId: original,
       from: 'Priya <priya@spaces.test>',
       cc: [],
+      subject: 'Fwd: Seed round',
+      body: [
+        '---------- Forwarded message ---------',
+        'From: Priya <priya@spaces.test>',
+        'Date: Mon, Sep 21, 2026 at 10:04 AM',
+        'Subject: Seed round',
+        `Message-ID: <${original}>`,
+        `To: ${OWNER_ADDRESS}`,
+        '',
+        'The deck is attached.',
+      ].join('\n'),
     })
     expect(await filedOn(doc)).toEqual([])
     const unfiled = (viewer: { id: string }) =>
