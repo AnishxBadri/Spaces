@@ -210,7 +210,10 @@ function Clip({ count }: { count: number }) {
 
 const STAMP = 'w-22 shrink-0 text-right mono text-micro text-graphite'
 
-/** A folded message: one 40px line that unfolds it in place. */
+/**
+ * A folded message: one 40px line that unfolds it in place. At phone width
+ * the preview goes, so the sender line keeps the room it needs.
+ */
 export function FoldedCard({
   head,
   today,
@@ -231,12 +234,12 @@ export function FoldedCard({
     >
       <span
         data-sender-line
-        className="w-45 shrink-0 truncate text-ui"
+        className="min-w-0 flex-1 truncate text-ui sm:w-45 sm:flex-none"
         title={senderLine(head, true)}
       >
         <HeaderLine head={head} folded tips={false} />
       </span>
-      <span className="min-w-0 flex-1 truncate text-ui text-graphite">
+      <span className="hidden min-w-0 flex-1 truncate text-ui text-graphite sm:block">
         {head.preview ?? ''}
       </span>
       <Clip count={head.attachments} />
