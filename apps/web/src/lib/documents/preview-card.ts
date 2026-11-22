@@ -3,6 +3,7 @@ import { and, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import { document, entity } from '@spaces/db/schema'
 import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
+import { remoteBytesSql } from '#/lib/arrival/mail-attachments'
 import { documentsQuery } from './query'
 
 /**
@@ -31,6 +32,9 @@ export const documentPreviewCardProgram = Effect.fn('documentPreviewCard')(
           // stored — which is what `getDocumentDownloadUrl` throws about.
           blobSha: document.blobSha,
           url: document.url,
+          // An email attachment with no blob still opens, through Gmail,
+          // until its mailbox is disconnected.
+          remoteBytes: remoteBytesSql,
           mergedIntoId: entity.mergedIntoId,
         })
         .from(document)
@@ -56,6 +60,7 @@ export const documentPreviewCardProgram = Effect.fn('documentPreviewCard')(
       extractionError: row.extractionError,
       blobSha: row.blobSha,
       url: row.url,
+      remoteBytes: row.remoteBytes,
     }
   },
 )

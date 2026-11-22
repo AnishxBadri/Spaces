@@ -24,6 +24,8 @@ import {
   note,
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
+import { remoteBytesSql } from '#/lib/arrival/mail-attachments'
+import type { RemoteBytes } from '#/lib/documents/files-tab'
 import { sanitizeEmailHtml } from '#/lib/email/sanitize'
 import { viewerSelf } from '#/lib/timeline/record'
 import { emailPrivacyProgram } from './email-privacy'
@@ -85,6 +87,8 @@ export type EmailAttachment = {
   uploader: string | null
   /** ISO instant the file was kept. */
   addedAt: string
+  /** A file that stays in the mailbox: opened through Gmail, or gone with it. */
+  remoteBytes: RemoteBytes
 }
 
 /** An earlier message of the thread, as its folded card prints it. */
@@ -270,6 +274,7 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
             lane: integration.capabilityId,
             uploader: uploader.name,
             addedAt: document.createdAt,
+            remoteBytes: remoteBytesSql,
           })
           .from(interactionDocument)
           .innerJoin(

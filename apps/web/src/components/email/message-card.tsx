@@ -5,6 +5,8 @@ import { formatBytes } from '@spaces/core/documents'
 import { dayKey, formatDay, formatTime } from '@spaces/core/format'
 import { FileGlyph } from '#/components/files/file-glyph'
 import { downloadDocument } from '#/components/files/file-row'
+import { keepCopyItems } from '#/components/files/keep-copy'
+import type { KeepCopy } from '#/components/files/keep-copy'
 import { MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
 import {
@@ -390,11 +392,14 @@ export type FileActions = {
   onOpen: (a: EmailAttachment, of: ReadonlyArray<EmailAttachment>) => void
   onFileOn: (a: EmailAttachment) => void
   onNewer: (a: EmailAttachment) => void
+  /** Keeps a copy of a file that stays in the mailbox; the thread re-reads after. */
+  keeper: KeepCopy
 }
 
 /**
- * A file card's `···`: Open, Download, File on… and — opened from a record —
- * Newer version of…. A copy kept in Spaces' own storage goes after Download.
+ * A file card's `···`: Open, Download, Keep a copy, File on… and — opened
+ * from a record — Newer version of…. A file still in the mailbox downloads
+ * through it; one whose mailbox is gone has no file to download or keep.
  */
 function fileMenu(
   a: EmailAttachment,
@@ -403,11 +408,20 @@ function fileMenu(
 ): Array<MoreMenuEntry> {
   return [
     { label: 'Open', icon: <icon.open />, opens: true, onSelect: open },
-    {
-      label: 'Download',
-      icon: <icon.download />,
-      onSelect: () => void downloadDocument(a.documentId),
-    },
+    ...(a.remoteBytes === 'gone'
+      ? []
+      : [
+          {
+            label: 'Download',
+            icon: <icon.download />,
+            onSelect: () =>
+              void downloadDocument(a.documentId, a.remoteBytes === 'linked'),
+          },
+        ]),
+    ...keepCopyItems(
+      { id: a.documentId, remoteBytes: a.remoteBytes },
+      actions.keeper,
+    ),
     {
       label: 'File on…',
       icon: <icon.fileOn />,

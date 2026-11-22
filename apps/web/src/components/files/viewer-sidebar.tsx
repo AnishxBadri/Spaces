@@ -10,6 +10,8 @@ import { Layers } from '../icons'
 import { KindIcon } from '../kind-icon'
 import { FollowedRevisions } from './revision-ledger'
 import { useKeepCopy } from './keep-copy'
+import type { KeepCopy } from './keep-copy'
+import type { RemoteBytes } from '#/lib/documents/files-tab'
 import type { FilingEdge, RecordDocument } from './types'
 import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
 import {
@@ -35,7 +37,7 @@ import { useClock } from '#/components/clock'
 
 type Details = Awaited<ReturnType<typeof getDocumentDetails>>
 
-function Section({
+export function Section({
   label,
   count,
   children,
@@ -212,23 +214,7 @@ export function FileViewerSidebar({
         <p data-source-line className="text-label text-graphite">
           {sourceLine(doc, today)}
         </p>
-        {doc.remoteBytes === 'linked' ? (
-          <p data-source-keep className="mono text-micro text-graphite">
-            File in Gmail, text here ·{' '}
-            <button
-              type="button"
-              disabled={keeper.busy}
-              onClick={() => void keeper.keep(doc.id)}
-              className="focus-ring underline hover:text-foreground"
-            >
-              {keeper.busy ? 'Keeping a copy…' : 'Keep a copy'}
-            </button>
-          </p>
-        ) : doc.remoteBytes === 'gone' ? (
-          <p data-source-keep className="mono text-micro text-graphite">
-            Gmail disconnected, text here
-          </p>
-        ) : null}
+        <KeepCopyLine doc={doc} keeper={keeper} />
         {doc.sourcePath === null ? null : (
           <p className="truncate mono text-micro text-graphite">
             From {doc.sourcePath}
@@ -243,6 +229,41 @@ export function FileViewerSidebar({
       </Section>
     </>
   )
+}
+
+/**
+ * The Source section's last word on an email attachment whose file stays
+ * in the mailbox: `File in Gmail, text here · Keep a copy`, or the text
+ * alone once the mailbox is disconnected. Nothing for any other file.
+ */
+export function KeepCopyLine({
+  doc,
+  keeper,
+}: {
+  doc: { readonly id: string; readonly remoteBytes?: RemoteBytes }
+  keeper: KeepCopy
+}) {
+  if (doc.remoteBytes === 'linked')
+    return (
+      <p data-source-keep className="mono text-micro text-graphite">
+        File in Gmail, text here ·{' '}
+        <button
+          type="button"
+          disabled={keeper.busy}
+          onClick={() => void keeper.keep(doc.id)}
+          className="focus-ring underline hover:text-foreground"
+        >
+          {keeper.busy ? 'Keeping a copy…' : 'Keep a copy'}
+        </button>
+      </p>
+    )
+  if (doc.remoteBytes === 'gone')
+    return (
+      <p data-source-keep className="mono text-micro text-graphite">
+        Gmail disconnected, text here
+      </p>
+    )
+  return null
 }
 
 /** The lanes that bring files, as the source line names them. */

@@ -6,6 +6,9 @@ import { DocumentPreview } from '#/components/document-preview'
 import { DraftComposer } from '#/components/email/draft-composer'
 import type { FileActions, ReplyMode } from '#/components/email/message-card'
 import { EmailThread } from '#/components/email/thread'
+import { AttachmentSidebar } from '#/components/email/attachment-sidebar'
+import { useKeepCopy } from '#/components/files/keep-copy'
+import type { KeepCopy } from '#/components/files/keep-copy'
 import { NewerVersionDialog } from '#/components/files/newer-version-dialog'
 import { FilingPickers } from '#/components/files/viewer-sidebar'
 import type { RecordDocument } from '#/components/files/types'
@@ -444,11 +447,27 @@ function EmailWindow({
     }
   }
 
+  const keepCopy = useKeepCopy()
+  // The window holds the thread and the open file in state, so a kept copy
+  // re-reads both: the card's `···` and the Source line stop offering it.
+  const keeper: KeepCopy = {
+    busy: keepCopy.busy,
+    keep: async (documentId) => {
+      const kept = await keepCopy.keep(documentId)
+      if (kept) {
+        setReads((n) => n + 1)
+        if (viewer?.doc.id === documentId) await view(viewer.files, viewer.at)
+      }
+      return kept
+    },
+  }
+
   const actions: FileActions = {
     recordId,
     onOpen: (a, files) => void view(files, files.indexOf(a)),
     onFileOn: setFiling,
     onNewer: (a) => void newerVersion(a),
+    keeper,
   }
 
   /**
@@ -623,10 +642,21 @@ function EmailWindow({
       onDraft={(messageId, mode) => void startDraft(messageId, mode)}
     />
   )
+  const viewing = viewer?.files.at(viewer.at)
   const extras = (
     <>
       <DocumentPreview
         doc={viewer?.doc ?? null}
+        sidebar={
+          viewer === null || viewing === undefined ? null : (
+            <AttachmentSidebar
+              attachment={viewing}
+              doc={viewer.doc}
+              subject={email.subject ?? ''}
+              keeper={keeper}
+            />
+          )
+        }
         onOpenChange={(open) => {
           if (!open) setViewer(null)
         }}

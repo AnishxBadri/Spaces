@@ -21,7 +21,9 @@ import { QUEUES } from '@spaces/core/queue/names'
 import { forgetConnection } from '@spaces/core/writes/connections/list'
 import { markNewerVersionProgram } from '@spaces/core/writes/links/supersedes'
 import { storage } from '@spaces/core/writes/storage'
+import { documentPreviewCard } from '#/lib/documents/preview-card'
 import { recordDocumentRows } from '#/lib/documents/record-files'
+import { emailDetailProgram } from '#/lib/interactions/email-read'
 import { documentBytesProgram } from '#/lib/documents/remote-bytes'
 import { fileByHandProgram, keepCopyProgram } from '#/lib/documents/keep-copy'
 import { recordTabCounts } from '#/lib/records/record-tabs'
@@ -267,6 +269,51 @@ describe('a synced email with a PDF and a signature logo', () => {
     expect(again.state).toBe('ready')
     // The row still holds no bytes: a viewer's fetch is a cache.
     expect((await docs()).at(0)?.blobSha).toBeNull()
+  })
+
+  it('marks the file in the mailbox on the thread’s card and its viewer doc, until it is kept', async () => {
+    const { m, row } = await deckAndLogo()
+    const email = (
+      await db
+        .select({ id: interaction.id })
+        .from(interaction)
+        .where(eq(interaction.messageId, m.messageId ?? ''))
+    ).at(0)?.id
+    if (email === undefined) throw new Error('no email')
+    const marks = async () => ({
+      card: (
+        await Effect.runPromise(emailDetailProgram(FIXTURE_ACTOR, email))
+      ).attachments.map((a) => a.remoteBytes),
+      viewer: (await documentPreviewCard(FIXTURE_ACTOR, row.id))?.remoteBytes,
+    })
+    expect(await documentPreviewCard(FIXTURE_ACTOR, row.id)).toMatchObject({
+      blobSha: null,
+      remoteBytes: 'linked',
+    })
+    expect(await marks()).toEqual({ card: ['linked'], viewer: 'linked' })
+
+    expect(await keep(row.id)).toEqual({ _tag: 'kept' })
+    expect(await marks()).toEqual({ card: [null], viewer: null })
+  })
+
+  it('marks it gone on the card and the viewer doc once the mailbox is disconnected', async () => {
+    const { m, row } = await deckAndLogo()
+    const email = (
+      await db
+        .select({ id: interaction.id })
+        .from(interaction)
+        .where(eq(interaction.messageId, m.messageId ?? ''))
+    ).at(0)?.id
+    if (email === undefined) throw new Error('no email')
+    expect(await forgetConnection(FIXTURE_ACTOR.id, connectionId)).toBe(true)
+    expect(
+      (
+        await Effect.runPromise(emailDetailProgram(FIXTURE_ACTOR, email))
+      ).attachments.map((a) => a.remoteBytes),
+    ).toEqual(['gone'])
+    expect(
+      (await documentPreviewCard(FIXTURE_ACTOR, row.id))?.remoteBytes,
+    ).toBe('gone')
   })
 })
 

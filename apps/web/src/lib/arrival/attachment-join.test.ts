@@ -380,6 +380,8 @@ describe('an attachment is private with its email’s body (D67)', () => {
         // A synced file names the mailbox it came through.
         uploader: FIXTURE_ACTOR.name,
         addedAt: expect.any(String),
+        // Its file stays in the mailbox it came through.
+        remoteBytes: 'linked',
       },
     ])
     expect(await shelf(FIXTURE_ACTOR)).toEqual([doc])

@@ -68,6 +68,9 @@ const fns = vi.hoisted(() => ({
   getDocumentPreview: vi.fn(),
   getDocumentDownloadUrl: vi.fn(),
   getDocumentText: vi.fn(),
+  getDocumentDetails: vi.fn(),
+  getDocumentBytes: vi.fn(),
+  keepDocumentCopy: vi.fn(),
   listMembers: vi.fn(),
   setEmailAudience: vi.fn(),
   openEmailReply: vi.fn(),
@@ -124,6 +127,7 @@ const HTML: EmailDetail = {
       lane: 'gmail',
       uploader: 'Anish',
       addedAt: '2026-10-01T09:20:00.000Z',
+      remoteBytes: null,
     },
   ],
   privacy: null,
@@ -153,6 +157,7 @@ beforeEach(() => {
   for (const f of Object.values(fns)) f.mockReset()
   router.navigate.mockReset()
   fns.getEmail.mockResolvedValue(HTML)
+  fns.getDocumentDetails.mockResolvedValue(null)
   fns.getEmailSender.mockResolvedValue({
     _tag: 'ready',
     from: 'anish@fund.example',
@@ -406,6 +411,130 @@ describe('the email window', () => {
       document.querySelector('[data-window-depth="2"] [data-file-stepper]')
         ?.textContent,
     ).toBe('‹File 2 of 2›')
+  })
+
+  describe('a file that stays in the mailbox', () => {
+    const withFile = (remoteBytes: 'linked' | 'gone' | null) => ({
+      ...HTML,
+      attachments: [{ ...HTML.attachments[0], remoteBytes }],
+    })
+    const remoteDoc = (remoteBytes: 'linked' | 'gone' | null) => ({
+      id: 'd1',
+      filename: 'acme-q3.pdf',
+      mime: 'application/pdf',
+      sizeBytes: 2048,
+      kind: 'other',
+      extractionStatus: 'done',
+      extractionError: null,
+      blobSha: remoteBytes === null ? 'sha' : null,
+      url: null,
+      remoteBytes,
+    })
+    const MENU = 'More for acme-q3.pdf'
+
+    it('offers Download and Keep a copy on the card while the mailbox answers', async () => {
+      fns.getEmail.mockResolvedValue(withFile('linked'))
+      await open()
+      expect(await openMenu(MENU)).toEqual([
+        'Open',
+        'Download',
+        'Keep a copy',
+        'File on…',
+      ])
+    })
+
+    it('offers neither once the mailbox is disconnected', async () => {
+      fns.getEmail.mockResolvedValue(withFile('gone'))
+      await open()
+      expect(await openMenu(MENU)).toEqual(['Open', 'File on…'])
+    })
+
+    it('offers Download alone once a copy is kept', async () => {
+      await open()
+      expect(await openMenu(MENU)).toEqual(['Open', 'Download', 'File on…'])
+    })
+
+    it('downloads through the mailbox, not storage', async () => {
+      fns.getEmail.mockResolvedValue(withFile('linked'))
+      fns.getDocumentBytes.mockResolvedValue({
+        state: 'unavailable',
+        reason: 'Gmail refused',
+      })
+      await open()
+      await openMenu(MENU)
+      await choose('Download')
+      expect(fns.getDocumentBytes).toHaveBeenCalledWith({
+        data: { id: 'd1', poll: false },
+      })
+      expect(fns.getDocumentDownloadUrl).not.toHaveBeenCalled()
+    })
+
+    it('keeps a copy from the card and re-reads the thread so the card stops offering it', async () => {
+      fns.getEmail
+        .mockResolvedValueOnce(withFile('linked'))
+        .mockResolvedValue(withFile(null))
+      fns.keepDocumentCopy.mockResolvedValue({ kept: true })
+      await open()
+      await openMenu(MENU)
+      await choose('Keep a copy')
+      expect(fns.keepDocumentCopy).toHaveBeenCalledWith({
+        data: { documentId: 'd1' },
+      })
+      expect(fns.getEmail).toHaveBeenCalledTimes(2)
+      expect(await openMenu(MENU)).toEqual(['Open', 'Download', 'File on…'])
+    })
+
+    it('puts the Source line with Keep a copy beside the viewer, and keeping re-reads the file', async () => {
+      fns.getEmail
+        .mockResolvedValueOnce(withFile('linked'))
+        .mockResolvedValue(withFile(null))
+      fns.getDocumentPreview
+        .mockResolvedValueOnce(remoteDoc('linked'))
+        .mockResolvedValue(remoteDoc(null))
+      fns.getDocumentText.mockResolvedValue({ text: 'Q3' })
+      fns.keepDocumentCopy.mockResolvedValue({ kept: true })
+      await open()
+      act(() =>
+        document
+          .querySelector<HTMLElement>('[data-file-card="d1"] button')
+          ?.click(),
+      )
+      await settle()
+      const viewer = () => document.querySelector('[data-window-depth="2"]')
+      expect(viewer()?.querySelector('[data-source-email]')?.textContent).toBe(
+        'Acme Robotics — Q3 update',
+      )
+      expect(viewer()?.querySelector('[data-source-line]')?.textContent).toBe(
+        'Via Gmail · Anish · 1 Oct',
+      )
+      const keep = viewer()?.querySelector('[data-source-keep]')
+      expect(keep?.textContent).toBe('File in Gmail, text here · Keep a copy')
+      act(() => keep?.querySelector<HTMLElement>('button')?.click())
+      await settle()
+      expect(fns.keepDocumentCopy).toHaveBeenCalledWith({
+        data: { documentId: 'd1' },
+      })
+      expect(fns.getEmail).toHaveBeenCalledTimes(2)
+      expect(fns.getDocumentPreview).toHaveBeenCalledTimes(2)
+      expect(viewer()?.querySelector('[data-source-keep]')).toBeNull()
+    })
+
+    it('says a disconnected mailbox on the Source line, with nothing to keep', async () => {
+      fns.getEmail.mockResolvedValue(withFile('gone'))
+      fns.getDocumentPreview.mockResolvedValue(remoteDoc('gone'))
+      fns.getDocumentText.mockResolvedValue({ text: 'Q3' })
+      await open()
+      act(() =>
+        document
+          .querySelector<HTMLElement>('[data-file-card="d1"] button')
+          ?.click(),
+      )
+      await settle()
+      const viewer = document.querySelector('[data-window-depth="2"]')
+      const line = viewer?.querySelector('[data-source-keep]')
+      expect(line?.textContent).toBe('Gmail disconnected, text here')
+      expect(line?.querySelector('button')).toBeNull()
+    })
   })
 
   it('says a private body in one line and lists no file', async () => {

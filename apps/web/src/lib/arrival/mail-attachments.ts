@@ -180,6 +180,16 @@ export function mailAttachmentRefusalMessage(
  */
 export const remoteAttachmentSql = sql<boolean>`(${document.blobSha} is null and ${document.sourceClass} = 'integration' and exists (select 1 from ${interactionDocument} where ${interactionDocument.documentId} = ${document.entityId} and ${interactionDocument.role} = 'attachment'))`
 
+/**
+ * Such an attachment's reach, as every list reads it: `linked` opens
+ * through Gmail and offers Keep a copy; `gone` is a disconnected mailbox,
+ * its text alone left. Null on every row whose bytes are here, or that never
+ * had any.
+ */
+export const remoteBytesSql = sql<
+  'linked' | 'gone' | null
+>`case when ${remoteAttachmentSql} then (case when ${document.externalStatus} = 'gone' or ${document.connectionId} is null then 'gone' else 'linked' end) end`
+
 /** The row's pointer and its connection's health, read once. */
 export const mailAttachmentOf = Effect.fn('mailAttachmentOf')(function* (
   documentId: string,
