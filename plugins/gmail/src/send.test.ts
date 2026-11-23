@@ -6,6 +6,7 @@ import {
   HttpFetchTest,
   LogTest,
   SecretsTest,
+  fakeGmailSeed,
   fromBase64Url,
   makeFakeGmailApi,
 } from '@spaces/sdk/testing'
@@ -186,6 +187,31 @@ describe('send', () => {
     expect(Exit.isSuccess(second)).toBe(true)
     expect(sends(h.api)).toHaveLength(1)
     expect(h.claims()).toHaveLength(2)
+  })
+
+  it('files the copy under the mailbox’s own label names', async () => {
+    // The copy Gmail holds carries a user label, which only labels.list names.
+    const held = {
+      id: 'm-held',
+      labelIds: ['SENT', 'Label_1'],
+      receivedAt: NOW - 60_000,
+      messageId: 'spaces-d1-all@fund.example',
+      from: `Anish <${FAKE_GMAIL_OWNER}>`,
+      to: ['jane@acme-robotics.example'],
+      subject: 'Re: Acme Robotics — Q3 update',
+      body: 'Thanks Jane — the board pack is great.',
+    }
+    const h = harness(
+      makeFakeGmailApi({
+        now: NOW,
+        others: blobs,
+        seed: [...fakeGmailSeed(NOW), held],
+      }),
+    )
+    const exit = await h.run(outgoing())
+    if (Exit.isFailure(exit)) throw new Error(Cause.pretty(exit.cause))
+    expect(sends(h.api)).toHaveLength(0)
+    expect(h.claims().at(0)?.labels).toEqual(['Sent', 'Recruiting'])
   })
 
   it('fails retryable with Gmail’s words on a 5xx, and sends nothing', async () => {

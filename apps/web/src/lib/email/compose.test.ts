@@ -6,6 +6,8 @@ import {
   emailRecordAction,
   messageCount,
   openBlankCount,
+  reconnectHref,
+  reconnectReturn,
   reviewCopies,
   sendLabel,
   withChoices,
@@ -128,5 +130,49 @@ describe('Review', () => {
     })
     // Cleared, the chips are bare again.
     expect(withChoices(to, NO_CHOICES)).toEqual([DEV, OPS])
+  })
+})
+
+describe('Reconnect Gmail’s return', () => {
+  const D = '00000000-0000-4000-8000-0000000000d1'
+
+  it('comes back to the page that already opens the draft, marked', () => {
+    expect(
+      reconnectReturn('here', D, {
+        pathname: '/email',
+        search: `?tab=drafts&id=${D}`,
+      }),
+    ).toBe(`/email?tab=drafts&id=${D}&reconnected=gmail`)
+  })
+
+  it('opens a reply on a record in its own window on Interactions', () => {
+    expect(
+      reconnectReturn('record', D, {
+        pathname: '/companies/c1',
+        search: '?modal=email&id=m1',
+      }),
+    ).toBe(
+      `/companies/c1?tab=interactions&modal=email&new=1&draft=${D}&reconnected=gmail`,
+    )
+  })
+
+  it('sends a draft with no page of its own to the Email page’s window', () => {
+    expect(
+      reconnectReturn('email', D, { pathname: '/today', search: '' }),
+    ).toBe(`/email?modal=email&new=1&draft=${D}&reconnected=gmail`)
+  })
+
+  it('asks Google for the sending mailbox, back to an in-app path', () => {
+    const href = new URL(
+      reconnectHref('anish@fund.example', 'email', D, {
+        pathname: '/today',
+        search: '',
+      }),
+      'http://x',
+    )
+    expect(href.pathname).toBe('/api/connections/google/start')
+    expect(href.searchParams.get('product')).toBe('gmail')
+    expect(href.searchParams.get('account')).toBe('anish@fund.example')
+    expect(href.searchParams.get('return')?.startsWith('/email?')).toBe(true)
   })
 })

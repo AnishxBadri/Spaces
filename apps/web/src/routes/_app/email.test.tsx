@@ -169,6 +169,7 @@ const DRAFTS: Array<DraftRow> = [
       { email: 'dev@exponent.example' },
     ],
     updatedAt: at(13),
+    notSent: false,
   },
   {
     id: '00000000-0000-4000-8000-0000000000d2',
@@ -176,6 +177,7 @@ const DRAFTS: Array<DraftRow> = [
     subject: '',
     to: [],
     updatedAt: at(15),
+    notSent: false,
   },
 ]
 
@@ -468,6 +470,28 @@ describe('Drafts', () => {
     await settle()
     expect(fns.deleteEmailDraft).toHaveBeenCalledWith({ data: { id: D1 } })
     expect(document.querySelector(`[data-draft="${D1}"]`)).toBeNull()
+  })
+
+  it('leads a draft whose send failed with the crimson square and Not sent', async () => {
+    fns.listEmailDrafts.mockResolvedValue([
+      { ...DRAFTS[1], notSent: true },
+      DRAFTS[0],
+    ])
+    await mount('/email?tab=drafts')
+    const first = document.querySelector('[data-draft]')
+    expect(first?.textContent).toBe('(no subject)Not sentNew email')
+    expect(first?.querySelector('.bg-destructive')).not.toBeNull()
+    expect(
+      document.querySelector(`[data-draft="${D1}"] .bg-destructive`),
+    ).toBeNull()
+  })
+
+  it('opens a draft addressed by the URL in the pane, as Today’s Open › does', async () => {
+    await mount(`/email?tab=drafts&id=${D1}`)
+    expect(fns.getEmailDraft).toHaveBeenCalledWith({ data: { id: D1 } })
+    expect(
+      document.querySelector(`[data-draft-pane] [data-stub-composer="${D1}"]`),
+    ).not.toBeNull()
   })
 
   it('says so when there are none', async () => {

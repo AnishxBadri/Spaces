@@ -832,9 +832,12 @@ describe('Send', () => {
     expect(button('Send')).toBeUndefined()
     const primary = document.querySelector('[data-reconnect]')
     expect(primary?.textContent).toBe('Reconnect Gmail')
-    expect(primary?.getAttribute('href')).toBe(
-      `/settings/email-calendar/${CONNECTION}`,
-    )
+    // Google's consent for that mailbox, back to this page and draft.
+    const href = new URL(primary?.getAttribute('href') ?? '', 'http://x')
+    expect(href.pathname).toBe('/api/connections/google/start')
+    expect(href.searchParams.get('product')).toBe('gmail')
+    expect(href.searchParams.get('account')).toBe('anish@fund.example')
+    expect(href.searchParams.get('return')).toBe('/today?reconnected=gmail')
     pressMeta()
     await settle()
     expect(fns.sendEmailDraft).not.toHaveBeenCalled()
@@ -862,7 +865,7 @@ describe('Send', () => {
 
   it('keeps Review open with Gmail’s words when the send fails', async () => {
     fns.sendEmailDraft.mockRejectedValue(
-      new Error('Gmail answered 503: Backend Error. The draft is kept'),
+      new Error('Gmail answered 503: Backend Error'),
     )
     mount({ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks Dana' })
     await settle()
@@ -870,12 +873,65 @@ describe('Send', () => {
     act(() => button('Send')?.click())
     await settle()
     expect(document.querySelector('[data-send-failed]')?.textContent).toBe(
-      '■ Not sent · Gmail answered 503: Backend Error. The draft is kept',
+      'Not sent · Gmail answered 503: Backend Error',
     )
     expect(closed).not.toHaveBeenCalled()
     expect(fns.deleteEmailDraft).not.toHaveBeenCalled()
     expect(card()).not.toBeNull()
-    expect(button('Send')).not.toBeUndefined()
+    expect(footButtons()).toEqual(['Back to draft', 'Retry'])
+    // Retry sends the reviewed draft again.
+    fns.sendEmailDraft.mockResolvedValue({ sent: 1, interactionIds: ['i1'] })
+    act(() => button('Retry')?.click())
+    await settle()
+    expect(fns.sendEmailDraft).toHaveBeenCalledTimes(2)
+    expect(closed).toHaveBeenCalledTimes(1)
+  })
+
+  it('says a stored failure in the foot when the draft opens again, and Review offers Retry', async () => {
+    act(() =>
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <Dialog open>
+            <DialogContent size="l">
+              <DraftComposer
+                initial={{ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks' }}
+                notSent="Gmail didn’t answer"
+                onClose={closed}
+              />
+            </DialogContent>
+          </Dialog>
+        </QueryClientProvider>,
+      ),
+    )
+    await settle()
+    expect(document.querySelector('[data-send-failed]')?.textContent).toBe(
+      'Not sent · Gmail didn’t answer',
+    )
+    await review()
+    expect(footButtons()).toEqual(['Back to draft', 'Retry'])
+  })
+
+  it('back from Reconnect Gmail opens on Review with Send and no note', async () => {
+    act(() =>
+      root.render(
+        <QueryClientProvider client={queryClient}>
+          <Dialog open>
+            <DialogContent size="l">
+              <DraftComposer
+                initial={{ ...blankDraft(ID), to: [DANA], bodyMd: 'Thanks' }}
+                notSent="Gmail asks you to sign in again"
+                reconnected
+                onClose={closed}
+              />
+            </DialogContent>
+          </Dialog>
+        </QueryClientProvider>,
+      ),
+    )
+    await settle()
+    expect(card()).not.toBeNull()
+    expect(document.querySelector('[data-send-failed]')).toBeNull()
+    expect(footButtons()).toEqual(['Back to draft', 'Send'])
   })
 
   it('greys the draft while it goes, says it goes through Gmail, and holds Back to draft', async () => {
@@ -893,9 +949,11 @@ describe('Send', () => {
     await review()
     act(() => button('Send')?.click())
     await settle()
-    expect(document.querySelector('[data-sending]')?.textContent).toBe(
-      'Through your Gmail',
-    )
+    // The primary twinkles `Sending`; the foot says nothing else.
+    const primary = foot()?.querySelector('[data-pending]')
+    expect(primary?.textContent).toBe('Sending')
+    expect(primary?.querySelector('[data-twinkle]')).not.toBeNull()
+    expect(foot()?.querySelector('[data-send-failed]')).toBeNull()
     expect(document.querySelector('[aria-busy="true"]')).not.toBeNull()
     expect(button('Back to draft')?.disabled).toBe(true)
     await act(async () => finish({ sent: 1, interactionIds: ['i1'] }))
@@ -916,7 +974,7 @@ describe('Send', () => {
     act(() => button('Send')?.click())
     await settle()
     expect(document.querySelector('[data-send-failed]')?.textContent).toBe(
-      '■ Not sent · Gmail asks you to sign in again · the draft is kept',
+      'Not sent · Gmail asks you to sign in again',
     )
     expect(document.querySelector('[data-reconnect]')?.textContent).toBe(
       'Reconnect Gmail',

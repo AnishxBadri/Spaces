@@ -24,18 +24,26 @@ import type { FailingBinding } from '#/lib/documents/binding-health'
 import type { MovingSignal } from '#/lib/records/moving'
 import { stagedImportsProgram } from '#/lib/import/staged'
 import type { StagedImport } from '#/lib/import/staged'
+import { unsentDraftsProgram } from '#/lib/interactions/email-drafts'
+import type { UnsentDraft } from '#/lib/interactions/email-drafts'
 
 /**
  * What Today reads beyond the existing lists: the open Review queue (flattened
  * into rows on the client, after the held decisions leave it), the reader's
  * broken connections, the invitation to connect Google and the grants about
  * to lapse, auto-enrich runs parked at a source's cap, folder bindings that
- * cannot sync, the reader's staged imports nobody committed, and What's
- * moving.
+ * cannot sync, the reader's drafts whose send failed, the reader's staged
+ * imports nobody committed, and What's moving.
  * Outside the server-fn barrel so tests can call the programs without a request.
  */
 
-export type { FailingBinding, MovingSignal, ParkedSource, StagedImport }
+export type {
+  FailingBinding,
+  MovingSignal,
+  ParkedSource,
+  StagedImport,
+  UnsentDraft,
+}
 
 export class ConnectionsReadFailed extends Schema.TaggedError<ConnectionsReadFailed>()(
   'ConnectionsReadFailed',
@@ -94,6 +102,8 @@ export type TodayAttention = {
   parked: ParkedSource[]
   waiting: WaitingExport[]
   failing: ReadonlyArray<FailingBinding>
+  /** The reader's drafts whose send failed, until each is sent or deleted. */
+  unsent: UnsentDraft[]
   /** The reader's own batches still `staged`, oldest first. */
   imports: StagedImport[]
 }
@@ -255,6 +265,7 @@ export const todayAttentionProgram = Effect.fn('todayAttentionProgram')(
       parked,
       waiting,
       failing,
+      unsent,
       imports,
     ] = yield* Effect.all(
       [
@@ -265,6 +276,7 @@ export const todayAttentionProgram = Effect.fn('todayAttentionProgram')(
         parkedEnrichmentProgram(),
         waitingExportsForToday(),
         failingBindingsForProgram(userId),
+        unsentDraftsProgram({ id: userId }),
         stagedImportsProgram(userId),
       ],
       { concurrency: 'unbounded' },
@@ -279,6 +291,7 @@ export const todayAttentionProgram = Effect.fn('todayAttentionProgram')(
       parked,
       waiting,
       failing,
+      unsent,
       imports,
     }
     return out

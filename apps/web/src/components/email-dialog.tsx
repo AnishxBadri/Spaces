@@ -264,6 +264,7 @@ function EmailWindow({
     modes: ReplyOpening['modes']
     draft: DraftState
     savedAt: string | null
+    notSent: string | null
   } | null>(null)
   const [replyError, setReplyError] = useState<string | null>(null)
 
@@ -359,11 +360,13 @@ function EmailWindow({
               modes: opened.modes,
               draft: { ...opened.modes[mode], id: crypto.randomUUID() },
               savedAt: null,
+              notSent: null,
             }
           : {
               modes: opened.modes,
               draft: draftStateOf(opened.draft),
               savedAt: opened.draft.updatedAt,
+              notSent: opened.draft.sendError,
             },
       )
     } catch (err) {
@@ -648,6 +651,10 @@ function EmailWindow({
           card
           initial={reply.draft}
           savedAt={reply.savedAt}
+          notSent={reply.notSent}
+          // A thread's URL does not open its reply: the consent comes back
+          // to the draft's own window, over the record or the Email page.
+          home={recordId === null ? 'email' : 'record'}
           modes={reply.modes}
           recordId={recordId}
           recordName={email.record?.name ?? null}

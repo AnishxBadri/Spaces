@@ -8,6 +8,7 @@ import type {
   FailingBinding,
   ParkedSource,
   StoppedPlugin,
+  UnsentDraft,
   WaitingExport,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
@@ -42,7 +43,7 @@ function NoticeLine({
 }: {
   tone: Tone
   /** The sentence: what stopped, then why, joined by ` · `. */
-  children: string
+  children: ReactNode
   fix: ReactNode
 }) {
   return (
@@ -77,7 +78,8 @@ const sentence = (what: string, why: string | null) =>
  * plugin switched on and not running or capped, auto-enrich parked at a
  * source's daily cap, the reader's connections in `error` and grants about
  * to lapse, bound folders that cannot sync, and uploads waiting to reach a
- * bound folder; and, once Google is set up, the invitation to connect it.
+ * bound folder; drafts whose send failed, each opening in Email › Drafts;
+ * and, once Google is set up, the invitation to connect it.
  * Renders nothing when all runs.
  */
 export function NoticesBand({
@@ -88,6 +90,7 @@ export function NoticesBand({
   failing,
   invite = null,
   expiring = [],
+  unsent = [],
 }: {
   stopped: ReadonlyArray<StoppedPlugin>
   broken: ReadonlyArray<BrokenConnection>
@@ -96,9 +99,11 @@ export function NoticesBand({
   failing: ReadonlyArray<FailingBinding>
   invite?: ConnectInvite | null
   expiring?: ReadonlyArray<ExpiringConnection>
+  unsent?: ReadonlyArray<UnsentDraft>
 }) {
   if (
     invite === null &&
+    unsent.length === 0 &&
     expiring.length === 0 &&
     stopped.length === 0 &&
     broken.length === 0 &&
@@ -128,6 +133,26 @@ export function NoticesBand({
               `${c.label} stopped syncing`,
               c.errorReason ?? c.externalEmail,
             )}
+          </NoticeLine>
+        ))}
+        {unsent.map((d) => (
+          <NoticeLine
+            key={`unsent:${d.id}`}
+            tone="bad"
+            fix={
+              <Link
+                to="/email"
+                search={{ tab: 'drafts', id: d.id }}
+                className={fixClass}
+              >
+                Open ›
+              </Link>
+            }
+          >
+            <span data-unsent={d.id}>
+              {d.subject === '' ? '(no subject)' : d.subject}
+              <span className="text-graphite"> · not sent</span>
+            </span>
           </NoticeLine>
         ))}
         {expiring.map((c) => (

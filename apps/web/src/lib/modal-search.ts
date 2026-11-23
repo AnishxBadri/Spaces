@@ -14,12 +14,14 @@ export type Modal = (typeof MODALS)[number]
 /**
  * A new email's window: `?modal=email&new=1&draft=<id>`, with `template=`
  * applied as it opens. `draft` is the id the email saves under, so the same
- * URL reopens the same draft once it is saved.
+ * URL reopens the same draft once it is saved. `reconnected=gmail` is where
+ * Reconnect Gmail's consent lands: the draft opens on Review, with a toast.
  */
 export const composeSearchShape = {
   new: caught(Schema.Literal(1)),
   draft: caught(uuidString),
   template: caught(uuidString),
+  reconnected: caught(Schema.Literal('gmail')),
 }
 
 export const modalSearchShape = {

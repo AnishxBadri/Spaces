@@ -24,6 +24,7 @@ import {
   choicesOf,
   messageCount,
   openBlankCount,
+  reconnectHref,
   reviewCopies,
   saveInput,
   sendLabel,
@@ -33,7 +34,8 @@ import {
   withTemplate,
   useDraftsChanged,
 } from '#/lib/email/compose'
-import type { DraftState, ReviewChoices } from '#/lib/email/compose'
+import type { DraftHome, DraftState, ReviewChoices } from '#/lib/email/compose'
+import { SIGN_IN_AGAIN } from '#/lib/email/send-words'
 import {
   getEmailSender,
   getEmailTemplate,
@@ -72,8 +74,13 @@ import { ReviewPanes } from './variable-review'
  *   would stand, Review's foot links to connecting Gmail, or is Reconnect
  *   Gmail when the mailbox asks to sign in again.
  * - Send saves the draft, then hands its id and Review's fills to the
- *   Gmail plugin and waits, the draft greyed; a failure keeps Review open
- *   and says why. ⌘↵ is the primary, in its tooltip.
+ *   Gmail plugin and waits: the primary twinkles `Sending`, the draft greyed
+ *   and `Back to draft` off. A failure keeps Review open, says
+ *   `■ Not sent ·` and why, and the primary becomes `Retry`, or `Reconnect
+ *   Gmail` when the mailbox asks to sign in again. Reconnect runs Google's
+ *   consent and comes back to this draft open on Review (`home`). A draft
+ *   reopened after a failure says so in its foot until it is sent or
+ *   deleted. ⌘↵ is the primary, in its tooltip.
  */
 
 type ReplyMode = keyof ReplyOpening['modes']
@@ -110,9 +117,6 @@ const COULD_NOT_READ: EmailSender = {
   href: null,
 }
 
-const reconnectHref = (connectionId: string) =>
-  `/settings/email-calendar/${connectionId}`
-
 /** In the primary's place when there is no mailbox to send with. */
 function SendBlocked({
   sender,
@@ -134,8 +138,18 @@ function SendBlocked({
   )
 }
 
-/** What the last send said: why it did not go, and whether to reconnect. */
-type Failure = { message: string; reconnect: string | null }
+/** `■ Not sent ·` and why, crimson, at the foot's left. */
+function NotSent({ message }: { message: string }) {
+  return (
+    <span
+      data-send-failed
+      className="flex items-center gap-2 font-sans text-label text-destructive"
+    >
+      <span aria-hidden className="size-2 shrink-0 bg-destructive" />
+      Not sent · {message}
+    </span>
+  )
+}
 
 export function DraftComposer({
   initial,
@@ -145,6 +159,9 @@ export function DraftComposer({
   recordName = null,
   above,
   card = false,
+  notSent = null,
+  home = 'here',
+  reconnected = false,
   onSaved,
   onSubject,
   onClose,
@@ -165,6 +182,12 @@ export function DraftComposer({
    * flush window, rather than edge to edge in a window of its own.
    */
   card?: boolean
+  /** Why its last send did not go, as stored on the draft. */
+  notSent?: string | null
+  /** Where Reconnect Gmail's consent comes back to. */
+  home?: DraftHome
+  /** Back from Reconnect Gmail: open on Review, the old failure not said. */
+  reconnected?: boolean
   onSaved?: (at: string) => void
   /** The subject as typed, for a window head that prints it. */
   onSubject?: (subject: string) => void
@@ -177,7 +200,9 @@ export function DraftComposer({
   const [ccOpen, setCcOpen] = useState(initial.cc.length > 0)
   const [bccOpen, setBccOpen] = useState(initial.bcc.length > 0)
   const [sending, setSending] = useState(false)
-  const [failure, setFailure] = useState<Failure | null>(null)
+  const [failure, setFailure] = useState<string | null>(
+    reconnected ? null : notSent,
+  )
   const [error, setError] = useState<string | null>(null)
   const [review, setReview] = useState<VariableReview | null>(null)
   const [reviewing, setReviewing] = useState(false)
@@ -293,19 +318,24 @@ export function DraftComposer({
       if (now !== null) setSender(now)
       setFailure(
         now?._tag === 'reconnect'
-          ? {
-              message: 'Gmail asks you to sign in again · the draft is kept',
-              reconnect: now.connectionId,
-            }
-          : {
-              // The server's sentence already says the draft is kept.
-              message: err instanceof Error ? err.message : 'Could not send',
-              reconnect: null,
-            },
+          ? SIGN_IN_AGAIN
+          : err instanceof Error
+            ? err.message
+            : 'Could not send',
       )
+      // The draft now leads Drafts as not sent.
+      draftsChanged()
       setSending(false)
     }
   }
+
+  // Back from Google's consent: straight to Review, where Send now stands.
+  const landing = useRef(reconnected)
+  useEffect(() => {
+    if (!landing.current) return
+    landing.current = false
+    void startReview()
+  })
 
   async function startReview() {
     setReviewing(true)
@@ -376,10 +406,8 @@ export function DraftComposer({
       : reviewCopies(review.rows, draft.to, review.paths.length > 0)
   const open = openBlankCount(copies, choices)
   const busy = sending || reviewing
-  const reconnect =
-    failure?.reconnect ??
-    (sender?._tag === 'reconnect' ? sender.connectionId : null)
-  const ready = sender?._tag === 'ready' && reconnect === null
+  const reconnect = sender?._tag === 'reconnect' ? sender.from : null
+  const ready = sender?._tag === 'ready'
   const fromOriginal = new Set(
     draft.mode === 'forward' && modes !== null
       ? modes.forward.attachments.map((a) => a.documentId)
@@ -392,15 +420,8 @@ export function DraftComposer({
     else if (ready && open === 0) void send()
   }
 
-  const note: ReactNode = sending ? (
-    <span data-sending className="flex items-center gap-2">
-      <Twinkle size={14} />
-      Through your Gmail
-    </span>
-  ) : failure !== null ? (
-    <span data-send-failed className="text-destructive">
-      ■ Not sent · {failure.message}
-    </span>
+  const note: ReactNode = sending ? null : failure !== null ? (
+    <NotSent message={failure} />
   ) : review !== null || modeRow || saved === null ? null : (
     // Without the mode row, the foot is where the save is told.
     <span data-saved>{saved}</span>
@@ -634,7 +655,16 @@ export function DraftComposer({
             </Button>
             {reconnect !== null ? (
               <Button asChild>
-                <a data-reconnect href={reconnectHref(reconnect)}>
+                <a
+                  data-reconnect
+                  // Client state only: a sender is read after mount.
+                  href={reconnectHref(
+                    reconnect,
+                    home,
+                    draft.id,
+                    window.location,
+                  )}
+                >
                   Reconnect Gmail
                 </a>
               </Button>
@@ -649,7 +679,16 @@ export function DraftComposer({
                 disabled={busy || sender === null || open > 0}
                 onClick={primary}
               >
-                {sendLabel(messageCount(copies.length))}
+                {sending ? (
+                  <>
+                    <Twinkle tone="paper" />
+                    Sending
+                  </>
+                ) : failure !== null ? (
+                  'Retry'
+                ) : (
+                  sendLabel(messageCount(copies.length))
+                )}
               </Button>
             )}
           </>

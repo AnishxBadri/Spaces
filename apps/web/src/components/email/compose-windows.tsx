@@ -19,28 +19,37 @@ import {
   closeCompose,
   draftStateOf,
   useComposeState,
+  useReconnectedLanding,
   withTemplate,
 } from '#/lib/email/compose'
-import type { ComposeTarget, DraftState } from '#/lib/email/compose'
+import type { ComposeTarget, DraftHome, DraftState } from '#/lib/email/compose'
 import { openComposeOf } from '#/lib/modal-search'
 import { getEmailTemplate, openEmailCompose } from '#/lib/server-fns'
 import { DraftComposer } from './draft-composer'
 
 /**
  * The full composer, mounted once in the app shell and opened through
- * `openCompose`: a held draft read back, or a new email.
+ * `openCompose`: a held draft read back, or a new email. It has no URL of
+ * its own, so Reconnect Gmail comes back to the Email page's window.
  */
 export function ComposeWindows() {
   const { compose } = useComposeState()
-  return <ComposeDialog target={compose} onClose={closeCompose} />
+  return (
+    <ComposeDialog
+      target={compose}
+      home="email"
+      reconnected={false}
+      onClose={closeCompose}
+    />
+  )
 }
 
 /**
  * The composer a page opens over itself from its URL (`openComposeOf`): a
  * record's Interactions tab, the Email page. A URL without the draft's id
  * gets one minted into it, so the open window is always addressable and the
- * same URL reopens the same draft. Esc or Cancel drops the keys and returns
- * to the page as it was.
+ * same URL reopens the same draft, which is where Reconnect Gmail comes
+ * back to. Esc or Cancel drops the keys and returns to the page as it was.
  */
 export function ComposeModal({ recordId }: { recordId: string | null }) {
   const search = useSearch({ strict: false })
@@ -49,6 +58,7 @@ export function ComposeModal({ recordId }: { recordId: string | null }) {
   const draftId = opened?.draftId ?? null
   const templateId = opened?.templateId ?? null
   const minting = opened !== null && draftId === null
+  const reconnected = useReconnectedLanding(draftId)
 
   useEffect(() => {
     if (!minting) return
@@ -68,6 +78,8 @@ export function ComposeModal({ recordId }: { recordId: string | null }) {
   return (
     <ComposeDialog
       target={target}
+      home="here"
+      reconnected={reconnected}
       onClose={() =>
         void navigate({
           to: '.',
@@ -77,6 +89,7 @@ export function ComposeModal({ recordId }: { recordId: string | null }) {
             new: undefined,
             draft: undefined,
             template: undefined,
+            reconnected: undefined,
           }),
           replace: true,
           resetScroll: false,
@@ -118,6 +131,8 @@ export function NewEmailSplit({
 type Loaded = {
   draft: DraftState
   savedAt: string | null
+  /** Why its last send did not go; null for a new email. */
+  notSent: string | null
   record: { id: string; name: string } | null
 }
 
@@ -130,6 +145,7 @@ async function openTarget(target: ComposeTarget): Promise<Loaded> {
     return {
       draft: blankDraft(crypto.randomUUID()),
       savedAt: null,
+      notSent: null,
       record: null,
     }
   const opening = await openEmailCompose({
@@ -139,22 +155,19 @@ async function openTarget(target: ComposeTarget): Promise<Loaded> {
     return {
       draft: draftStateOf(opening.draft),
       savedAt: opening.draft.updatedAt,
+      notSent: opening.draft.sendError,
       record: opening.record,
     }
   const blank = blankDraft(target.draftId ?? crypto.randomUUID(), opening.to)
-  if (templateId === null)
-    return { draft: blank, savedAt: null, record: opening.record }
+  const fresh = { savedAt: null, notSent: null, record: opening.record }
+  if (templateId === null) return { draft: blank, ...fresh }
   try {
     const fill = await getEmailTemplate({ data: { id: templateId } })
-    return {
-      draft: withTemplate(blank, fill),
-      savedAt: null,
-      record: opening.record,
-    }
+    return { draft: withTemplate(blank, fill), ...fresh }
   } catch (err) {
     // The email still opens, without the template.
     toast.error(err instanceof Error ? err.message : 'Could not apply it')
-    return { draft: blank, savedAt: null, record: opening.record }
+    return { draft: blank, ...fresh }
   }
 }
 
@@ -165,9 +178,14 @@ async function openTarget(target: ComposeTarget): Promise<Loaded> {
  */
 function ComposeDialog({
   target,
+  home,
+  reconnected,
   onClose,
 }: {
   target: ComposeTarget | null
+  home: DraftHome
+  /** Back from Reconnect Gmail: the draft opens on Review. */
+  reconnected: boolean
   onClose: () => void
 }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
@@ -239,6 +257,9 @@ function ComposeDialog({
             key={loaded.draft.id}
             initial={loaded.draft}
             savedAt={loaded.savedAt}
+            notSent={loaded.notSent}
+            home={home}
+            reconnected={reconnected}
             recordId={loaded.record?.id ?? null}
             recordName={loaded.record?.name ?? null}
             onSubject={setSubject}

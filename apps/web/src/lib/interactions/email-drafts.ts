@@ -7,6 +7,7 @@ import {
   eq,
   ilike,
   inArray,
+  isNotNull,
   isNull,
   or,
   sql,
@@ -94,6 +95,8 @@ export type EmailDraft = DraftFields & {
   id: string
   /** ISO instant of the last save. */
   updatedAt: string
+  /** Why the last send did not go; null unless one failed. */
+  sendError: string | null
 }
 
 /** One row of the drafts list. */
@@ -103,7 +106,12 @@ export type DraftRow = {
   subject: string
   to: Array<DraftRecipient>
   updatedAt: string
+  /** A send of it failed: it leads the list with `Not sent`. */
+  notSent: boolean
 }
+
+/** A draft whose send failed, as Today's notice names it. */
+export type UnsentDraft = { id: string; subject: string }
 
 /** A reply opened from the email window: the draft held, and each mode's start. */
 export type ReplyOpening = {
@@ -172,12 +180,41 @@ export const listDraftsProgram = Effect.fn('listDraftsProgram')(
           subject: emailDraft.subject,
           to: emailDraft.to,
           updatedAt: emailDraft.updatedAt,
+          failedAt: emailDraft.sendFailedAt,
         })
         .from(emailDraft)
         .where(eq(emailDraft.userId, viewer.id))
-        .orderBy(desc(emailDraft.updatedAt)),
+        // The ones that failed first, then the rest newest first.
+        .orderBy(
+          sql`${emailDraft.sendFailedAt} is null`,
+          desc(emailDraft.updatedAt),
+        ),
     )
-    return rows.map((r) => ({ ...r, updatedAt: r.updatedAt.toISOString() }))
+    return rows.map(({ failedAt, ...r }) => ({
+      ...r,
+      updatedAt: r.updatedAt.toISOString(),
+      notSent: failedAt !== null,
+    }))
+  },
+)
+
+/** The viewer's drafts whose send failed, the latest failure first: Today's notices. */
+export const unsentDraftsProgram = Effect.fn('unsentDraftsProgram')(
+  function* (viewer: {
+    id: string
+  }): Effect.fn.Return<Array<UnsentDraft>, DraftFailed> {
+    return yield* query(() =>
+      db
+        .select({ id: emailDraft.id, subject: emailDraft.subject })
+        .from(emailDraft)
+        .where(
+          and(
+            eq(emailDraft.userId, viewer.id),
+            isNotNull(emailDraft.sendFailedAt),
+          ),
+        )
+        .orderBy(desc(emailDraft.sendFailedAt)),
+    )
   },
 )
 
@@ -221,6 +258,7 @@ const draftOf = Effect.fn('draftOf')(function* (
     bodyMd: row.bodyMd,
     attachments,
     updatedAt: row.updatedAt.toISOString(),
+    sendError: row.sendError,
   } satisfies EmailDraft
 })
 

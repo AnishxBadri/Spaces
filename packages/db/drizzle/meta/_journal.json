@@ -673,6 +673,13 @@
       "when": 1794986164497,
       "tag": "0095_auth_rate_limit",
       "breakpoints": true
+    },
+    {
+      "idx": 96,
+      "version": "7",
+      "when": 1795401165633,
+      "tag": "0096_email_draft_send_error",
+      "breakpoints": true
     }
   ]
 }

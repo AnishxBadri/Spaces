@@ -35,6 +35,7 @@ import {
   draftStateOf,
   openCompose,
   useComposeHere,
+  useReconnectedLanding,
 } from '#/lib/email/compose'
 import {
   THREADS_STEP,
@@ -44,6 +45,7 @@ import {
   threadDay,
 } from '#/lib/email/threads'
 import type { EmailTab, ThreadFilter } from '#/lib/email/threads'
+import { openComposeOf } from '#/lib/modal-search'
 import { emailSearch } from '#/lib/route-search'
 import {
   getEmailDraft,
@@ -66,6 +68,8 @@ import { cn } from '#/lib/utils'
  *   anywhere re-reads the Draft marks, the tab's count and the list.
  * - The head's `New email ⌄` opens the composer as a window over the page,
  *   from the URL (`modal=email&new=1&draft=`), templates in its menu.
+ * - A draft addressed under Drafts (Today's `Open ›`) opens in the pane, or
+ *   below the split in the composer's window.
  */
 export const Route = createFileRoute('/_app/email')({
   validateSearch: emailSearch,
@@ -109,9 +113,6 @@ const STATE_ROW =
 
 const DRAFTS_LIST = [EMAIL_DRAFTS_QUERY, 'list'] as const
 
-/** A row of the Drafts list; `notSent` leads a draft whose send failed. */
-type DraftItem = DraftRow & { readonly notSent?: boolean | undefined }
-
 function EmailPage() {
   const search = Route.useSearch()
   const go = Route.useNavigate()
@@ -120,10 +121,14 @@ function EmailPage() {
   const open = search.id ?? null
   const split = useSplit()
   const composeHere = useComposeHere()
+  // The window's own landing is ComposeModal's; the pane's is the open draft.
+  const paneDraft =
+    tab === 'drafts' && openComposeOf(search) === null ? open : null
+  const reconnected = useReconnectedLanding(paneDraft)
 
   const drafts = useQuery({
     queryKey: DRAFTS_LIST,
-    queryFn: (): Promise<Array<DraftItem>> => listEmailDrafts(),
+    queryFn: (): Promise<Array<DraftRow>> => listEmailDrafts(),
   })
 
   const select = (id: string | null) =>
@@ -132,6 +137,17 @@ function EmailPage() {
       replace: true,
       resetScroll: false,
     })
+
+  // Below the split a draft has no pane: an addressed one opens as a window.
+  useEffect(() => {
+    if (split !== false || paneDraft === null) return
+    openCompose({ draftId: paneDraft })
+    void go({
+      search: (prev) => ({ ...prev, id: undefined }),
+      replace: true,
+      resetScroll: false,
+    })
+  }, [split, paneDraft, go])
 
   return (
     <ListPage>
@@ -199,6 +215,7 @@ function EmailPage() {
             onRetry={() => void drafts.refetch()}
             open={open}
             split={split}
+            reconnected={reconnected}
             onSelect={(id) => {
               // Below the split the composer opens as its own window.
               if (split === false) openCompose({ draftId: id })
@@ -421,14 +438,17 @@ function DraftsFolder({
   onRetry,
   open,
   split,
+  reconnected,
   onSelect,
   onClose,
 }: {
-  rows: ReadonlyArray<DraftItem> | undefined
+  rows: ReadonlyArray<DraftRow> | undefined
   failed: boolean
   onRetry: () => void
   open: string | null
   split: boolean | null
+  /** The open draft is back from Reconnect Gmail. */
+  reconnected: boolean
   onSelect: (id: string) => void
   onClose: () => void
 }) {
@@ -477,7 +497,12 @@ function DraftsFolder({
       </div>
       <div data-open-pane className={OPEN_PANE}>
         {split === true && open !== null ? (
-          <DraftPane key={open} id={open} onClose={onClose} />
+          <DraftPane
+            key={open}
+            id={open}
+            reconnected={reconnected}
+            onClose={onClose}
+          />
         ) : null}
       </div>
       {deleting.confirmDialog}
@@ -497,13 +522,13 @@ function DraftListRow({
   onSelect,
   onDelete,
 }: {
-  row: DraftItem
+  row: DraftRow
   day: string
   selected: boolean
   onSelect: () => void
   onDelete: () => void
 }) {
-  const notSent = row.notSent === true
+  const notSent = row.notSent
   const subject = row.subject === '' ? '(no subject)' : row.subject
   return (
     <li
@@ -575,7 +600,15 @@ function DraftListRow({
 }
 
 /** The composer for one draft, in the pane, under its subject. */
-function DraftPane({ id, onClose }: { id: string; onClose: () => void }) {
+function DraftPane({
+  id,
+  reconnected,
+  onClose,
+}: {
+  id: string
+  reconnected: boolean
+  onClose: () => void
+}) {
   const draft = useQuery({
     queryKey: ['email-draft', id],
     queryFn: () => getEmailDraft({ data: { id } }),
@@ -611,6 +644,8 @@ function DraftPane({ id, onClose }: { id: string; onClose: () => void }) {
         <DraftComposer
           initial={draftStateOf(draft.data)}
           savedAt={draft.data.updatedAt}
+          notSent={draft.data.sendError}
+          reconnected={reconnected}
           onClose={onClose}
         />
       </div>

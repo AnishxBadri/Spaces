@@ -431,7 +431,7 @@ describe('send through gmail with the fakes on', () => {
       Exit.isFailure(exit) ? Cause.squash(exit.cause) : null,
     ).toMatchObject({
       _tag: 'SendFailed',
-      message: 'Gmail answered 503: Backend Error. The draft is kept',
+      message: 'Gmail answered 503: Backend Error',
     })
     expect(api.sent()).toHaveLength(0)
     expect(await draftHeld(id)).toBe(1)
@@ -472,7 +472,7 @@ describe('refused before any request', () => {
       Exit.isFailure(exit) ? Cause.squash(exit.cause) : null,
     ).toMatchObject({
       _tag: 'SendRefused',
-      message: 'Reconnect Gmail to send',
+      message: 'Gmail asks you to sign in again',
     })
     expect(api.requests).toHaveLength(0)
     expect(await draftHeld(id)).toBe(1)

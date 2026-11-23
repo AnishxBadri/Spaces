@@ -9,6 +9,7 @@ export type {
   MovingSignal,
   ParkedSource,
   TodayAttention,
+  UnsentDraft,
   WaitingExport,
 } from '../today/attention'
 

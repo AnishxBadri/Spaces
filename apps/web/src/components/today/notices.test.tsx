@@ -13,6 +13,7 @@ import type {
   FailingBinding,
   ParkedSource,
   StoppedPlugin,
+  UnsentDraft,
   WaitingExport,
 } from '#/lib/server-fns'
 import { NoticesBand } from './notices'
@@ -34,6 +35,7 @@ async function render(
   broken: ReadonlyArray<BrokenConnection> = [],
   invite: ConnectInvite | null = null,
   expiring: ReadonlyArray<ExpiringConnection> = [],
+  unsent: ReadonlyArray<UnsentDraft> = [],
 ) {
   const root = createRootRoute({
     component: () => (
@@ -45,6 +47,7 @@ async function render(
         failing={failing}
         invite={invite}
         expiring={expiring}
+        unsent={unsent}
       />
     ),
   })
@@ -192,6 +195,32 @@ describe('NoticesBand — the line', () => {
     expect(html).toContain('data-notice="warn"')
     expect(html).toContain('>Reconnect ›<')
     expect(html).toContain('account=anish%40gmail.com')
+  })
+
+  it('names a draft that was not sent, rose, with Open to it under Email › Drafts', async () => {
+    const id = '00000000-0000-4000-8000-0000000000f1'
+    const html = await render(
+      [],
+      [],
+      [],
+      [],
+      [],
+      null,
+      [],
+      [
+        { id, subject: 'Re: Pilot terms' },
+        { id: '00000000-0000-4000-8000-0000000000f2', subject: '' },
+      ],
+    )
+    expect(html).toContain(
+      `data-unsent="${id}">Re: Pilot terms<span class="text-graphite"> · not sent</span>`,
+    )
+    expect(html).toContain(
+      '(no subject)<span class="text-graphite"> · not sent',
+    )
+    expect(html).toContain('data-notice="bad"')
+    expect(html).toContain('>Open ›<')
+    expect(html).toContain(`href="/email?tab=drafts&amp;id=${id}"`)
   })
 
   it('names a stopped plugin in sentence case, rose, with Fix', async () => {

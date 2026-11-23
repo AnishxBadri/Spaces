@@ -75,7 +75,20 @@ const router = vi.hoisted(() => {
   return { navigate: vi.fn(), search }
 })
 
+const toasts = vi.hoisted(() => {
+  const said: Array<string> = []
+  return { said }
+})
+
 vi.mock('#/lib/server-fns', () => fns)
+vi.mock('sonner', () => ({
+  toast: Object.assign(
+    (text: string) => {
+      toasts.said.push(text)
+    },
+    { error: () => undefined },
+  ),
+}))
 vi.mock('@tanstack/react-router', () => ({
   useSearch: () => router.search,
   useNavigate: () => router.navigate,
@@ -97,6 +110,7 @@ beforeEach(() => {
   for (const f of Object.values(fns)) f.mockReset()
   router.navigate.mockReset()
   router.search = {}
+  toasts.said.length = 0
   fns.openEmailCompose.mockResolvedValue(opening())
   fns.getEmailSender.mockResolvedValue({
     _tag: 'ready',
@@ -202,6 +216,7 @@ describe('the composer over a page', () => {
       bodyMd: 'The link.',
       attachments: [],
       updatedAt: '2026-11-20T10:58:00.000Z',
+      sendError: null,
     }
     fns.openEmailCompose.mockResolvedValue(opening({ draft: held, to: [] }))
     await open({ modal: 'email', new: 1, draft: DRAFT, template: TEMPLATE })
@@ -265,6 +280,7 @@ describe('Review in the window', () => {
     bodyMd: 'Hi {{name.first}},',
     attachments: [],
     updatedAt: '2026-11-20T10:58:00.000Z',
+    sendError: null,
   }
   const review = {
     paths: ['name.first'],
@@ -298,6 +314,49 @@ describe('Review in the window', () => {
 
   beforeEach(() => {
     fns.reviewEmailVariables.mockResolvedValue(review)
+  })
+
+  it('back from Reconnect Gmail: the draft opens on Review, no note, Send, and a toast', async () => {
+    fns.openEmailCompose.mockResolvedValue(
+      opening({
+        draft: { ...held, sendError: 'Gmail asks you to sign in again' },
+        to: [],
+      }),
+    )
+    fns.reviewEmailVariables.mockResolvedValue({
+      paths: [],
+      rows: [DEV, PRIYA].map((r) => ({
+        email: r.email,
+        name: r.name,
+        values: {},
+        blanks: [],
+      })),
+    })
+    await open({ modal: 'email', new: 1, draft: DRAFT, reconnected: 'gmail' })
+    expect(dialog()?.querySelector('[data-review-card]')).not.toBeNull()
+    expect(dialog()?.querySelector('[data-send-failed]')).toBeNull()
+    expect(footButtons()).toEqual(['Back to draft', 'Send'])
+    expect(toasts.said).toEqual(['Gmail reconnected'])
+    // The key goes, so a reload does not say it again.
+    expect(
+      lastSearch({
+        modal: 'email',
+        new: 1,
+        draft: DRAFT,
+        reconnected: 'gmail',
+      }),
+    ).toEqual({ modal: 'email', new: 1, draft: DRAFT, reconnected: undefined })
+  })
+
+  it('a draft whose send failed reopens saying so', async () => {
+    fns.openEmailCompose.mockResolvedValue(
+      opening({ draft: { ...held, sendError: 'Gmail didn’t answer' }, to: [] }),
+    )
+    await open({ modal: 'email', new: 1, draft: DRAFT })
+    expect(dialog()?.querySelector('[data-send-failed]')?.textContent).toBe(
+      'Not sent · Gmail didn’t answer',
+    )
+    expect(toasts.said).toEqual([])
   })
 
   it('shows the email on bone under the head, a copy each, and counts the send', async () => {

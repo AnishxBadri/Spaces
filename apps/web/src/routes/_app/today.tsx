@@ -450,6 +450,7 @@ function TodayLedger({
               expiring={
                 attention.state === 'done' ? attention.value.expiring : []
               }
+              unsent={attention.state === 'done' ? attention.value.unsent : []}
             />
             <NeedsYou
               rows={rows}

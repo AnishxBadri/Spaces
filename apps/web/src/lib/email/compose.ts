@@ -1,7 +1,9 @@
-import { useEffect, useRef, useSyncExternalStore } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
+import { toast } from 'sonner'
 import { Email } from '#/components/icons'
+import { connectHref } from '#/lib/connections/products'
 import { composeSearch } from '#/lib/modal-search'
 import type { PageAction } from '#/lib/page-actions'
 import type {
@@ -371,6 +373,83 @@ export function messageCount(copies: number): number {
 /** The primary in Review: `Send`, or `Send 3 emails`. */
 export function sendLabel(messages: number): string {
   return messages === 1 ? 'Send' : `Send ${String(messages)} emails`
+}
+
+/**
+ * Where a draft is open, for the page Google's consent returns to: the page
+ * as it stands (`here`, a URL that already opens it), the record's
+ * Interactions tab with the draft's window over it, or the Email page with
+ * the window over it (a draft opened from anywhere else).
+ */
+export type DraftHome = 'here' | 'record' | 'email'
+
+type At = { readonly pathname: string; readonly search: string }
+
+/**
+ * The in-app path Reconnect Gmail comes back to: the same page, the same
+ * draft open, and `reconnected=gmail`, so it opens on Review with a toast.
+ */
+export function reconnectReturn(
+  home: DraftHome,
+  draftId: string,
+  at: At,
+): string {
+  const window = {
+    modal: 'email',
+    new: '1',
+    draft: draftId,
+    reconnected: 'gmail',
+  }
+  if (home === 'email')
+    return `/email?${new URLSearchParams(window).toString()}`
+  if (home === 'record') {
+    const query = new URLSearchParams({ tab: 'interactions', ...window })
+    return `${at.pathname}?${query.toString()}`
+  }
+  const query = new URLSearchParams(at.search)
+  query.set('reconnected', 'gmail')
+  return `${at.pathname}?${query.toString()}`
+}
+
+/**
+ * Whether `draftId` was just reopened by Reconnect Gmail's return. Seen
+ * once: it says `Gmail reconnected` and drops the key from the URL, and the
+ * answer holds for that draft so a composer that mounts later still opens
+ * on Review.
+ */
+export function useReconnectedLanding(draftId: string | null): boolean {
+  const search = useSearch({ strict: false })
+  const navigate = useNavigate()
+  const [landed, setLanded] = useState<string | null>(null)
+  const back = draftId !== null && search.reconnected === 'gmail'
+  useEffect(() => {
+    if (!back) return
+    setLanded(draftId)
+    toast('Gmail reconnected')
+    void navigate({
+      to: '.',
+      search: (prev) => ({ ...prev, reconnected: undefined }),
+      replace: true,
+      resetScroll: false,
+    })
+  }, [back, draftId, navigate])
+  return draftId !== null && (back || landed === draftId)
+}
+
+/** Google's consent for the sending mailbox, back to the draft open. */
+export function reconnectHref(
+  account: string,
+  home: DraftHome,
+  draftId: string,
+  at: At,
+): string {
+  return connectHref(
+    'google',
+    'gmail',
+    [],
+    reconnectReturn(home, draftId, at),
+    account,
+  )
 }
 
 /** The blanks still open across the copies; Send stays off until none is. */

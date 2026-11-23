@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { Context, Effect, Layer, Schema } from 'effect'
-import { and, asc, eq, inArray, isNull, ne } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { OUTGOING_EMAIL_LIMIT_BYTES, decodeManifest } from '@spaces/sdk'
 import type { EmailAddress, OutgoingEmail } from '@spaces/sdk'
 import {
@@ -25,6 +25,7 @@ import {
 import { user } from '@spaces/db/schema/auth'
 import type { DraftRecipient } from '@spaces/db/schema/drafts'
 import { enqueue, jobsByKey } from '#/lib/queue'
+import { SIGN_IN_AGAIN } from '#/lib/email/send-words'
 import { runnable } from '#/lib/integrations/runnable'
 import {
   DraftFailed,
@@ -49,8 +50,10 @@ import { recipientContextsProgram } from './email-variables'
  * - Each Message-ID is minted here from the draft and the recipient, so the
  *   outgoing row and a later sync dedupe on it and a second press after a
  *   failure never sends one already gone.
- * - The draft is deleted once every message is sent; any failure keeps it
- *   and says what Gmail said.
+ * - The draft is deleted only once every message's sent row has landed.
+ *   Anything short of that keeps it, says what Gmail said, and stores that
+ *   sentence on the draft (`send_error`), which Drafts and Today read until
+ *   the draft is sent or deleted. There is no outbox and no automatic retry.
  */
 
 export class SendRefused extends Schema.TaggedError<SendRefused>()(
@@ -70,6 +73,10 @@ export class AttachmentsTooLarge extends Schema.TaggedError<AttachmentsTooLarge>
 export class SendFailed extends Schema.TaggedError<SendFailed>()('SendFailed', {
   message: Schema.String,
 }) {}
+
+/** Every job settled but a sent row is missing: Retry files it without sending again. */
+const NOT_FILED =
+  'Gmail took it, but the sent copy did not land here; Retry files it without sending again'
 
 /** The sentence a client is shown. */
 export function sendMessage(failure: unknown): string {
@@ -272,6 +279,18 @@ const senderOf = Effect.fn('emailSender')(function* (
 })
 
 const isSender = (s: Sender | EmailSender): s is Sender => !('_tag' in s)
+
+/**
+ * Whether a refused job left the mailbox needing a new sign-in: the worker
+ * marks a connection whose grant Google refused, so it reads again here.
+ */
+const signInAgain = Effect.fn('signInAgain')(function* (
+  viewerId: string,
+  parentId: string | null,
+) {
+  const now = yield* senderOf(viewerId, parentId)
+  return isSender(now) && !now.canSend
+})
 
 const asEmailSender = (s: Sender): EmailSender =>
   s.canSend
@@ -501,31 +520,59 @@ const heldIds = Effect.fn('heldMessageIds')(function* (
   )
 })
 
-export const sendDraftProgram = Effect.fn('sendDraftProgram')(function* (
-  viewer: { id: string },
-  input: SendInput,
-  timing: SendTiming = SEND_TIMING,
-): Effect.fn.Return<
-  Sent,
+/** Why the draft did not go, kept on it for Drafts and Today. */
+const markNotSent = Effect.fn('markNotSent')(function* (
+  viewerId: string,
+  draftId: string,
+  reason: string,
+) {
+  yield* query(() =>
+    db
+      .update(emailDraft)
+      .set({ sendError: reason, sendFailedAt: sql`now()` })
+      .where(and(eq(emailDraft.id, draftId), eq(emailDraft.userId, viewerId))),
+  )
+})
+
+type SendError =
   | DraftFailed
   | DraftNotFound
   | UnknownVariable
   | SendRefused
   | AttachmentsTooLarge
-  | SendFailed,
-  SendQueue
-> {
+  | SendFailed
+
+export const sendDraftProgram = Effect.fn('sendDraftProgram')(function* (
+  viewer: { id: string },
+  input: SendInput,
+  timing: SendTiming = SEND_TIMING,
+): Effect.fn.Return<Sent, SendError, SendQueue> {
   const draft = yield* getDraftProgram(viewer, input.draftId)
+  return yield* sendHeldDraft(viewer, draft, input, timing).pipe(
+    Effect.tapError((failure) =>
+      // A database failure is not the send's reason; storing it would fail too.
+      failure instanceof DraftFailed
+        ? Effect.void
+        : // The refusal still reaches the composer if the mark cannot be written.
+          markNotSent(viewer.id, draft.id, sendMessage(failure)).pipe(
+            Effect.ignore,
+          ),
+    ),
+  )
+})
+
+const sendHeldDraft = Effect.fn('sendHeldDraft')(function* (
+  viewer: { id: string },
+  draft: EmailDraft,
+  input: SendInput,
+  timing: SendTiming,
+): Effect.fn.Return<Sent, Exclude<SendError, DraftNotFound>, SendQueue> {
   const sender = yield* senderOf(viewer.id, draft.inReplyToId)
   if (!isSender(sender))
     return yield* new SendRefused({
-      message:
-        sender._tag === 'unavailable'
-          ? sender.reason
-          : 'Reconnect Gmail to send',
+      message: sender._tag === 'unavailable' ? sender.reason : SIGN_IN_AGAIN,
     })
-  if (!sender.canSend)
-    return yield* new SendRefused({ message: 'Reconnect Gmail to send' })
+  if (!sender.canSend) return yield* new SendRefused({ message: SIGN_IN_AGAIN })
   if (draft.to.length + draft.cc.length + draft.bcc.length === 0)
     return yield* new SendRefused({ message: 'Add a recipient' })
 
@@ -561,9 +608,7 @@ export const sendDraftProgram = Effect.fn('sendDraftProgram')(function* (
     const key = randomUUID()
     const id = yield* queue.enqueue(sender.queue, payload, key)
     if (id === null)
-      return yield* new SendFailed({
-        message: 'The send queue is unreachable. The draft is kept',
-      })
+      return yield* new SendFailed({ message: 'The send queue is unreachable' })
     waiting.push({ key, message })
   }
 
@@ -581,17 +626,25 @@ export const sendDraftProgram = Effect.fn('sendDraftProgram')(function* (
     if (open.length > 0) yield* Effect.sleep(timing.pollMs)
   }
 
+  // Sent means the outgoing row landed: a settled job whose copy was not
+  // filed keeps the draft, and the next press files it without resending.
   const held = yield* heldIds(messages.map((m) => m.messageId))
-  const sent = messages.length - failures.length - open.length
-  if (failures.length > 0 || open.length > 0) {
+  const landed = messages.filter((m) => held.has(m.messageId)).length
+  if (landed < messages.length) {
+    const failed = failures.at(0)
     const reason =
-      failures.at(0) ??
-      'Gmail has not answered yet; a second press will not send it twice'
+      failed === undefined
+        ? open.length > 0
+          ? 'Gmail didn’t answer'
+          : NOT_FILED
+        : (yield* signInAgain(viewer.id, draft.inReplyToId))
+          ? SIGN_IN_AGAIN
+          : failed
     return yield* new SendFailed({
       message:
-        messages.length > 1 && sent > 0
-          ? `Sent ${String(sent)} of ${String(messages.length)}. ${reason}. The draft is kept`
-          : `${reason}. The draft is kept`,
+        messages.length > 1 && landed > 0
+          ? `${String(landed)} of ${String(messages.length)} sent · ${reason}`
+          : reason,
     })
   }
   yield* query(() =>

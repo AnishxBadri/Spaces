@@ -22,7 +22,9 @@ import {
   GMAIL_SEND,
   QUOTA_REASONS,
   googleError,
+  isUserLabel,
   labelNames,
+  labelsList,
   messagesPage,
   rawMessage,
   sentRef,
@@ -37,9 +39,10 @@ import {
  *   message carries `In-Reply-To` and `References` from the host.
  * - Idempotent by the host's Message-ID: a message the mailbox already
  *   holds under it is not sent again, only filed.
- * - The sent copy, as the mailbox keeps it, goes to `Content.logEmail`, so
- *   the outgoing row and a later sync land on one Message-ID. A copy the
- *   host cannot file is logged, never a failure: the mail is gone.
+ * - The sent copy, as the mailbox keeps it and under its label names, goes
+ *   to `Content.logEmail`, so the outgoing row and a later sync land on one
+ *   Message-ID. A copy the host cannot file is logged, never a failure: the
+ *   mail is gone.
  * - A failure says what Gmail said; the host shows it and keeps the draft.
  */
 
@@ -279,13 +282,28 @@ export const send = Effect.fn('gmail.send')(function* (
     return
   }
   const snippet = snippetText(copy.value.snippet)
+  // A user label is named by `labels.list`; unread, the copy is still filed
+  // and the label prints as its id.
+  const userLabels = copy.value.labelIds.some(isUserLabel)
+    ? Option.match(
+        Schema.decodeUnknownOption(labelsList)(
+          yield* get(url('/users/me/labels')).pipe(
+            Effect.orElseSucceed(() => null),
+          ),
+        ),
+        {
+          onNone: () => new Map<string, string>(),
+          onSome: (listed) => new Map(listed.labels.map((l) => [l.id, l.name])),
+        },
+      )
+    : new Map<string, string>()
   const filed = yield* content
     .logEmail({
       _tag: 'email',
       providerMessageId: copy.value.id,
       raw: copy.value.raw,
       receivedAt: new Date(Number(copy.value.internalDate)).toISOString(),
-      labels: labelNames(copy.value.labelIds, new Map()),
+      labels: labelNames(copy.value.labelIds, userLabels),
       ...(snippet === undefined ? {} : { snippet }),
     })
     .pipe(

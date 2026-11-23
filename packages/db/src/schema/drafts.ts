@@ -67,6 +67,12 @@ export const emailDraft = pgTable(
       .$type<Array<DraftAttachment>>()
       .notNull()
       .default([]),
+    /**
+     * Why the last send did not go, in the words the composer showed; null
+     * until a send fails. Held until the draft is sent or deleted.
+     */
+    sendError: text('send_error'),
+    sendFailedAt: timestamp('send_failed_at', { withTimezone: true }),
     createdAt: timestamp('created_at', { withTimezone: true })
       .notNull()
       .defaultNow(),

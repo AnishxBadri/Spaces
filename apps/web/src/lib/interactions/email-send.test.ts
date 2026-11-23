@@ -15,7 +15,12 @@ import { writeIntegrationInteraction } from '@spaces/core/writes/interactions/wr
 import type { QueuedJob } from '@spaces/core/queue/sender'
 import { truncateAndReseed } from '#/test/reseed'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
-import { saveDraftProgram } from './email-drafts'
+import {
+  getDraftProgram,
+  listDraftsProgram,
+  saveDraftProgram,
+  unsentDraftsProgram,
+} from './email-drafts'
 import type { DraftSave } from './email-drafts'
 import {
   SendQueue,
@@ -101,11 +106,15 @@ beforeEach(async () => {
   integrationId = ''
 })
 
-type Outcome = 'sent' | { failed: string } | 'pending'
+type Outcome = 'sent' | 'unfiled' | { failed: string } | 'pending'
 
-/** A queue whose jobs settle as `outcome` says; a sent one files its row. */
+/**
+ * A queue whose jobs settle as `outcome` says; a sent one files its row,
+ * an `unfiled` one completes without its row landing.
+ */
 const standIn = (
-  outcome: (payload: OutgoingEmail) => Outcome = () => 'sent',
+  outcome: (payload: OutgoingEmail) => Outcome | Promise<Outcome> = () =>
+    'sent',
 ) => {
   const sent: Array<OutgoingEmail> = []
   const jobs = new Map<string, Array<QueuedJob>>()
@@ -115,12 +124,12 @@ const standIn = (
       enqueue: (_queue, payload, key) =>
         Effect.promise(async () => {
           sent.push(payload)
-          const out = outcome(payload)
+          const out = await outcome(payload)
           if (out === 'sent') await fileOutgoing(payload)
           jobs.set(key, [
             out === 'pending'
               ? { state: 'active', output: null, createdOn: new Date() }
-              : out === 'sent'
+              : out === 'sent' || out === 'unfiled'
                 ? {
                     state: 'completed',
                     output: { kind: 'completed', reason: '' },
@@ -202,6 +211,22 @@ const failure = <TValue, TError>(exit: Exit.Exit<TValue, TError>) =>
 const draftHeld = async (id: string) =>
   (await db.select().from(emailDraft).where(eq(emailDraft.id, id))).length
 
+/** What the draft stores about its last send. */
+const stored = async (id: string) => {
+  const row = (
+    await db
+      .select({
+        error: emailDraft.sendError,
+        at: emailDraft.sendFailedAt,
+      })
+      .from(emailDraft)
+      .where(eq(emailDraft.id, id))
+  ).at(0)
+  return row === undefined
+    ? null
+    : { error: row.error, failed: row.at !== null }
+}
+
 const aDocument = async (name: string, sizeBytes: number) => {
   const ent = (
     await db
@@ -258,10 +283,14 @@ describe('sendDraftProgram', () => {
       failure(await send(queue, { draftId: id, ...NO_FILLS })),
     ).toMatchObject({
       _tag: 'SendRefused',
-      message: 'Reconnect Gmail to send',
+      message: 'Gmail asks you to sign in again',
     })
     expect(queue.sent).toHaveLength(0)
     expect(await draftHeld(id)).toBe(1)
+    expect(await stored(id)).toEqual({
+      error: 'Gmail asks you to sign in again',
+      failed: true,
+    })
   })
 
   it('sends one message to everyone, Bcc on the payload, and deletes the draft', async () => {
@@ -363,9 +392,103 @@ describe('sendDraftProgram', () => {
       failure(await send(queue, { draftId: id, ...NO_FILLS })),
     ).toMatchObject({
       _tag: 'SendFailed',
-      message: 'Gmail answered 503: Backend Error. The draft is kept',
+      message: 'Gmail answered 503: Backend Error',
     })
     expect(await draftHeld(id)).toBe(1)
+  })
+
+  it('stores the failure on the draft, leads Drafts and Today with it, and a sent retry clears it', async () => {
+    await connect(SENDING)
+    const older = await draft({ subject: 'Pilot terms' })
+    const id = await draft({ subject: 'Re: Pilot terms' })
+    const queue = standIn(() => ({ failed: 'Gmail answered 503' }))
+    await send(queue, { draftId: older, ...NO_FILLS })
+    // A later save of another draft would put it first; the failed one leads.
+    await draft({ subject: 'Newest' })
+    expect(await stored(older)).toEqual({
+      error: 'Gmail answered 503',
+      failed: true,
+    })
+    expect(await stored(id)).toEqual({ error: null, failed: false })
+    const rows = await Effect.runPromise(listDraftsProgram(ME))
+    expect(rows.map((r) => [r.subject, r.notSent])).toEqual([
+      ['Pilot terms', true],
+      ['Newest', false],
+      ['Re: Pilot terms', false],
+    ])
+    expect(
+      (await Effect.runPromise(getDraftProgram(ME, older))).sendError,
+    ).toBe('Gmail answered 503')
+    expect(await Effect.runPromise(unsentDraftsProgram(ME))).toEqual([
+      { id: older, subject: 'Pilot terms' },
+    ])
+
+    // An edit keeps the failure: the draft has still not gone.
+    await Effect.runPromise(
+      saveDraftProgram(ME, {
+        id: older,
+        mode: 'new',
+        inReplyToId: null,
+        to: [{ email: 'dana@flent.example', name: 'Dana Moreau' }],
+        cc: [],
+        bcc: [],
+        subject: 'Pilot terms',
+        bodyMd: 'Edited after the failure.',
+        attachments: [],
+      }),
+    )
+    expect(await stored(older)).toMatchObject({ failed: true })
+    const exit = await send(standIn(), { draftId: older, ...NO_FILLS })
+    if (Exit.isFailure(exit)) throw new Error(Cause.pretty(exit.cause))
+    expect(await draftHeld(older)).toBe(0)
+    expect(await Effect.runPromise(unsentDraftsProgram(ME))).toEqual([])
+  })
+
+  it('names a new sign-in when Gmail refused the grant', async () => {
+    await connect(SENDING)
+    const id = await draft()
+    // The worker marks the connection when Google refuses the token.
+    const queue = standIn(async () => {
+      await db
+        .update(accountConnection)
+        .set({ status: 'error', errorReason: 'invalid_grant' })
+        .where(eq(accountConnection.id, connectionId))
+      return { failed: 'Google refused to send through Gmail. Reconnect Gmail' }
+    })
+    expect(
+      failure(await send(queue, { draftId: id, ...NO_FILLS })),
+    ).toMatchObject({
+      _tag: 'SendFailed',
+      message: 'Gmail asks you to sign in again',
+    })
+    expect(await stored(id)).toMatchObject({
+      error: 'Gmail asks you to sign in again',
+    })
+  })
+
+  it('keeps the draft, not sent, when the job completed but its sent row never landed', async () => {
+    await connect(SENDING)
+    const id = await draft()
+    const exit = await send(
+      standIn(() => 'unfiled'),
+      { draftId: id, ...NO_FILLS },
+    )
+    expect(failure(exit)).toMatchObject({
+      _tag: 'SendFailed',
+      message:
+        'Gmail took it, but the sent copy did not land here; Retry files it without sending again',
+    })
+    expect(await draftHeld(id)).toBe(1)
+    expect(await stored(id)).toMatchObject({ failed: true })
+    // Retry asks again under the same Message-ID; the plugin files the copy
+    // it finds rather than sending it twice.
+    const retry = standIn()
+    const second = await send(retry, { draftId: id, ...NO_FILLS })
+    if (Exit.isFailure(second)) throw new Error(Cause.pretty(second.cause))
+    expect(retry.sent.map((p) => p.messageId)).toEqual([
+      mintMessageId(id, null, MAILBOX),
+    ])
+    expect(await draftHeld(id)).toBe(0)
   })
 
   it('keeps the draft when Gmail has not answered in time', async () => {
@@ -377,7 +500,10 @@ describe('sendDraftProgram', () => {
       { draftId: id, ...NO_FILLS },
       { waitMs: 50, pollMs: 10 },
     )
-    expect(failure(exit)).toMatchObject({ _tag: 'SendFailed' })
+    expect(failure(exit)).toMatchObject({
+      _tag: 'SendFailed',
+      message: 'Gmail didn’t answer',
+    })
     expect(await draftHeld(id)).toBe(1)
   })
 })
@@ -473,7 +599,7 @@ describe('a draft with variables', () => {
       failure(await send(first, { draftId: id, fills, accepted: [] })),
     ).toMatchObject({
       _tag: 'SendFailed',
-      message: 'Sent 1 of 2. Gmail answered 500. The draft is kept',
+      message: '1 of 2 sent · Gmail answered 500',
     })
     expect(await draftHeld(id)).toBe(1)
     const second = standIn()
