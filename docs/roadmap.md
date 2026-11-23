@@ -43,8 +43,6 @@ Plus Zod leaves (project 37: every server-fn validator through `input()`, job pa
 ## Open
 
 - `SPA-389` `ai-b` — the mandate in every judging lane, and cached tokens on the ledger. Project 31; `migration`, `hitl`: the owner confirms AI column answers may change under the mandate.
-- `SPA-461` `email-2` — New email ⌄ in a record's Interactions toolbar, the composer as a window over the record, To filled (D111). Project 35; `afk`, after SPA-429.
-- `SPA-464` `email-3` — every send passes Review, shown as the message card it will become (D111). Project 35; `afk`, after SPA-461.
 - `SPA-466` `email-4` — a failed send keeps its window with Retry, Reconnect Gmail returns to the draft, `Not sent` on Drafts and Today (D111). Project 35; `afk`, `migration`, after SPA-460 and SPA-464.
 - `SPA-465` `email-7` — a member's email signature, added once to new emails and replies (D111). Project 35; `afk`, `migration`, after SPA-461.
 - `SPA-437` `heads-2` — an index page's head is 48px and never folds; a page about one thing keeps 104 (D114). `afk`.
@@ -90,6 +88,7 @@ Plus Zod leaves (project 37: every server-fn validator through `input()`, job pa
 
 ## Unticketed follow-ups
 
+- Compose, after `email-2` and `email-3`: the split in a record's Interactions toolbar is the bordered secondary (E6), where board 02 draws it in pine; the template menu is the shared picker's 224px, not the board's 260px; Review's `Leave blank` is a checkbox on the last fill row, where the board draws text; the sending address shows on every review card; Review now makes one copy per To recipient only, as the send always did (it used to count Cc and Bcc too); a copy-each review with open blanks, the template menu with templates in it and a reply reviewed in its thread were not seen on a live screen (the dev database has no email template and no Gmail connection).
 - Email page, after `email-1`: the head is the shared 104px page head, not D114's 48px index head (`heads-2` is not built); the pane head's buttons are 32px, since there is no 28px size; `New email` is a plain button until `email-2` gives it the templates menu; the thread list reads people from the participants' records, so a thread whose messages sit on several records lists them all.
 - Who can read this, after `email-6`: the window is the S size (440px, the board draws 480); its switch is the app's 24×14 one; the record form of the wider line borrows the globe icon, since the board draws only the mailbox form; a mailbox that shares its bodies now gives the email a privacy row, so `Who can read this…` shows there; the window was not seen on a live screen (no email in the dev database carries a private body).
 - Email thread, after `interactions-4`: a card reads `→ you` among To even when the reader was only cc'd or bcc'd, because arrival drops the mailbox's own address and the read puts it back first in To; a member's address that no person record holds prints as the address; the email window is 85vh tall, not the board's 680px; the meeting write-up's source reads `Via Granola` in words, not the mark; the meeting rail's Participants and the quoted-history fold were not seen on a live screen (no such rows in the dev database).
