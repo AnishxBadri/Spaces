@@ -59,6 +59,21 @@ describe('the sender line', () => {
     )
   })
 
+  it('names a draft’s bcc last, and counts it past three', () => {
+    expect(senderLine({ from: YOU, to: [DEV], cc: [] }, false, [PRIYA])).toBe(
+      'You → Dev Shah, bcc Priya Raman',
+    )
+    expect(
+      senderLine({ from: YOU, to: [DEV], cc: [ROHAN] }, false, [PRIYA]),
+    ).toBe('You → Dev Shah, cc Rohan Gupta, bcc Priya Raman')
+    expect(
+      senderLine({ from: YOU, to: [DEV, ROHAN], cc: [MEERA] }, false, [
+        PRIYA,
+        ARJUN,
+      ]),
+    ).toBe('You → Dev Shah, Rohan Gupta · cc 1 · bcc 2')
+  })
+
   it('puts you first among the recipients', () => {
     expect(senderLine({ from: DEV, to: [PRIYA, YOU], cc: [] })).toBe(
       'Dev Shah → you, Priya Raman',

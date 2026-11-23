@@ -110,35 +110,50 @@ function senderPart(from: EmailParticipant | null): LinePart {
 /**
  * Who a message went to, after the arrow. Up to three names in full
  * (`you, cc Priya Raman`); past three, three To names, `+n` for the rest of
- * To and `· cc n`, and a folded card just its first name and `+n`.
+ * To, `· cc n` and `· bcc n`, and a folded card just its first name and `+n`.
+ * A Bcc is printed only on a message not yet sent: Review's card.
  */
 function recipientParts(
   head: Pick<CardHead, 'to' | 'cc'>,
   folded: boolean,
+  bccLine: ReadonlyArray<EmailParticipant> = [],
 ): Array<LinePart> {
   const to = youFirst(head.to)
   const cc = youFirst(head.cc)
-  const total = to.length + cc.length
+  const bcc = youFirst(bccLine)
+  const total = to.length + cc.length + bcc.length
   if (total === 0) return []
+  const named = (
+    label: string,
+    ps: ReadonlyArray<EmailParticipant>,
+    before: number,
+  ): Array<LinePart> =>
+    ps.length === 0
+      ? []
+      : [words(before === 0 ? `${label} ` : `, ${label} `), ...listed(ps)]
   if (total <= NAMED)
     return [
       ...listed(to),
-      ...(cc.length === 0
-        ? []
-        : [words(to.length === 0 ? 'cc ' : ', cc '), ...listed(cc)]),
+      ...named('cc', cc, to.length),
+      ...named('bcc', bcc, to.length + cc.length),
     ]
   if (folded) {
-    const first = to.at(0) ?? cc.at(0)
+    const first = to.at(0) ?? cc.at(0) ?? bcc.at(0)
     return first === undefined
       ? []
       : [part(first), words(` +${String(total - 1)}`)]
   }
+  const counted = (
+    label: string,
+    n: number,
+    before: number,
+  ): Array<LinePart> =>
+    n === 0 ? [] : [words(`${before === 0 ? '' : ' · '}${label} ${String(n)}`)]
   return [
     ...listed(to.slice(0, NAMED)),
     ...(to.length > NAMED ? [words(` +${String(to.length - NAMED)}`)] : []),
-    ...(cc.length === 0
-      ? []
-      : [words(`${to.length === 0 ? '' : ' · '}cc ${String(cc.length)}`)]),
+    ...counted('cc', cc.length, to.length),
+    ...counted('bcc', bcc.length, to.length + cc.length),
   ]
 }
 
@@ -146,8 +161,9 @@ function recipientParts(
 export function senderLine(
   head: Pick<CardHead, 'from' | 'to' | 'cc'>,
   folded = false,
+  bcc: ReadonlyArray<EmailParticipant> = [],
 ): string {
-  const to = recipientParts(head, folded)
+  const to = recipientParts(head, folded, bcc)
   const sender = senderPart(head.from).text
   return to.length === 0
     ? sender
@@ -168,17 +184,20 @@ function Named({ part: p }: { part: LinePart }) {
 }
 
 /** Sender in ink, the arrow and the recipients in graphite. */
-function HeaderLine({
+export function HeaderLine({
   head,
   folded,
   tips,
+  bcc = [],
 }: {
   head: Pick<CardHead, 'from' | 'to' | 'cc'>
   folded: boolean
   tips: boolean
+  /** A draft's own Bcc, after the cc. */
+  bcc?: ReadonlyArray<EmailParticipant>
 }) {
   const sender = senderPart(head.from)
-  const to = recipientParts(head, folded)
+  const to = recipientParts(head, folded, bcc)
   const show = (p: LinePart, i: number) =>
     tips ? <Named key={i} part={p} /> : <span key={i}>{p.text}</span>
   return (

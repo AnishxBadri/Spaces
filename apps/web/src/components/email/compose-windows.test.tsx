@@ -11,7 +11,9 @@ import { ComposeModal } from './compose-windows'
  * a new email under the URL's id with To from the record, a template
  * applied as it opens, a held draft reopened as it was, an id minted into a
  * URL without one, and Esc or Cancel dropping the keys. The head is the
- * mail glyph and the subject, the foot the saved line, Cancel and Send.
+ * mail glyph and the subject, the foot the saved line, Cancel and Review;
+ * Review shows the email on bone, and a fill made there is still there when
+ * the window is closed and the draft opened again.
  */
 
 await vi.hoisted(async () => {
@@ -65,6 +67,8 @@ const fns = vi.hoisted(() => ({
   listRecordDocuments: vi.fn(),
   listEmailVariables: vi.fn(),
   listTemplates: vi.fn(),
+  reviewEmailVariables: vi.fn(),
+  sendEmailDraft: vi.fn(),
 }))
 const router = vi.hoisted(() => {
   const search: Record<string, unknown> = {}
@@ -158,14 +162,14 @@ describe('the composer over a page', () => {
     expect(fns.openEmailCompose).not.toHaveBeenCalled()
   })
 
-  it('opens a new email under the URL’s id, To from the record, head New email, foot Cancel and Send', async () => {
+  it('opens a new email under the URL’s id, To from the record, head New email, foot Cancel and Review', async () => {
     await open({ tab: 'interactions', modal: 'email', new: 1, draft: DRAFT })
     expect(fns.openEmailCompose).toHaveBeenCalledWith({
       data: { draftId: DRAFT, recordId: RECORD },
     })
     expect(title()).toBe('New email')
     expect(chips()).toEqual(['dev@flent.example'])
-    expect(footButtons()).toEqual(['Cancel', 'Send'])
+    expect(footButtons()).toEqual(['Cancel', 'Review'])
     // Nothing is written until something is typed.
     expect(fns.saveEmailDraft).not.toHaveBeenCalled()
   })
@@ -245,5 +249,112 @@ describe('the composer over a page', () => {
       draft: undefined,
       template: undefined,
     })
+  })
+})
+
+describe('Review in the window', () => {
+  const PRIYA = { email: 'priya@flent.example', name: 'Priya Raman' }
+  const held: EmailDraft = {
+    id: DRAFT,
+    mode: 'new',
+    inReplyToId: null,
+    to: [DEV, PRIYA],
+    cc: [],
+    bcc: [],
+    subject: 'Diligence next steps',
+    bodyMd: 'Hi {{name.first}},',
+    attachments: [],
+    updatedAt: '2026-11-20T10:58:00.000Z',
+  }
+  const review = {
+    paths: ['name.first'],
+    rows: [
+      {
+        email: DEV.email,
+        name: 'Dev Shah',
+        values: { 'name.first': 'Dev' },
+        blanks: [],
+      },
+      {
+        email: PRIYA.email,
+        name: 'Priya Raman',
+        values: { 'name.first': null },
+        blanks: ['name.first'],
+      },
+    ],
+  }
+  const press = async (label: string) => {
+    act(() =>
+      [...document.querySelectorAll('button')]
+        .find((b) => b.textContent.trim() === label)
+        ?.click(),
+    )
+    await settle()
+  }
+  const fillCell = () =>
+    document.querySelector<HTMLInputElement>(
+      'input[aria-label="name.first for Priya Raman"]',
+    )
+
+  beforeEach(() => {
+    fns.reviewEmailVariables.mockResolvedValue(review)
+  })
+
+  it('shows the email on bone under the head, a copy each, and counts the send', async () => {
+    fns.openEmailCompose.mockResolvedValue(opening({ draft: held, to: [] }))
+    await open({ modal: 'email', new: 1, draft: DRAFT })
+    await press('Review')
+    const ground = dialog()?.querySelector('section[aria-label="Review"]')
+    expect(ground?.className).toContain('bg-bone')
+    expect(
+      dialog()?.querySelector('[data-review-card] [data-review-from]')
+        ?.textContent,
+    ).toBe('anish@fund.example')
+    expect(footButtons()).toEqual(['Back to draft', 'Send 2 emails'])
+  })
+
+  it('keeps a fill made in Review when the window closes and the draft opens again', async () => {
+    let saved: EmailDraft = held
+    fns.saveEmailDraft.mockImplementation(
+      ({ data }: { data: Omit<EmailDraft, 'updatedAt' | 'attachments'> }) => {
+        saved = { ...data, attachments: [], updatedAt: held.updatedAt }
+        return Promise.resolve({ id: DRAFT, updatedAt: held.updatedAt })
+      },
+    )
+    fns.openEmailCompose.mockImplementation(() =>
+      Promise.resolve(opening({ draft: saved, to: [] })),
+    )
+    await open({ modal: 'email', new: 1, draft: DRAFT })
+    await press('Review')
+    const cell = fillCell()
+    if (cell === null) throw new Error('no fill row')
+    Object.getOwnPropertyDescriptor(
+      HTMLInputElement.prototype,
+      'value',
+    )?.set?.call(cell, 'Priya')
+    act(() => {
+      cell.dispatchEvent(new Event('input', { bubbles: true }))
+    })
+    // Closed before the autosave's pause: the close saves it.
+    await open({})
+    expect(dialog()).toBeNull()
+    expect(saved.to).toEqual([
+      DEV,
+      { ...PRIYA, fills: { 'name.first': 'Priya' } },
+    ])
+    await open({ modal: 'email', new: 1, draft: DRAFT })
+    await press('Review')
+    // Nothing is flagged now, so Dev's copy opens first; Priya's holds the fill.
+    act(() =>
+      document
+        .querySelector<HTMLElement>(`[data-review-row="${PRIYA.email}"]`)
+        ?.click(),
+    )
+    expect(fillCell()?.value).toBe('Priya')
+    expect(
+      [...document.querySelectorAll('button')]
+        .find((b) => b.textContent.trim() === 'Send 2 emails')
+        ?.hasAttribute('disabled'),
+    ).toBe(false)
   })
 })

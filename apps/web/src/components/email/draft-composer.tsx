@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { formatBytes } from '@spaces/core/documents'
-import { parseVariables } from '@spaces/core/templates/variables'
 import { formatTime } from '@spaces/core/format'
 import { FileGlyph } from '#/components/files/file-glyph'
 import { SaveAsTemplateAction, TemplatePicker } from '#/components/templates'
@@ -22,17 +21,20 @@ import { Segmented } from '#/components/ui/segmented'
 import { fileType } from '#/lib/documents/files-tab'
 import { uploadDocument } from '#/lib/documents/upload'
 import {
-  NO_CHOICES,
-  openBlanks,
+  choicesOf,
+  messageCount,
+  openBlankCount,
+  reviewCopies,
   saveInput,
+  sendLabel,
   switchMode,
   useDraftAutosave,
+  withChoices,
   withTemplate,
   useDraftsChanged,
 } from '#/lib/email/compose'
 import type { DraftState, ReviewChoices } from '#/lib/email/compose'
 import {
-  deleteEmailDraft,
   getEmailSender,
   getEmailTemplate,
   listEmailVariables,
@@ -50,22 +52,28 @@ import type {
   VariableReview,
 } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
+import { useDeleteDraft } from './delete-draft'
 import { AddressRow, RecipientLine } from './recipient-line'
 import { ReviewPanes } from './variable-review'
 
 /**
- * The composer (inline under a message, or in its own window): the mode,
- * the address block, the subject, the body and the files, the tool row,
- * then the foot.
+ * The composer (the last card of a thread, the Email page's pane, or its
+ * own window): the mode, the address block, the subject, the body and the
+ * files, the tool row, then the foot.
  * - Cc and Bcc open from the address block and are closed when empty.
  * - Autosaved after `AUTOSAVE_MS` of quiet; Cancel and closing keep the row;
  *   `Delete draft…` in the tool row's `···` deletes it.
- * - A draft with `{{variables}}` is reviewed before it sends: the primary is
- *   Review and send, and Send appears once no recipient has an open blank.
+ * - Every send passes Review: the primary is Review, which shows the email
+ *   as the card it will become (`ReviewPanes`), a copy per To recipient when
+ *   it has variables. Review's primary counts what goes (`Send 3 emails`)
+ *   and stays off while a blank is open. Its fills live on the To chips, so
+ *   they are saved with the draft.
+ * - A draft is reviewed without a mailbox; the send is not. Where Send
+ *   would stand, Review's foot links to connecting Gmail, or is Reconnect
+ *   Gmail when the mailbox asks to sign in again.
  * - Send saves the draft, then hands its id and Review's fills to the
- *   Gmail plugin and waits, the draft greyed; a failure keeps the draft and
- *   says why. A mailbox that asks to sign in again makes the primary
- *   Reconnect Gmail. ⌘↵ is the primary, in its tooltip.
+ *   Gmail plugin and waits, the draft greyed; a failure keeps Review open
+ *   and says why. ⌘↵ is the primary, in its tooltip.
  */
 
 type ReplyMode = keyof ReplyOpening['modes']
@@ -172,11 +180,15 @@ export function DraftComposer({
   const [failure, setFailure] = useState<Failure | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [review, setReview] = useState<VariableReview | null>(null)
-  const [choices, setChoices] = useState<ReviewChoices>(NO_CHOICES)
   const [reviewing, setReviewing] = useState(false)
   const [templating, setTemplating] = useState(false)
   const [sender, setSender] = useState<EmailSender | null>(null)
   const { confirm, confirmDialog } = useConfirm()
+  const deleting = useDeleteDraft()
+  // Review's fills and accepted blanks ride on the To chips, saved with the draft.
+  const choices = choicesOf(draft.to)
+  const setChoices = (next: ReviewChoices) =>
+    edit({ to: withChoices(draft.to, next) })
   const inflight = useRef<Promise<void>>(Promise.resolve())
   const body = useRef<HTMLTextAreaElement>(null)
   const draftsChanged = useDraftsChanged()
@@ -264,11 +276,12 @@ export function DraftComposer({
       onSaved?.(saved.updatedAt)
       // Counted now: a refused send keeps the draft.
       draftsChanged()
+      const settled = choicesOf(draft.to)
       const sent = await sendEmailDraft({
         data: {
           draftId: draft.id,
-          fills: typedFills(choices),
-          accepted: [...choices.accepted],
+          fills: typedFills(settled),
+          accepted: [...settled.accepted],
         },
       })
       draftsChanged()
@@ -343,21 +356,12 @@ export function DraftComposer({
   }
 
   async function deleteDraft() {
-    if (
-      !(await confirm({
-        title: 'Delete this draft?',
-        body: 'What you wrote here goes.',
-        action: 'Delete',
-        kind: 'destructive',
-      }))
-    )
-      return
-    autosave.cancel()
-    await inflight.current
     try {
-      await deleteEmailDraft({ data: { id: draft.id } })
-      draftsChanged()
-      onClose()
+      const gone = await deleting.deleteDraft(draft.id, async () => {
+        autosave.cancel()
+        await inflight.current
+      })
+      if (gone) onClose()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not delete')
     }
@@ -366,17 +370,16 @@ export function DraftComposer({
   const saved = saving ? 'Saving…' : savedLine(savedAt)
   // A reply's mode row carries the saved line; without it, the foot does.
   const modeRow = modes !== null && draft.mode !== 'new'
-  const variables =
-    parseVariables(`${draft.subject}\n${draft.bodyMd}`).length > 0
-  const open =
+  const copies =
     review === null
-      ? 0
-      : review.rows.reduce((sum, r) => sum + openBlanks(r, choices).length, 0)
-  const sendable = review === null ? !variables : open === 0
+      ? []
+      : reviewCopies(review.rows, draft.to, review.paths.length > 0)
+  const open = openBlankCount(copies, choices)
   const busy = sending || reviewing
   const reconnect =
     failure?.reconnect ??
     (sender?._tag === 'reconnect' ? sender.connectionId : null)
+  const ready = sender?._tag === 'ready' && reconnect === null
   const fromOriginal = new Set(
     draft.mode === 'forward' && modes !== null
       ? modes.forward.attachments.map((a) => a.documentId)
@@ -384,9 +387,9 @@ export function DraftComposer({
   )
 
   function primary() {
-    if (busy || sender === null || sender._tag !== 'ready') return
-    if (sendable) void send()
-    else if (review === null) void startReview()
+    if (busy) return
+    if (review === null) void startReview()
+    else if (ready && open === 0) void send()
   }
 
   const note: ReactNode = sending ? (
@@ -398,12 +401,12 @@ export function DraftComposer({
     <span data-send-failed className="text-destructive">
       ■ Not sent · {failure.message}
     </span>
-  ) : review !== null ? (
-    "Can't be unsent · goes at once"
-  ) : modeRow || saved === null ? null : (
+  ) : review !== null || modeRow || saved === null ? null : (
     // Without the mode row, the foot is where the save is told.
     <span data-saved>{saved}</span>
   )
+  const sendFrom =
+    sender === null || sender._tag === 'unavailable' ? null : sender.from
 
   return (
     <>
@@ -411,6 +414,10 @@ export function DraftComposer({
         className={cn(
           'flex min-h-0 flex-1 flex-col overflow-y-auto',
           card ? 'gap-2 bg-bone p-3' : '-mx-4',
+          // Review's bone runs from the window's head to its foot.
+          !card &&
+            review !== null &&
+            'bg-bone in-data-[slot=dialog-content]:-mt-4',
           sending && 'pointer-events-none opacity-50',
         )}
         {...(sending ? { 'aria-busy': true } : {})}
@@ -421,14 +428,26 @@ export function DraftComposer({
           }
         }}
       >
-        {review === null ? above : null}
+        {above}
+        {review === null ? null : (
+          <ReviewPanes
+            review={review}
+            draft={draft}
+            choices={choices}
+            onChange={setChoices}
+            from={sendFrom}
+            card={card}
+          />
+        )}
         <div
           {...(card ? { 'data-draft-card': '' } : {})}
-          className={
+          className={cn(
             card
               ? 'flex shrink-0 flex-col border border-hairline bg-paper'
-              : 'contents'
-          }
+              : 'contents',
+            // Held while Review shows, so going back finds it as it was.
+            review !== null && 'hidden',
+          )}
         >
           {modes === null || draft.mode === 'new' ? null : (
             <div className="flex h-11 shrink-0 items-center gap-3 border-b border-rule px-4">
@@ -448,23 +467,8 @@ export function DraftComposer({
               )}
             </div>
           )}
-          {review === null ? null : (
-            <ReviewPanes
-              review={review}
-              choices={choices}
-              onChange={setChoices}
-              subject={draft.subject}
-              bodyMd={draft.bodyMd}
-            />
-          )}
           <div
-            className={
-              review !== null
-                ? 'hidden'
-                : card
-                  ? 'flex flex-col'
-                  : 'flex min-h-0 flex-1 flex-col'
-            }
+            className={card ? 'flex flex-col' : 'flex min-h-0 flex-1 flex-col'}
           >
             <section aria-label="Addresses" className="flex flex-col">
               <RecipientLine
@@ -592,56 +596,64 @@ export function DraftComposer({
       </div>
       <DialogFooter
         note={note}
-        {...(card ? { className: 'mx-0 mt-0 mb-0 shrink-0' } : {})}
+        {...(card
+          ? { className: 'mx-0 mt-0 mb-0 shrink-0' }
+          : review === null
+            ? {}
+            : { className: 'mt-0' })}
       >
         {review === null ? (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={sending}
-            onClick={() => void cancel()}
-          >
-            Cancel
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={sending}
+              onClick={() => void cancel()}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              shortcut="⌘↵"
+              pending={reviewing}
+              disabled={busy}
+              onClick={primary}
+            >
+              Review
+            </Button>
+          </>
         ) : (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={sending}
-            onClick={() => setReview(null)}
-          >
-            Back to draft
-          </Button>
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={sending}
+              onClick={() => setReview(null)}
+            >
+              Back to draft
+            </Button>
+            {reconnect !== null ? (
+              <Button asChild>
+                <a data-reconnect href={reconnectHref(reconnect)}>
+                  Reconnect Gmail
+                </a>
+              </Button>
+            ) : sender !== null && sender._tag === 'unavailable' ? (
+              <SendBlocked sender={sender} />
+            ) : (
+              <Button
+                type="button"
+                shortcut="⌘↵"
+                pending={sending}
+                // Off while a blank is open; the flagged copy says which.
+                disabled={busy || sender === null || open > 0}
+                onClick={primary}
+              >
+                {sendLabel(messageCount(copies.length))}
+              </Button>
+            )}
+          </>
         )}
-        {reconnect !== null ? (
-          <Button asChild>
-            <a data-reconnect href={reconnectHref(reconnect)}>
-              Reconnect Gmail
-            </a>
-          </Button>
-        ) : sender !== null && sender._tag === 'unavailable' ? (
-          <SendBlocked sender={sender} />
-        ) : sendable ? (
-          <Button
-            type="button"
-            shortcut="⌘↵"
-            pending={sending}
-            disabled={busy || sender === null}
-            onClick={primary}
-          >
-            Send
-          </Button>
-        ) : review === null ? (
-          <Button
-            type="button"
-            shortcut="⌘↵"
-            pending={reviewing}
-            disabled={busy || sender === null}
-            onClick={primary}
-          >
-            Review and send
-          </Button>
-        ) : null}
       </DialogFooter>
       {templating ? (
         <SaveAsTemplateAction
@@ -662,6 +674,7 @@ export function DraftComposer({
         />
       ) : null}
       {confirmDialog}
+      {deleting.confirmDialog}
     </>
   )
 }

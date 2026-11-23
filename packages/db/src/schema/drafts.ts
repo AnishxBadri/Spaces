@@ -28,12 +28,20 @@ export const emailDraftMode = pgEnum('email_draft_mode', [
 
 export type EmailDraftMode = (typeof emailDraftMode.enumValues)[number]
 
-/** One recipient chip: the address chosen, and the person it is an alias of. */
+/**
+ * One recipient chip: the address chosen, and the person it is an alias of.
+ * A To chip also carries what Review settled for that recipient's copy, so a
+ * fill outlives the composer; send reads them only from To.
+ */
 export type DraftRecipient = {
   email: string
   /** The person record whose alias `email` is; absent for a new address. */
   entityId?: string
   name?: string
+  /** Review's fills for this copy, by variable path. */
+  fills?: { [path: string]: string }
+  /** This copy's remaining blanks go out empty. */
+  blank?: boolean
 }
 
 /** A document the draft carries; read through `canReadDocumentSql`. */

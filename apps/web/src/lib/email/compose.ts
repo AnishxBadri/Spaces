@@ -312,3 +312,71 @@ export function openBlanks(
   const filled = choices.fills[row.email] ?? {}
   return row.blanks.filter((p) => (filled[p] ?? '').trim() === '')
 }
+
+/** Review's choices as the draft holds them: on each To chip. */
+export function choicesOf(to: ReadonlyArray<DraftRecipient>): ReviewChoices {
+  return {
+    fills: Object.fromEntries(
+      to.flatMap((r) => (r.fills === undefined ? [] : [[r.email, r.fills]])),
+    ),
+    accepted: to.filter((r) => r.blank === true).map((r) => r.email),
+  }
+}
+
+/**
+ * The To chips with Review's choices written onto them, so a fill is saved
+ * with the draft. Empty fills are not kept.
+ */
+export function withChoices(
+  to: ReadonlyArray<DraftRecipient>,
+  choices: ReviewChoices,
+): Array<DraftRecipient> {
+  return to.map((r) => {
+    const chip: DraftRecipient = {
+      email: r.email,
+      ...(r.entityId === undefined ? {} : { entityId: r.entityId }),
+      ...(r.name === undefined ? {} : { name: r.name }),
+    }
+    const typed = Object.entries(choices.fills[chip.email] ?? {}).flatMap(
+      ([path, value]): Array<[string, string]> =>
+        value === undefined || value === '' ? [] : [[path, value]],
+    )
+    return {
+      ...chip,
+      ...(typed.length === 0 ? {} : { fills: Object.fromEntries(typed) }),
+      ...(choices.accepted.includes(chip.email) ? { blank: true } : {}),
+    }
+  })
+}
+
+/**
+ * The copies Review shows: one per To recipient when the draft has
+ * variables, else none, because one message goes to everyone.
+ */
+export function reviewCopies<TRow extends { email: string }>(
+  rows: ReadonlyArray<TRow>,
+  to: ReadonlyArray<DraftRecipient>,
+  variables: boolean,
+): Array<TRow> {
+  if (!variables) return []
+  const keys = new Set(to.map((r) => r.email.toLowerCase()))
+  return rows.filter((r) => keys.has(r.email.toLowerCase()))
+}
+
+/** How many messages a send makes: a copy each, or one to everyone. */
+export function messageCount(copies: number): number {
+  return Math.max(1, copies)
+}
+
+/** The primary in Review: `Send`, or `Send 3 emails`. */
+export function sendLabel(messages: number): string {
+  return messages === 1 ? 'Send' : `Send ${String(messages)} emails`
+}
+
+/** The blanks still open across the copies; Send stays off until none is. */
+export function openBlankCount(
+  copies: ReadonlyArray<{ email: string; blanks: ReadonlyArray<string> }>,
+  choices: ReviewChoices,
+): number {
+  return copies.reduce((sum, r) => sum + openBlanks(r, choices).length, 0)
+}

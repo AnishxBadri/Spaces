@@ -11,6 +11,7 @@ import {
 import { toast } from 'sonner'
 import { useClock } from '#/components/clock'
 import { EmailDialog, EmailPane } from '#/components/email-dialog'
+import { useDeleteDraft } from '#/components/email/delete-draft'
 import { DraftComposer } from '#/components/email/draft-composer'
 import { PaneHead } from '#/components/email/pane-head'
 import { Band } from '#/components/ledger-section'
@@ -26,6 +27,7 @@ import { ListFoot } from '#/components/table/list-foot'
 import { ListErrorRow, ListLoadingRow } from '#/components/table/list-states'
 import { Twinkle } from '#/components/twinkle'
 import { Input } from '#/components/ui/input'
+import { MoreMenu } from '#/components/ui/more-menu'
 import { Segmented } from '#/components/ui/segmented'
 import { FolderBody, Tabs } from '#/components/ui/tabs'
 import {
@@ -431,6 +433,18 @@ function DraftsFolder({
   onClose: () => void
 }) {
   const { now } = useClock()
+  const deleting = useDeleteDraft()
+
+  async function remove(id: string) {
+    // The open draft's pane goes first, so no save of it lands after the delete.
+    if (id === open) onClose()
+    try {
+      await deleting.deleteDraft(id)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not delete')
+    }
+  }
+
   return (
     <FolderBody label="Drafts" className="min-h-0 flex-1 flex-row">
       <div data-draft-list className={LIST_PANE}>
@@ -454,6 +468,7 @@ function DraftsFolder({
                   day={threadDay(r.updatedAt, now)}
                   selected={r.id === open}
                   onSelect={() => onSelect(r.id)}
+                  onDelete={() => void remove(r.id)}
                 />
               ))}
             </ol>
@@ -465,6 +480,7 @@ function DraftsFolder({
           <DraftPane key={open} id={open} onClose={onClose} />
         ) : null}
       </div>
+      {deleting.confirmDialog}
     </FolderBody>
   )
 }
@@ -472,24 +488,29 @@ function DraftsFolder({
 /**
  * One draft: the subject with when it was saved, then the mode and who it
  * goes to. One whose send failed leads with a crimson square and `Not sent`.
+ * Its `···` (on hover, after the saved lane) is Open and Delete draft….
  */
 function DraftListRow({
   row,
   day,
   selected,
   onSelect,
+  onDelete,
 }: {
   row: DraftItem
   day: string
   selected: boolean
   onSelect: () => void
+  onDelete: () => void
 }) {
   const notSent = row.notSent === true
+  const subject = row.subject === '' ? '(no subject)' : row.subject
   return (
     <li
       data-draft={row.id}
+      data-row
       {...(selected ? { 'data-selected': '' } : {})}
-      className="border-b border-rule"
+      className="relative border-b border-rule"
     >
       <button
         type="button"
@@ -513,7 +534,7 @@ function DraftListRow({
               row.subject === '' ? 'text-graphite' : 'text-foreground',
             )}
           >
-            {row.subject === '' ? '(no subject)' : row.subject}
+            {subject}
           </span>
           <span
             className={cn(
@@ -523,11 +544,32 @@ function DraftListRow({
           >
             {notSent ? 'Not sent' : `Saved ${day}`}
           </span>
+          {/* The `···` lane, so the saved lane ends clear of it. */}
+          <span aria-hidden className="w-6 shrink-0" />
         </span>
         <span className="min-w-0 truncate pl-7 text-label text-graphite">
           {draftLine(row)}
         </span>
       </button>
+      <MoreMenu
+        variant="row"
+        label={`draft ${subject}`}
+        className="absolute top-1.75 right-(--inset)"
+        items={[
+          {
+            label: 'Open',
+            icon: <icon.open />,
+            onSelect,
+          },
+          {
+            label: 'Delete draft…',
+            icon: <icon.delete />,
+            opens: true,
+            destructive: true,
+            onSelect: onDelete,
+          },
+        ]}
+      />
     </li>
   )
 }

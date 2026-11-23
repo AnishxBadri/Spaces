@@ -81,6 +81,7 @@ const fns = vi.hoisted(() => ({
   fileDocument: vi.fn(),
   listRecordDocuments: vi.fn(),
   listEmailVariables: vi.fn(),
+  reviewEmailVariables: vi.fn(),
   searchEntities: vi.fn(),
   fileInteractionOnEntity: vi.fn(),
   unlinkInteractionFromEntity: vi.fn(),
@@ -959,9 +960,55 @@ describe('a reply (E3)', () => {
     expect(draft?.querySelector('[data-tool-row]')?.textContent).toContain(
       'Attach',
     )
-    // The composer's own foot: Cancel and Send.
+    // The composer's own foot: Cancel and Review.
     expect(buttons('Cancel')).toHaveLength(1)
+    expect(buttons('Review')).toHaveLength(1)
+    expect(buttons('Send')).toHaveLength(0)
+  })
+
+  it('reviews the reply in place: the draft card turns into the card as it goes, the foot Back to draft and Send', async () => {
+    fns.getEmail.mockResolvedValue({
+      ...HTML,
+      body: { kind: 'text', text: 'Q3 closed ahead of plan.' },
+    })
+    fns.openEmailReply.mockResolvedValue(OPENING)
+    fns.reviewEmailVariables.mockResolvedValue({
+      paths: [],
+      rows: [
+        {
+          email: 'jane@acme-robotics.example',
+          name: 'Jane Founder',
+          values: {},
+          blanks: [],
+        },
+      ],
+    })
+    await open(RECORD)
+    act(() => buttons('Reply')[0]?.click())
+    await settle()
+    typeBody('Thanks Jane — the numbers look right.')
+    act(() => buttons('Review')[0]?.click())
+    await settle()
+    // The thread stays above; the draft card gives way to Review's card.
+    expect(cards()).toEqual([`folded ${ID}`])
+    const review = dialog()?.querySelector('[data-review-card]')
+    expect(review?.querySelector('[data-sender-line]')?.textContent).toBe(
+      'You → Jane Founder',
+    )
+    expect(review?.querySelector('[data-review-body]')?.textContent).toBe(
+      'Thanks Jane — the numbers look right.',
+    )
+    expect(
+      dialog()
+        ?.querySelector('[data-draft-card]')
+        ?.classList.contains('hidden'),
+    ).toBe(true)
+    expect(buttons('Back to draft')).toHaveLength(1)
     expect(buttons('Send')).toHaveLength(1)
+    expect(buttons('Cancel')).toHaveLength(0)
+    act(() => buttons('Back to draft')[0]?.click())
+    expect(dialog()?.querySelector('[data-review-card]')).toBeNull()
+    expect(body()).toBe('Thanks Jane — the numbers look right.')
   })
 
   it('forwards an earlier message from its own ···, the earlier cards kept', async () => {
@@ -1110,7 +1157,7 @@ describe('the Email page’s pane', () => {
     )
   })
 
-  it('grows the reply as the last card, its Cancel and Send at the pane’s foot', async () => {
+  it('grows the reply as the last card, its Cancel and Review at the pane’s foot', async () => {
     fns.openEmailReply.mockResolvedValue({
       draft: null,
       modes: {
@@ -1151,7 +1198,7 @@ describe('the Email page’s pane', () => {
     await settle()
     expect(pane()?.querySelector('[data-draft-card]')).not.toBeNull()
     expect(buttons('Cancel')).toHaveLength(1)
-    expect(buttons('Send')).toHaveLength(1)
+    expect(buttons('Review')).toHaveLength(1)
     // The head keeps the subject and drops Reply while the draft is open.
     expect(
       [...(pane()?.querySelectorAll('[data-pane-head] button') ?? [])].map(

@@ -5,8 +5,9 @@ import { expect, test } from '../harness/fixtures.ts'
 /**
  * A new email started from a company's Interactions tab, against `main`:
  * `New email` opens the composer as a window over the record with To
- * filled with the person last emailed there, what is typed is saved, and
- * after Esc the draft is under Email › Drafts. The company and its person
+ * filled with the person last emailed there, what is typed is saved, Review
+ * shows it as its card, and after Esc the draft is under Email › Drafts with
+ * its row's `···`. The company and its person
  * are written straight into the instance's own database, since this suite
  * imports nothing internal.
  */
@@ -93,6 +94,23 @@ test('starts an email from a company’s Interactions tab and finds the draft un
   await win.getByLabel('Message').fill('Hi Dev, three things before Friday.')
   await expect(win.locator('[data-saved]')).toHaveText(/^Saved \d\d:\d\d$/)
 
+  // Every send passes Review: the email as its card, on bone. This instance
+  // has no Gmail, so where Send would stand is the link to connect it.
+  await win.getByRole('button', { name: 'Review', exact: true }).click()
+  const card = win.locator('[data-review-card]')
+  await expect(card.locator('[data-sender-line]')).toHaveText('You → Dev Shah')
+  await expect(card.locator('[data-review-body]')).toHaveText(
+    'Hi Dev, three things before Friday.',
+  )
+  await expect(
+    win.getByRole('button', { name: 'Back to draft', exact: true }),
+  ).toBeVisible()
+  await expect(win.locator('[data-send-blocked]')).toHaveText(
+    'Connect Gmail to send ›',
+  )
+  await win.getByRole('button', { name: 'Back to draft', exact: true }).click()
+  await expect(card).toHaveCount(0)
+
   await adminPage.keyboard.press('Escape')
   await expect(win).toHaveCount(0)
   expect(new URL(adminPage.url()).searchParams.get('tab')).toBe('interactions')
@@ -103,4 +121,12 @@ test('starts an email from a company’s Interactions tab and finds the draft un
   })
   await expect(draft).toBeVisible()
   await expect(draft).toContainText('Dev Shah')
+
+  // The row's `···`: Open and Delete draft….
+  await draft.hover()
+  await draft.getByRole('button', { name: /^More for draft/ }).click()
+  await expect(adminPage.getByRole('menuitem')).toHaveText([
+    'Open',
+    'Delete draft…',
+  ])
 })

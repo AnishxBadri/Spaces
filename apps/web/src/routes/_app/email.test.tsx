@@ -21,8 +21,8 @@ import type { DraftRow, EmailThreadPage } from '#/lib/server-fns'
  * lines a row and `Draft` before the day; the three filters and the foot's
  * paging each asking the server again; the selected thread in the right
  * pane at 1440 and in the window below the split; Drafts with its count,
- * `Saved <day>` and the mode line, its composer in the pane, `No drafts.`
- * when there are none.
+ * `Saved <day>` and the mode line, its composer in the pane, a row's `···`
+ * (Open, Delete draft…), `No drafts.` when there are none.
  */
 
 const fns = vi.hoisted(() => ({
@@ -30,6 +30,7 @@ const fns = vi.hoisted(() => ({
   listEmailDrafts: vi.fn(),
   getEmailDraft: vi.fn(),
   openEmailCompose: vi.fn(),
+  deleteEmailDraft: vi.fn(),
 }))
 
 vi.mock('#/lib/server-fns', async (importOriginal) => ({
@@ -416,6 +417,57 @@ describe('Drafts', () => {
     expect(
       document.querySelector(`[data-stub-composer="${D1}"]`),
     ).not.toBeNull()
+  })
+
+  /** Opens a draft row's `···` and returns its items. */
+  async function rowMenu(id: string) {
+    const trigger = document.querySelector(
+      `[data-draft="${id}"] [aria-label^="More for draft"]`,
+    )
+    if (!(trigger instanceof HTMLElement)) throw new Error('no ···')
+    act(() => {
+      trigger.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      )
+    })
+    await settle()
+    return [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+  }
+
+  it('gives each row a ···: Open and Delete draft…, each led by its mark', async () => {
+    await mount('/email?tab=drafts')
+    const items = await rowMenu(D1)
+    expect(items.map((i) => i.textContent.trim())).toEqual([
+      'Open',
+      'Delete draft…',
+    ])
+    for (const item of items) expect(item.querySelector('svg')).not.toBeNull()
+    click(items.at(0))
+    await settle()
+    expect(fns.getEmailDraft).toHaveBeenCalledWith({ data: { id: D1 } })
+    expect(
+      document.querySelector(`[data-stub-composer="${D1}"]`),
+    ).not.toBeNull()
+  })
+
+  it('deletes a draft from its row after the composer’s confirm', async () => {
+    fns.deleteEmailDraft.mockResolvedValue({ ok: true })
+    await mount('/email?tab=drafts')
+    const items = await rowMenu(D1)
+    click(items.find((i) => i.textContent.trim() === 'Delete draft…'))
+    await settle()
+    const dialog = document.querySelector(
+      '[role="alertdialog"], [role="dialog"]',
+    )
+    expect(
+      dialog?.querySelector('[data-slot="dialog-title"]')?.textContent,
+    ).toBe('Delete this draft?')
+    expect(fns.deleteEmailDraft).not.toHaveBeenCalled()
+    fns.listEmailDrafts.mockResolvedValue(DRAFTS.slice(1))
+    click(byText('button', 'Delete'))
+    await settle()
+    expect(fns.deleteEmailDraft).toHaveBeenCalledWith({ data: { id: D1 } })
+    expect(document.querySelector(`[data-draft="${D1}"]`)).toBeNull()
   })
 
   it('says so when there are none', async () => {

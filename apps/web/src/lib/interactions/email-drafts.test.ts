@@ -196,6 +196,19 @@ describe('a draft', () => {
     expect(back.to).toEqual([{ email: 'dana@flent.example' }])
   })
 
+  it('keeps Review’s fills and a left blank on its To chips', async () => {
+    const reviewed = save({
+      bodyMd: 'Hi {{name.first}}',
+      to: [
+        { email: 'dana@flent.example', fills: { 'name.first': 'Dana' } },
+        { email: 'ops@northgate.example', blank: true },
+      ],
+    })
+    await run(saveDraftProgram(ME, reviewed))
+    const back = await run(getDraftProgram(ME, reviewed.id))
+    expect(back.to).toEqual(reviewed.to)
+  })
+
   it('reads back only the attachments its author may read', async () => {
     const shared = await aDocument('flent-ic-note.pdf')
     const hidden = await aDocument('her-notes.pdf')

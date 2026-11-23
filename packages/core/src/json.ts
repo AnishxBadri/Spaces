@@ -275,6 +275,13 @@ const draftRecipientSchema = Schema.Struct({
   email: emailString.check(Schema.isMaxLength(320)),
   entityId: Schema.optionalKey(uuidString),
   name: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(400))),
+  fills: Schema.optionalKey(
+    Schema.Record(
+      Schema.String.check(Schema.isMaxLength(200)),
+      Schema.String.check(Schema.isMaxLength(2000)),
+    ),
+  ),
+  blank: Schema.optionalKey(Schema.Boolean),
 }).annotate(strict)
 
 /** A draft's recipients: one line of chips, at most 100. */
