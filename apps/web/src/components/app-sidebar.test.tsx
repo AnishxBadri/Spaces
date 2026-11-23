@@ -53,12 +53,6 @@ vi.mock('#/lib/server-fns', () => ({
   listMembers: vi.fn(async () => served.members),
 }))
 
-// The Drafts row's door, watched rather than opened.
-vi.mock('#/lib/email/compose', async (importOriginal) => ({
-  ...(await importOriginal<typeof ComposeModule>()),
-  openDrafts: vi.fn(),
-}))
-
 const win = new Window({ url: 'http://localhost/' })
 let createRoot: typeof CreateRoot
 let sidebar: typeof SidebarModule
@@ -244,6 +238,7 @@ describe('the chassis', () => {
       'Spaces',
       'Notes',
       'Meetings',
+      'Email',
       'Files',
       'Feeds',
       'Companies',
@@ -283,7 +278,7 @@ describe('the chassis', () => {
     expect(rows()).toEqual(
       ['Today', 'Tasks', 'Spaces'].concat(['Companies', 'People', 'Deals']),
     )
-    expect(button(/^Library/).textContent).toContain('▸ 4')
+    expect(button(/^Library/).textContent).toContain('▸ 5')
     expect(button(/^Library/).getAttribute('aria-expanded')).toBe('false')
     expect(button(/^Capital/).textContent).toContain('▸ 2')
 
@@ -321,7 +316,7 @@ describe('the chassis', () => {
     for (const n of [1, 2, 3, 4, 5, 6])
       prefs.toggleStarredSpace({ id: `s${n}`, name: `Space ${n}` })
     await mount('/today')
-    const after = rows().slice(rows().indexOf('Spaces') + 1, -9)
+    const after = rows().slice(rows().indexOf('Spaces') + 1, -10)
     expect(after).toEqual([
       'Space 1',
       'Space 2',
@@ -429,50 +424,49 @@ describe('the chassis', () => {
     expect(pathname()).toBe('/settings')
   })
 
-  it('draws no Drafts row under Library while there are none', async () => {
+  const emailLane = () => {
+    const lane = nav().querySelector('a[href="/email"]')?.lastElementChild
+    if (!lane) throw new Error('no email lane')
+    return lane
+  }
+
+  it('draws Email after Meetings with its key while there are no drafts', async () => {
     await mount('/today')
-    expect(document.querySelector('[data-drafts-row]')).toBeNull()
+    const email = nav().querySelector('a[href="/email"]')
+    expect(email?.previousElementSibling?.getAttribute('href')).toBe(
+      '/meetings',
+    )
+    expect(emailLane().textContent).toBe('G I')
+    expect(emailLane().className).toContain('text-graphite')
     expect(document.body.textContent).not.toContain('Drafts')
   })
 
-  it('draws Drafts after the last Library row with the count, a button that opens the drafts window', async () => {
+  it('prints the draft count in Email’s lane, in ink, while there is one', async () => {
     served.drafts = 2
-    const opened = vi.mocked(compose.openDrafts)
-    opened.mockClear()
     await mount('/files')
-    const row = one('[data-drafts-row]')
-    expect(row.tagName).toBe('BUTTON')
-    expect(row.textContent).toBe('Drafts2')
-    expect(row.hasAttribute('aria-current')).toBe(false)
-    const feeds = nav().querySelector('a[href="/feeds"]')
-    expect(feeds?.nextElementSibling).toBe(row)
-    // Library counts it while folded.
+    expect(emailLane().textContent).toBe('2')
+    expect(emailLane().className).toContain('text-foreground')
+    // Still one row of Library, folded or not.
     click(button(/^Library/))
     expect(button(/^Library/).textContent).toContain('▸ 5')
-    click(button(/^Library/))
-    if (!(row instanceof HTMLElement)) throw new Error('no Drafts row')
-    act(() => row.click())
-    expect(opened).toHaveBeenCalledTimes(1)
   })
 
-  it('draws Drafts as a mark with its count in the tip when collapsed', async () => {
+  it('keeps Email a plain mark when collapsed', async () => {
     served.drafts = 2
     await mount('/today', [], { collapsed: true })
-    const row = one('[data-drafts-row]')
-    expect(row.getAttribute('aria-label')).toBe('Drafts · 2')
-    const feeds = nav().querySelector('a[href="/feeds"]')
-    expect(feeds?.nextElementSibling).toBe(row)
+    expect(nav().querySelector('a[href="/email"]')).not.toBeNull()
+    expect(document.querySelector('[data-drafts-row]')).toBeNull()
   })
 
-  it('draws Drafts in the phone drawer too', async () => {
+  it('prints the count in the phone drawer too', async () => {
     served.drafts = 1
     await mount('/today', [], { drawer: true })
-    expect(one('[data-drafts-row]').textContent).toBe('Drafts1')
+    expect(emailLane().textContent).toBe('1')
   })
 
-  it('brings Drafts in with the first draft and out with the last, on invalidation', async () => {
+  it('brings the count in with the first draft and out with the last, on invalidation', async () => {
     await mount('/today')
-    expect(document.querySelector('[data-drafts-row]')).toBeNull()
+    expect(emailLane().textContent).toBe('G I')
     served.drafts = 1
     await act(async () => {
       await client.invalidateQueries({
@@ -480,7 +474,7 @@ describe('the chassis', () => {
       })
     })
     await settle()
-    expect(one('[data-drafts-row]').textContent).toBe('Drafts1')
+    expect(emailLane().textContent).toBe('1')
     served.drafts = 0
     await act(async () => {
       await client.invalidateQueries({
@@ -488,7 +482,7 @@ describe('the chassis', () => {
       })
     })
     await settle()
-    expect(document.querySelector('[data-drafts-row]')).toBeNull()
+    expect(emailLane().textContent).toBe('G I')
   })
 
   it('marks the current row by colour only — the same box as every row', async () => {

@@ -7,6 +7,7 @@ import { DraftComposer } from '#/components/email/draft-composer'
 import type { FileActions, ReplyMode } from '#/components/email/message-card'
 import { EmailThread } from '#/components/email/thread'
 import { AttachmentSidebar } from '#/components/email/attachment-sidebar'
+import { PaneHead } from '#/components/email/pane-head'
 import { useKeepCopy } from '#/components/files/keep-copy'
 import type { KeepCopy } from '#/components/files/keep-copy'
 import { NewerVersionDialog } from '#/components/files/newer-version-dialog'
@@ -90,6 +91,32 @@ export function EmailDialog({
         )}
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * The same thread as the Email page's right pane: the head carries the
+ * `···` and Reply, and there is no Done. A reply grows as the last card,
+ * its foot at the pane's foot.
+ */
+export function EmailPane({
+  id,
+  onClose,
+}: {
+  id: string
+  /** The thread left the pane: unlinked, or the read failed past repair. */
+  onClose: () => void
+}) {
+  return (
+    <div data-email-pane className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <EmailWindow
+        key={id}
+        id={id}
+        recordId={null}
+        frame="pane"
+        onClose={onClose}
+      />
+    </div>
   )
 }
 
@@ -365,12 +392,16 @@ type Viewing = {
 function EmailWindow({
   id,
   recordId,
+  frame = 'window',
   onClose,
 }: {
   id: string
   recordId: string | null
+  /** A dialog's head and foot, or a page pane's head with the acts in it. */
+  frame?: 'window' | 'pane'
   onClose: () => void
 }) {
+  const pane = frame === 'pane'
   const { today } = useClock()
   const router = useRouter()
   const { confirm, confirmDialog } = useConfirm()
@@ -574,40 +605,57 @@ function EmailWindow({
 
   const note =
     replyError ?? (email === null ? null : privacyNote(email.privacy))
+  // The thread's `···` and Reply: the window's foot holds them, a pane's head.
+  const acts =
+    email === null ? null : (
+      <>
+        <MoreMenu
+          variant="head"
+          label={email.subject || 'email'}
+          forceMenu
+          items={menu}
+        />
+        <PickPopover
+          open={filingDeal}
+          onOpenChange={setFilingDeal}
+          trigger={<span aria-hidden className="size-0" />}
+          placeholder="File on a deal…"
+          search={searchDeals}
+          onPick={async (deal) => {
+            const { filed } = await fileInteractionOnEntity({
+              data: { interactionId: id, entityId: deal.id },
+            })
+            toast(filed ? `Filed on ${deal.name}` : `Already on ${deal.name}`)
+            void router.invalidate()
+          }}
+        />
+        <Button onClick={() => void startDraft(email.id, 'reply')}>
+          Reply
+        </Button>
+      </>
+    )
   const foot = (
     <DialogFooter className={EDGE} {...(note === null ? {} : { note })}>
       <Button variant="outline" onClick={onClose}>
         Done
       </Button>
-      {email === null ? null : (
-        <>
-          <MoreMenu
-            variant="head"
-            label={email.subject || 'email'}
-            forceMenu
-            items={menu}
-          />
-          <PickPopover
-            open={filingDeal}
-            onOpenChange={setFilingDeal}
-            trigger={<span aria-hidden className="size-0" />}
-            placeholder="File on a deal…"
-            search={searchDeals}
-            onPick={async (deal) => {
-              const { filed } = await fileInteractionOnEntity({
-                data: { interactionId: id, entityId: deal.id },
-              })
-              toast(filed ? `Filed on ${deal.name}` : `Already on ${deal.name}`)
-              void router.invalidate()
-            }}
-          />
-          <Button onClick={() => void startDraft(email.id, 'reply')}>
-            Reply
-          </Button>
-        </>
-      )}
+      {acts}
     </DialogFooter>
   )
+
+  if (email === null && pane)
+    return (
+      <>
+        <PaneHead title="Email" />
+        <div className="flex min-h-48 flex-1 items-center justify-center bg-bone px-4">
+          {error === null ? (
+            <Twinkle size={29} />
+          ) : (
+            <p className="text-ui text-destructive">{error}</p>
+          )}
+        </div>
+      </>
+    )
 
   if (email === null)
     return (
@@ -698,7 +746,35 @@ function EmailWindow({
       {confirmDialog}
     </>
   )
-  const head = (
+  const size =
+    email.thread.messages < 2 ? null : plural(email.thread.messages, 'message')
+  // A pane has no foot: who reads the body, or why a reply did not open,
+  // stands before the thread's size in its head.
+  const paneHead = (
+    <PaneHead
+      title={email.subject || 'Untitled'}
+      context={
+        note === null ? (
+          size
+        ) : (
+          <>
+            <span
+              data-pane-note
+              className={replyError === null ? undefined : 'text-destructive'}
+            >
+              {note}
+            </span>
+            {size === null ? null : ` · ${size}`}
+          </>
+        )
+      }
+    >
+      {reply === null ? acts : null}
+    </PaneHead>
+  )
+  const head = pane ? (
+    paneHead
+  ) : (
     <DialogHeader className={cn(EDGE, 'flex-nowrap items-center')}>
       <Email
         data-window-mark
@@ -744,7 +820,7 @@ function EmailWindow({
       <div data-thread className={GROUND}>
         {thread}
       </div>
-      {foot}
+      {pane ? null : foot}
       {extras}
     </>
   )

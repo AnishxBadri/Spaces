@@ -9,7 +9,7 @@ import type {
 
 /**
  * The composer's client half: the draft it edits, the mode switch, the
- * autosave debounce and the store the sidebar's Drafts row opens through.
+ * autosave debounce and the store the full composer window opens through.
  * Imports types from the barrel and nothing that reaches a database.
  */
 
@@ -169,9 +169,9 @@ export function useDraftAutosave<T>(
 /** Which compose window is open, if any: a held draft, or a new email. */
 export type ComposeTarget = { draftId: string } | { draftId: null }
 
-type ComposeState = { drafts: boolean; compose: ComposeTarget | null }
+type ComposeState = { compose: ComposeTarget | null }
 
-let state: ComposeState = { drafts: false, compose: null }
+let state: ComposeState = { compose: null }
 const listeners = new Set<() => void>()
 
 function set(next: ComposeState) {
@@ -186,16 +186,11 @@ function subscribe(cb: () => void) {
   }
 }
 
-const CLOSED: ComposeState = { drafts: false, compose: null }
+const CLOSED: ComposeState = { compose: null }
 
-/** The sidebar's Drafts row: the drafts list. */
-export function openDrafts() {
-  set({ drafts: true, compose: null })
-}
-
-/** A draft from the list, or a new email; the list closes behind it. */
+/** A held draft, or a new email, in the composer's own window. */
 export function openCompose(target: ComposeTarget) {
-  set({ drafts: false, compose: target })
+  set({ compose: target })
 }
 
 export function closeCompose() {
@@ -203,7 +198,7 @@ export function closeCompose() {
 }
 
 /**
- * The windows' state, mounted once in the app shell. Server and first
+ * The window's state, mounted once in the app shell. Server and first
  * client render agree: both closed.
  */
 export function useComposeState(): ComposeState {
@@ -214,12 +209,15 @@ export function useComposeState(): ComposeState {
   )
 }
 
-/** The sidebar's query key for the drafts count. */
+/**
+ * The drafts' query key: the sidebar's count under it, and every list that
+ * reads a draft (the Email page's Drafts and Threads) under a longer key.
+ */
 export const EMAIL_DRAFTS_QUERY = 'email-drafts-count'
 
 /**
- * Marks the drafts count stale. Every save, send and trash calls it, so the
- * sidebar's Drafts row appears with the first draft and leaves with the last.
+ * Marks the drafts stale. Every save, send and trash calls it, so the
+ * sidebar's count and the Email page's lists follow without a reload.
  */
 export function useDraftsChanged(): () => void {
   const queryClient = useQueryClient()

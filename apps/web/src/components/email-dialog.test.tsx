@@ -10,7 +10,7 @@ import type {
   EmailThreadLine,
   ReplyOpening,
 } from '#/lib/server-fns'
-import { EmailModal } from './email-dialog'
+import { EmailModal, EmailPane } from './email-dialog'
 
 /**
  * The email window opened from `?modal=email&id=`: the thread as message
@@ -1057,5 +1057,105 @@ describe('a reply (E3)', () => {
     expect(dialog()?.querySelector('[data-saved]')?.textContent).toMatch(
       /^Saved \d\d:\d\d$/,
     )
+  })
+})
+
+describe('the Email page’s pane', () => {
+  const pane = () => document.querySelector('[data-email-pane]')
+
+  async function showPane(onClose: () => void = () => {}) {
+    act(() =>
+      root.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <EmailPane id={ID} onClose={onClose} />
+        </QueryClientProvider>,
+      ),
+    )
+    await settle()
+  }
+
+  it('reads the thread with its `···` and Reply in the head, and no Done', async () => {
+    fns.getEmail.mockResolvedValue({
+      ...HTML,
+      thread: { messages: 3, earlier: [] },
+    })
+    await showPane()
+    expect(dialog()).toBeNull()
+    const head = pane()?.querySelector('[data-pane-head]')
+    expect(head?.querySelector('h2')?.textContent).toBe(
+      'Acme Robotics — Q3 update',
+    )
+    expect(head?.textContent).toContain('3 messages')
+    expect(
+      head?.querySelector('[aria-label="More for Acme Robotics — Q3 update"]'),
+    ).not.toBeNull()
+    expect(
+      [...(head?.querySelectorAll('button') ?? [])].map((b) =>
+        b.textContent.trim(),
+      ),
+    ).toContain('Reply')
+    expect(buttons('Done')).toHaveLength(0)
+    expect(pane()?.querySelector(`[data-message="${ID}"]`)).not.toBeNull()
+  })
+
+  it('says who reads the body in the head, where a window puts it in the foot', async () => {
+    fns.getEmail.mockResolvedValue({
+      ...HTML,
+      privacy: { ...MINE, workspace: true },
+    })
+    await showPane()
+    expect(pane()?.querySelector('[data-pane-note]')?.textContent).toBe(
+      'Shared with the workspace',
+    )
+  })
+
+  it('grows the reply as the last card, its Cancel and Send at the pane’s foot', async () => {
+    fns.openEmailReply.mockResolvedValue({
+      draft: null,
+      modes: {
+        reply: {
+          mode: 'reply',
+          inReplyToId: ID,
+          to: [{ email: 'jane@acme-robotics.example', name: 'Jane Founder' }],
+          cc: [],
+          bcc: [],
+          subject: 'Re: Acme Robotics — Q3 update',
+          bodyMd: '',
+          attachments: [],
+        },
+        reply_all: {
+          mode: 'reply_all',
+          inReplyToId: ID,
+          to: [{ email: 'jane@acme-robotics.example', name: 'Jane Founder' }],
+          cc: [],
+          bcc: [],
+          subject: 'Re: Acme Robotics — Q3 update',
+          bodyMd: '',
+          attachments: [],
+        },
+        forward: {
+          mode: 'forward',
+          inReplyToId: ID,
+          to: [],
+          cc: [],
+          bcc: [],
+          subject: 'Fwd: Acme Robotics — Q3 update',
+          bodyMd: '',
+          attachments: [],
+        },
+      },
+    })
+    await showPane()
+    act(() => buttons('Reply')[0]?.click())
+    await settle()
+    expect(pane()?.querySelector('[data-draft-card]')).not.toBeNull()
+    expect(buttons('Cancel')).toHaveLength(1)
+    expect(buttons('Send')).toHaveLength(1)
+    // The head keeps the subject and drops Reply while the draft is open.
+    expect(
+      [...(pane()?.querySelectorAll('[data-pane-head] button') ?? [])].map(
+        (b) => b.textContent.trim(),
+      ),
+    ).not.toContain('Reply')
   })
 })

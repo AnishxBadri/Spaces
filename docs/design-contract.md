@@ -766,13 +766,13 @@ Every interactive element ships default, hover, focus-visible, active and disabl
 
 232px of bone with a hairline right edge. The workspace head (a menu: General,
 Members, Invite a member…), Search (`⌘K`), then Today, Tasks and Spaces with its starred
-spaces (five, then `▸ n more`), then Library (Notes, Meetings, Files, and Drafts only
-while the reader has one), Objects (the objects, then customs, each object's pinned
+spaces (five, then `▸ n more`), then Library (Notes, Meetings, Email, Files, Feeds),
+Objects (the objects, then customs, each object's pinned
 views under it) and Capital (Portfolio, Mandate), each folding per browser
 (`Library ▸ 3`). Overflow expands inline, never a dropdown. Rows are 30px with a 16px
 mark lane; the current row is a hairline box on paper, every row carries the same box,
-so nothing shifts. Counts only on Tasks and Drafts, ink, destructive only when a task
-is overdue. The foot is the Ask row (`⌘J`) above one account row, the initials square
+so nothing shifts. Counts only on Tasks and Email (the reader's drafts, when there are
+any), ink, destructive only when a task is overdue. The foot is the Ask row (`⌘J`) above one account row, the initials square
 and the name, whose menu opens to the right: `Signed in as …`, Settings (`G ,`),
 Keyboard (`?`), Sign out. Collapsed it is 48px of marks with no headings, names as ink
 tooltips; width snaps and is kept per browser. Below `md` it is a drawer under a 48px

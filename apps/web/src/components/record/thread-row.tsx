@@ -125,6 +125,49 @@ export function ThreadSubject({
   )
 }
 
+/**
+ * The narrow row a list pane draws (the Email page's Threads, 480px): three
+ * lines rather than two. The people move under the subject with the records
+ * the thread is filed on in ink, and the summary takes a line of its own.
+ * The whole row selects; the selected one is bone with a 2px ink bar.
+ */
+export type ThreadPaneRow = {
+  /** The records it is filed on, other than its people. */
+  records: ReadonlyArray<string>
+  /** The reader holds a draft on it: `Draft` in ink before the day. */
+  draft: boolean
+  /** The day lane, as the pane prints it (`10:42`, `Tue`, `9 Oct`). */
+  day: string
+  selected: boolean
+  onSelect: () => void
+}
+
+/** The clip and how many files, at a line's right end. */
+function Clip({ count, className }: { count: number; className?: string }) {
+  return (
+    <span
+      data-clip
+      className={cn(
+        'flex shrink-0 items-center justify-end gap-1 mono text-micro text-graphite',
+        className,
+      )}
+    >
+      <Attachment aria-label="attachments" className="size-4" />
+      {count}
+    </span>
+  )
+}
+
+/** The kind glyph in its 16px lane. */
+function KindMark({ kind }: { kind: string }) {
+  const Glyph = KIND_GLYPHS[kind] ?? Email
+  return (
+    <span className="flex w-4 shrink-0 justify-center">
+      <Glyph role="img" aria-label={kind} className="size-4 text-graphite" />
+    </span>
+  )
+}
+
 export function ThreadRow({
   item,
   messages = 1,
@@ -133,6 +176,7 @@ export function ThreadRow({
   highlighted = false,
   menu = null,
   summaryLines = 1,
+  pane,
 }: {
   item: ThreadItem
   /** The tab an email's window opens over. */
@@ -146,16 +190,99 @@ export function ThreadRow({
   menu?: ReactNode
   /** How many lines line two runs to: two in the Interactions tab, one elsewhere. */
   summaryLines?: 1 | 2
+  /** Drawn narrow, in a list pane, selecting rather than opening a window. */
+  pane?: ThreadPaneRow | undefined
 }) {
-  const Glyph = KIND_GLYPHS[item.kind] ?? Email
   const people = threadPeople(item)
   // Body-derived, so private with the body.
   const summary = item.privateBody ? null : item.summary
   // Opened from a link, the row may sit below the folder's fold.
   const row = useRef<HTMLLIElement>(null)
+  const shown = pane?.selected ?? highlighted
   useEffect(() => {
-    if (highlighted) row.current?.scrollIntoView({ block: 'nearest' })
-  }, [highlighted])
+    if (shown) row.current?.scrollIntoView({ block: 'nearest' })
+  }, [shown])
+  if (pane !== undefined) {
+    const lineThree = summary ?? item.attachmentNames.join(', ')
+    return (
+      <li
+        ref={row}
+        data-thread={item.id}
+        {...(pane.selected ? { 'data-selected': '' } : {})}
+        className={cn(!last && 'border-b border-rule')}
+      >
+        <button
+          type="button"
+          aria-current={pane.selected ? 'true' : undefined}
+          onClick={pane.onSelect}
+          className={cn(
+            'focus-ring-inset relative flex w-full flex-col gap-0.5 px-(--inset) py-2.25 text-left transition-colors duration-150 ease-out-quart hover:bg-row-hover',
+            pane.selected &&
+              'bg-bone before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-hairline',
+          )}
+        >
+          <span className="flex h-5 min-w-0 items-center gap-3">
+            <KindMark kind={item.kind} />
+            <span className="flex min-w-0 flex-1 items-baseline gap-2">
+              <span
+                className={cn(
+                  'min-w-0 truncate text-ui',
+                  item.subject === '' ? 'text-graphite' : 'text-foreground',
+                )}
+              >
+                {item.subject || 'Untitled'}
+              </span>
+              {messages > 1 ? (
+                <span
+                  data-messages
+                  className="shrink-0 mono text-micro text-graphite"
+                >
+                  {messages}
+                </span>
+              ) : null}
+            </span>
+            <span className="flex shrink-0 items-baseline gap-2 mono text-micro whitespace-nowrap text-graphite">
+              {pane.draft ? (
+                <span data-draft-mark className="text-foreground">
+                  Draft
+                </span>
+              ) : null}
+              <time dateTime={item.at}>{pane.day}</time>
+            </span>
+          </span>
+          {people === '' &&
+          pane.records.length === 0 &&
+          item.attachments === 0 ? null : (
+            <span className="flex h-4 min-w-0 items-center gap-3 pl-7">
+              <span
+                data-people
+                className="min-w-0 flex-1 truncate text-label text-graphite"
+              >
+                {people}
+                {pane.records.length === 0 ? null : (
+                  <span data-records className="text-foreground">
+                    {people === '' ? '' : ' · '}
+                    {pane.records.join(', ')}
+                  </span>
+                )}
+              </span>
+              {item.attachments > 0 ? <Clip count={item.attachments} /> : null}
+            </span>
+          )}
+          {lineThree === '' ? null : (
+            <span
+              {...(summary === null
+                ? { 'data-files': '' }
+                : { 'data-summary': '' })}
+              className="min-w-0 truncate pl-7 text-label text-graphite"
+            >
+              {lineThree}
+            </span>
+          )}
+        </button>
+      </li>
+    )
+  }
   return (
     <li
       ref={row}
@@ -169,13 +296,7 @@ export function ThreadRow({
       )}
     >
       <div className="flex h-5 min-w-0 items-center gap-3">
-        <span className="flex w-4 shrink-0 justify-center">
-          <Glyph
-            role="img"
-            aria-label={item.kind}
-            className="size-4 text-graphite"
-          />
-        </span>
+        <KindMark kind={item.kind} />
         <span className="flex min-w-0 flex-1 items-baseline gap-2">
           <ThreadSubject item={item} tab={tab} />
           {messages > 1 ? (
@@ -219,13 +340,7 @@ export function ThreadRow({
             {summary ?? item.attachmentNames.join(', ')}
           </p>
           {item.attachments > 0 ? (
-            <span
-              data-clip
-              className="flex w-22 shrink-0 items-center justify-end gap-1 mono text-micro text-graphite"
-            >
-              <Attachment aria-label="attachments" className="size-4" />
-              {item.attachments}
-            </span>
+            <Clip count={item.attachments} className="w-22" />
           ) : null}
         </div>
       )}

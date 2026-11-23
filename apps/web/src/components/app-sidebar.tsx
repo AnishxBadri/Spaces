@@ -47,7 +47,7 @@ import {
 import type { FoldableGroup } from '#/lib/chassis-prefs'
 import { objectIcon } from '#/lib/object-icons'
 import { listViewOf } from '#/lib/route-search'
-import { EMAIL_DRAFTS_QUERY, openDrafts } from '#/lib/email/compose'
+import { EMAIL_DRAFTS_QUERY } from '#/lib/email/compose'
 import {
   countEmailDrafts,
   listMembers,
@@ -71,8 +71,8 @@ import { cn } from '#/lib/utils'
  * - The foot's account row is one trigger: its menu holds Settings, Keyboard
  *   and Sign out. Upload is not here: it lives in ⌘K, on Files and in the
  *   first run.
- * - Drafts stands under Library only while the reader has one: a button that
- *   opens the drafts window, never the current page.
+ * - Email's lane holds the reader's draft count while it is not zero, in
+ *   place of its key.
  * - Collapsed it is 48px of marks only, with no group headings.
  * - The phone drawer prints no keys; Tasks' `n due` is data and stays.
  */
@@ -128,6 +128,8 @@ export const NAV_ITEMS = [
     key: 'G E',
     group: 'library',
   },
+  // Email takes I (inbox): E is Meetings.
+  { to: '/email', label: 'Email', icon: Email, key: 'G I', group: 'library' },
   // Files takes L (library): D is Deals.
   {
     to: '/files',
@@ -234,7 +236,7 @@ function usePinnedViewRows(): ReadonlyArray<PinnedView> {
 
 /**
  * The reader's unsent drafts, read on mount. Saving, sending and trashing a
- * draft invalidate the key, so the Drafts row comes and goes without a reload.
+ * draft invalidate the key, so Email's count comes and goes without a reload.
  */
 function useDraftsCount(): number {
   const { data } = useQuery({
@@ -313,7 +315,6 @@ export function AppSidebar({
         workspaceName={workspaceName}
         workspaceLogo={workspaceLogo}
         objects={objects}
-        drafts={drafts}
         onOpenCommand={onOpenCommand}
         onExpand={onToggleCollapsed}
         onKeyboard={onOpenKeyboard}
@@ -468,23 +469,24 @@ export function AppSidebar({
         <FoldGroup
           id="library"
           label="Library"
-          count={LIBRARY.length + (drafts > 0 ? 1 : 0)}
+          count={LIBRARY.length}
           folded={folded.includes('library')}
         >
-          {LIBRARY.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              icon={item.icon}
-              hint={chord(item.key)}
-              onClick={onNavigate}
-            >
-              {item.label}
-            </NavLink>
-          ))}
-          {drafts > 0 ? (
-            <DraftsRow count={drafts} onNavigate={onNavigate} />
-          ) : null}
+          {LIBRARY.map((item) => {
+            const counted = item.to === '/email' && drafts > 0
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                icon={item.icon}
+                hint={counted ? String(drafts) : chord(item.key)}
+                tone={counted ? 'count' : 'chord'}
+                onClick={onNavigate}
+              >
+                {item.label}
+              </NavLink>
+            )
+          })}
         </FoldGroup>
 
         <FoldGroup
@@ -823,39 +825,6 @@ function AccountMenu({
   )
 }
 
-/**
- * Drafts under Library: the row's box with the count in its lane. A button,
- * not a link — it opens the drafts window and is never the current page.
- */
-function DraftsRow({
-  count,
-  onNavigate,
-}: {
-  count: number
-  onNavigate?: (() => void) | undefined
-}) {
-  return (
-    <button
-      type="button"
-      data-drafts-row
-      onClick={() => {
-        openDrafts()
-        onNavigate?.()
-      }}
-      className="focus-ring flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-md border border-transparent pr-2.5 pl-2.5 text-left text-ui text-foreground transition-colors hover:bg-bone-deep"
-    >
-      <Email className="size-4 shrink-0" />
-      <span className="min-w-0 flex-1 truncate">Drafts</span>
-      <span
-        data-lane="count"
-        className="tabular shrink-0 mono text-micro text-foreground"
-      >
-        {count}
-      </span>
-    </button>
-  )
-}
-
 /** The account's mark: 24px of ink with the initials, never the primary. */
 function InitialsSquare({ name }: { name: string }) {
   return (
@@ -876,7 +845,6 @@ function CollapsedSidebar({
   workspaceName,
   workspaceLogo,
   objects,
-  drafts,
   onOpenCommand,
   onExpand,
   onKeyboard,
@@ -886,7 +854,6 @@ function CollapsedSidebar({
   workspaceName?: string | null | undefined
   workspaceLogo: string | null
   objects: Array<CustomObject>
-  drafts: number
   onOpenCommand: () => void
   onExpand?: (() => void) | undefined
   onKeyboard?: (() => void) | undefined
@@ -952,19 +919,6 @@ function CollapsedSidebar({
             {item.label}
           </CollapsedNavLink>
         ))}
-        {drafts > 0 ? (
-          <IconTip label={`Drafts · ${String(drafts)}`}>
-            <button
-              type="button"
-              data-drafts-row
-              onClick={openDrafts}
-              aria-label={`Drafts · ${String(drafts)}`}
-              className="focus-ring flex h-[1.875rem] w-8 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors hover:bg-bone-deep"
-            >
-              <Email className="size-4 shrink-0" />
-            </button>
-          </IconTip>
-        ) : null}
         <GroupRule />
         {OBJECTS.map((item) => (
           <CollapsedNavLink

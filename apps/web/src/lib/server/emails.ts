@@ -5,6 +5,7 @@ import {
   draftRecipientsSchema,
 } from '@spaces/core/json'
 import { uuidString } from '@spaces/core/attributes/registry'
+import { THREAD_FILTERS } from '../email/threads'
 import { requireUser } from './shared'
 import { input } from './input'
 
@@ -16,6 +17,11 @@ export type {
   EmailThreadLine,
 } from '../interactions/email-read'
 export type { EmailPrivacy } from '../interactions/email-privacy'
+export type {
+  EmailThreadPage,
+  EmailThreadRow,
+  ThreadRecord,
+} from '../interactions/email-threads'
 export type {
   DraftDocument,
   DraftFields,
@@ -59,6 +65,33 @@ export const getEmail = createServerFn()
     } catch (failure) {
       throw new Error(emailMessage(failure))
     }
+  })
+
+/**
+ * The Email page's Threads: a page of threads under the filter and the
+ * search, with the total they come to.
+ */
+export const listEmailThreads = createServerFn()
+  .validator(
+    input(
+      Schema.Struct({
+        filter: Schema.Literals(THREAD_FILTERS).pipe(
+          Schema.withDecodingDefault(Effect.succeed('all' as const)),
+        ),
+        q: Schema.optional(Schema.String.check(Schema.isMaxLength(200))),
+        cursor: Schema.optional(Schema.String.check(Schema.isMaxLength(500))),
+        limit: Schema.optional(
+          Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 100 })),
+        ),
+      }),
+    ),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { listEmailThreadsProgram } =
+      await import('../interactions/email-threads')
+    const { effectFn } = await import('./effect')
+    return effectFn(listEmailThreadsProgram)({ id: user.id }, data)
   })
 
 /**

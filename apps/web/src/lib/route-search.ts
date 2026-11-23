@@ -1,6 +1,7 @@
 import { Option, Schema } from 'effect'
 import { uuidString } from '@spaces/core/attributes/registry'
 import { PROVIDER_TABS } from '#/lib/connections/provider-view'
+import { EMAIL_TABS, THREAD_FILTERS } from '#/lib/email/threads'
 import { MEETING_FILTERS } from '#/lib/meetings/list'
 import { modalSearchShape } from '#/lib/modal-search'
 import { caught, fallback, searchValidator } from '#/lib/search-validator'
@@ -58,6 +59,19 @@ export const meetingsSearch = searchValidator(
   Schema.Struct({
     ...modalSearchShape,
     show: caught(Schema.Literals(MEETING_FILTERS)),
+  }),
+)
+
+/**
+ * `/email`: the tab, the thread or draft open in the pane (by the newest
+ * message's id, or the draft's), Threads' filter and its search.
+ */
+export const emailSearch = searchValidator(
+  Schema.Struct({
+    tab: caught(Schema.Literals(EMAIL_TABS)),
+    id: caught(uuidString),
+    filter: caught(Schema.Literals(THREAD_FILTERS)),
+    q: caught(Schema.String.check(Schema.isMaxLength(200))),
   }),
 )
 
