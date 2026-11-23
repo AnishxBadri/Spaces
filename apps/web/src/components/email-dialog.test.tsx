@@ -143,6 +143,7 @@ const MINE: EmailPrivacy = {
   owner: { id: 'u-anish', name: 'Anish' },
   mine: true,
   workspace: false,
+  wider: null,
   grantees: [],
   record: { id: RECORD, name: 'Flent', on: false },
 }
@@ -708,18 +709,18 @@ describe('who reads it', () => {
     expect(text).toContain('Every email I have with Flent')
     const foot = widen.querySelector('[data-slot="dialog-footer"]')
     expect(foot?.textContent).toBe(
-      'Subject, people and date stay visible to allCancelWiden',
+      'Subject, people and date stay visible to allCancelSave',
     )
     const remove = widen.querySelector('[aria-label="Remove Maya"]')
     if (!(remove instanceof HTMLElement)) throw new Error('no ×')
     act(() => remove.click())
     const box = widen.querySelector(
-      '[role="checkbox"][aria-label="Every email I have with Flent"]',
+      '[role="switch"][aria-label="Every email I have with Flent"]',
     )
     if (!(box instanceof HTMLElement)) throw new Error('no box')
     act(() => box.click())
     const save = [...widen.querySelectorAll('button')].find(
-      (b) => b.textContent.trim() === 'Widen',
+      (b) => b.textContent.trim() === 'Save',
     )
     act(() => save?.click())
     await settle()

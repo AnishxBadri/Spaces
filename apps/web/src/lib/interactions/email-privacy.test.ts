@@ -8,10 +8,13 @@ import {
   chunk,
   document,
   emailGrant,
+  entity,
   entityAlias,
   entitySpace,
   integration,
   interaction,
+  link,
+  note,
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { renderMessage } from '@spaces/sdk/testing'
@@ -62,6 +65,7 @@ const BODY_TOKEN = 'flywheel'
 const DECK_TOKEN = 'Quokka margins'
 const shas = new Set<string>()
 let gmail = ''
+let mailbox = ''
 
 beforeEach(async () => {
   await truncateAndReseed()
@@ -81,6 +85,7 @@ beforeEach(async () => {
       .returning({ id: accountConnection.id })
   ).at(0)
   if (!connection) throw new Error('no connection')
+  mailbox = connection.id
   const row = (
     await db
       .insert(integration)
@@ -425,6 +430,7 @@ describe('the two override tables', () => {
       owner: { id: OWNER.id, name: OWNER.name },
       mine: true,
       workspace: false,
+      wider: null,
       grantees: [],
       record: { id: f.acme, name: expect.any(String), on: false },
     })
@@ -438,5 +444,124 @@ describe('the two override tables', () => {
       (await Effect.runPromise(emailDetailProgram(OWNER, f.email.id, f.acme)))
         .privacy,
     ).toMatchObject({ workspace: true, record: { on: true } })
+  })
+})
+
+describe('what already opens the body wider (D111)', () => {
+  const privacyOf = async (
+    viewer: Viewer,
+    id: string,
+    recordId: string | null = null,
+  ) =>
+    (await Effect.runPromise(emailDetailProgram(viewer, id, recordId))).privacy
+
+  it('names the mailbox when it shares every body, and the owner can still save', async () => {
+    await db
+      .update(integration)
+      .set({ config: { shareBodies: true } })
+      .where(eq(integration.id, gmail))
+    const f = await fixture()
+    expect(await privacyOf(OWNER, f.email.id, f.acme)).toMatchObject({
+      mine: true,
+      workspace: true,
+      wider: { kind: 'mailbox', connectionId: mailbox },
+      record: { id: f.acme, on: false },
+    })
+    // The window's switch and grants still save, though the mailbox shares.
+    await Effect.runPromise(
+      setEmailAudienceProgram(OWNER, {
+        interactionId: f.email.id,
+        userIds: [TEAMMATE.id],
+        record: { id: f.acme, workspace: true },
+      }),
+    )
+    expect(await grants()).toBe(1)
+    expect(await privacyOf(TEAMMATE, f.email.id)).toMatchObject({
+      mine: false,
+      workspace: true,
+      wider: { kind: 'mailbox' },
+    })
+  })
+
+  it('has no row for a body shared any other way', async () => {
+    const f = await fixture()
+    await db
+      .update(note)
+      .set({ visibility: 'shared' })
+      .where(eq(note.entityId, f.email.noteId))
+    expect(await privacyOf(OWNER, f.email.id, f.acme)).toBeNull()
+    const exit = await Effect.runPromiseExit(
+      setEmailAudienceProgram(OWNER, {
+        interactionId: f.email.id,
+        userIds: [TEAMMATE.id],
+        record: null,
+      }),
+    )
+    expect(JSON.stringify(exit)).toContain('EmailNotWidenable')
+  })
+
+  it('names the record whose override opens it, but not the one its own switch holds', async () => {
+    const f = await fixture()
+    await Effect.runPromise(
+      setRecordEmailVisibilityProgram(OWNER, {
+        entityId: f.acme,
+        workspace: true,
+      }),
+    )
+    const acme = (
+      await db
+        .select({ name: entity.canonicalName })
+        .from(entity)
+        .where(eq(entity.id, f.acme))
+    ).at(0)?.name
+    expect(await privacyOf(OWNER, f.email.id)).toMatchObject({
+      workspace: true,
+      wider: {
+        kind: 'record',
+        record: { id: f.acme, kind: 'company', name: acme },
+      },
+    })
+    // Opened from Acme, the switch says it.
+    expect(await privacyOf(OWNER, f.email.id, f.acme)).toMatchObject({
+      workspace: true,
+      wider: null,
+      record: { id: f.acme, on: true },
+    })
+  })
+
+  it('names a deal whose company the email is on, as the read rule opens it', async () => {
+    const f = await fixture()
+    const deal = (
+      await db
+        .insert(entity)
+        .values({ kind: 'deal', canonicalName: 'Acme — Seed' })
+        .returning({ id: entity.id })
+    ).at(0)
+    if (!deal) throw new Error('no deal')
+    await db.insert(link).values({
+      fromEntityId: deal.id,
+      toEntityId: f.acme,
+      relation: 'references',
+      attrSlug: 'company',
+    })
+    await Effect.runPromise(
+      setRecordEmailVisibilityProgram(OWNER, {
+        entityId: deal.id,
+        workspace: true,
+      }),
+    )
+    expect(await privacyOf(OWNER, f.email.id, f.acme)).toMatchObject({
+      workspace: true,
+      wider: {
+        kind: 'record',
+        record: { id: deal.id, kind: 'deal', name: 'Acme — Seed' },
+      },
+      record: { id: f.acme, on: false },
+    })
+    // A teammate it reaches reads the same source.
+    expect(
+      (await Effect.runPromise(emailDetailProgram(TEAMMATE, f.email.id))).body
+        .kind,
+    ).not.toBe('private')
   })
 })

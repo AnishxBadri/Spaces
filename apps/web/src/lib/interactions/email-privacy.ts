@@ -1,22 +1,41 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  eq,
+  exists,
+  inArray,
+  isNull,
+  ne,
+  notInArray,
+  or,
+  sql,
+} from 'drizzle-orm'
 import { emailOpenedToWorkspaceSql } from '@spaces/core/writes/read/can-read-sql'
 import { db } from '@spaces/db'
 import {
   emailGrant,
   emailVisibility,
   entity,
+  integration,
   interaction,
+  interactionEntity,
+  link,
   note,
+  objectDef,
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
+import { syncedMailSettingsOf } from '#/lib/arrival/synced-settings'
+import { PRODUCTS } from '#/lib/connections/products'
 
 /**
- * Who reads a synced email past its owner: the owner's override on a
- * record (`email_visibility`) and their grants on one email (`email_grant`).
- * `canRead` and its SQL twins enforce both at read time; this module only
- * reads them for the privacy row and writes them for the owner.
- * - Only the owner widens: the body note's author, while it is private.
+ * Who reads a synced email past its owner: the mailbox sharing every body
+ * (its `shareBodies` setting), the owner's override on a record
+ * (`email_visibility`) and their grants on one email (`email_grant`).
+ * `canRead` and its SQL twins enforce them at read time; this module only
+ * reads them for the privacy row and writes the last two for the owner.
+ * - Only the owner widens: the body note's author, while the body is
+ *   private or shared only because the mailbox shares it.
  * - The override and the grants are written apart; removing one never
  *   touches the other.
  */
@@ -47,13 +66,36 @@ export function emailPrivacyMessage(failure: unknown): string {
 
 export type EmailMember = { id: string; name: string }
 
+/**
+ * What already opens the body to the workspace, past anything the window
+ * itself sets: the owner's mailbox sharing every body (its account page
+ * by `connectionId`), or the owner's override on another record.
+ */
+export type EmailWider =
+  | { kind: 'mailbox'; connectionId: string }
+  | {
+      kind: 'record'
+      record: {
+        id: string
+        kind: string
+        name: string
+        objectSlug: string | null
+      }
+    }
+
 /** The privacy row's facts, for a body private by default. */
 export type EmailPrivacy = {
   owner: EmailMember
   /** The viewer is the owner, so the row offers `widen`. */
   mine: boolean
-  /** The owner's override on a record this email is on covers it. */
+  /** The mailbox, or the owner's override on a record this email is on, opens it. */
   workspace: boolean
+  /**
+   * The source of `workspace` the window cannot switch itself; the mailbox
+   * wins when both hold. Null when nothing does, or only the override on
+   * the record the window was opened from (its own switch says that).
+   */
+  wider: EmailWider | null
   /** Members granted this one email, by name; `you` marks the viewer. */
   grantees: Array<EmailMember & { you: boolean }>
   /**
@@ -69,6 +111,93 @@ const query = <T>(run: () => Promise<T>) =>
     catch: (cause) => new EmailPrivacyFailed({ cause }),
   })
 
+const MAIL_SYNC = PRODUCTS.google.gmail.plugin
+
+/**
+ * The mail-sync mailbox an email came through, when its setting shares every
+ * body; null for one that keeps bodies private, or mail that came another way
+ * (forwarded, logged).
+ */
+const sharingMailbox = Effect.fn('sharingMailbox')(function* (
+  interactionId: string,
+) {
+  const row = (yield* query(() =>
+    db
+      .select({
+        config: integration.config,
+        connectionId: integration.connectionId,
+      })
+      .from(interaction)
+      .innerJoin(integration, eq(integration.id, interaction.sourceRef))
+      .where(
+        and(
+          eq(interaction.id, interactionId),
+          eq(integration.capabilityId, MAIL_SYNC),
+        ),
+      ),
+  )).at(0)
+  if (row === undefined || row.connectionId === null) return null
+  return syncedMailSettingsOf(row.config).shareBodies
+    ? { connectionId: row.connectionId }
+    : null
+})
+
+/**
+ * The first record, by name, whose override by `ownerId` opens this email:
+ * the rule `emailOpenedToWorkspaceSql` enforces (a record the email is on,
+ * or a deal whose company or people it is on), less `besides`.
+ */
+const coveringRecord = Effect.fn('coveringRecord')(function* (
+  interactionId: string,
+  ownerId: string,
+  besides: string | null,
+) {
+  const onEmail = db
+    .select({ id: interactionEntity.entityId })
+    .from(interactionEntity)
+    .where(eq(interactionEntity.interactionId, interactionId))
+  return (yield* query(() =>
+    db
+      .select({
+        id: entity.id,
+        kind: entity.kind,
+        name: entity.canonicalName,
+        objectSlug: objectDef.slug,
+      })
+      .from(emailVisibility)
+      .innerJoin(entity, eq(entity.id, emailVisibility.entityId))
+      .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+      .where(
+        and(
+          eq(emailVisibility.userId, ownerId),
+          eq(emailVisibility.scope, 'workspace'),
+          besides === null ? undefined : ne(emailVisibility.entityId, besides),
+          or(
+            inArray(emailVisibility.entityId, onEmail),
+            and(
+              eq(entity.kind, 'deal'),
+              exists(
+                db
+                  .select({ one: sql`1` })
+                  .from(link)
+                  .where(
+                    and(
+                      eq(link.fromEntityId, emailVisibility.entityId),
+                      eq(link.relation, 'references'),
+                      inArray(link.attrSlug, ['company', 'people']),
+                      inArray(link.toEntityId, onEmail),
+                    ),
+                  ),
+              ),
+            ),
+          ),
+        ),
+      )
+      .orderBy(asc(entity.canonicalName))
+      .limit(1),
+  )).at(0)
+})
+
 /** A live record, by id: what an override may name. */
 const liveRecord = Effect.fn('liveRecord')(function* (entityId: string) {
   const row = (yield* query(() =>
@@ -82,14 +211,23 @@ const liveRecord = Effect.fn('liveRecord')(function* (entityId: string) {
 })
 
 /**
- * The privacy row of one email whose body is private: owner, override and
- * grants. `recordId` is the record the window was opened from.
+ * The privacy row of one email whose body is private, or shared only by its
+ * mailbox: owner, what already opens it, override and grants. Null for a
+ * body shared any other way. `recordId` is the record the window was
+ * opened from.
  */
 export const emailPrivacyProgram = Effect.fn('emailPrivacyProgram')(function* (
   viewer: { id: string },
-  email: { id: string; owner: EmailMember },
+  email: {
+    id: string
+    owner: EmailMember
+    visibility: 'private' | 'shared'
+  },
   recordId: string | null,
-): Effect.fn.Return<EmailPrivacy, EmailPrivacyFailed> {
+): Effect.fn.Return<EmailPrivacy | null, EmailPrivacyFailed> {
+  const mailbox =
+    email.visibility === 'shared' ? yield* sharingMailbox(email.id) : null
+  if (email.visibility === 'shared' && mailbox === null) return null
   const opened = (yield* query(() =>
     db.execute<{ opened: boolean }>(
       sql`select ${emailOpenedToWorkspaceSql(
@@ -124,35 +262,49 @@ export const emailPrivacyProgram = Effect.fn('emailPrivacyProgram')(function* (
             .where(eq(entity.id, recordId)),
         )).at(0)
       : undefined
+  const covering =
+    mailbox === null
+      ? yield* coveringRecord(email.id, email.owner.id, record?.id ?? null)
+      : undefined
   return {
     owner: email.owner,
     mine,
-    workspace: opened?.opened === true,
+    workspace: mailbox !== null || opened?.opened === true,
+    wider:
+      mailbox !== null
+        ? { kind: 'mailbox', connectionId: mailbox.connectionId }
+        : covering === undefined
+          ? null
+          : { kind: 'record', record: covering },
     grantees: grantees.map((g) => ({ ...g, you: g.id === viewer.id })),
     record: record ?? null,
   }
 })
 
-/** The owner's private email, or `EmailNotWidenable` for anyone else. */
+/**
+ * The owner's email, private or shared only by their mailbox, or
+ * `EmailNotWidenable` for anyone else.
+ */
 const ownedEmail = Effect.fn('ownedEmail')(function* (
   owner: { id: string },
   interactionId: string,
 ) {
   const row = (yield* query(() =>
     db
-      .select({ id: interaction.id })
+      .select({ id: interaction.id, visibility: note.visibility })
       .from(interaction)
       .innerJoin(note, eq(note.entityId, interaction.noteId))
       .where(
         and(
           eq(interaction.id, interactionId),
           eq(interaction.kind, 'email'),
-          eq(note.visibility, 'private'),
           eq(note.authorId, owner.id),
         ),
       ),
   )).at(0)
   if (!row) return yield* new EmailNotWidenable({ id: interactionId })
+  if (row.visibility === 'shared' && (yield* sharingMailbox(row.id)) === null)
+    return yield* new EmailNotWidenable({ id: interactionId })
   return row
 })
 

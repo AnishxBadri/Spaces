@@ -305,12 +305,13 @@ export const emailDetailProgram = Effect.fn('emailDetailProgram')(function* (
     : []
 
   const privacy =
-    row.visibility === 'private' && row.authorId !== null
+    row.visibility !== null && row.authorId !== null
       ? yield* emailPrivacyProgram(
           viewer,
           {
             id: row.id,
             owner: { id: row.authorId, name: row.authorName ?? 'Someone' },
+            visibility: row.visibility,
           },
           recordId,
         ).pipe(Effect.mapError((e) => new EmailReadFailed({ cause: e.cause })))

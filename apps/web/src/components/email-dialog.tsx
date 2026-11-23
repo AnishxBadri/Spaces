@@ -8,17 +8,16 @@ import type { FileActions, ReplyMode } from '#/components/email/message-card'
 import { EmailThread } from '#/components/email/thread'
 import { AttachmentSidebar } from '#/components/email/attachment-sidebar'
 import { PaneHead } from '#/components/email/pane-head'
+import { WidenDialog } from '#/components/email/who-can-read'
 import { useKeepCopy } from '#/components/files/keep-copy'
 import type { KeepCopy } from '#/components/files/keep-copy'
 import { NewerVersionDialog } from '#/components/files/newer-version-dialog'
 import { FilingPickers } from '#/components/files/viewer-sidebar'
 import type { RecordDocument } from '#/components/files/types'
-import { LedgerRow } from '#/components/ledger-section'
 import { PickPopover } from '#/components/record/details-add'
 import { ProviderMark } from '#/components/provider-mark'
 import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
-import { Checkbox } from '#/components/ui/checkbox'
 import { useConfirm } from '#/components/ui/confirm-dialog'
 import {
   Dialog,
@@ -30,17 +29,14 @@ import {
 } from '#/components/ui/dialog'
 import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
-import { Select } from '#/components/ui/select'
 import {
   fileDocument,
   fileInteractionOnEntity,
   getDocumentPreview,
   getEmail,
-  listMembers,
   listRecordDocuments,
   openEmailReply,
   searchEntities,
-  setEmailAudience,
   unlinkInteractionFromEntity,
 } from '#/lib/server-fns'
 import type {
@@ -172,158 +168,6 @@ function emailLink(id: string): string {
   url.searchParams.set('modal', 'email')
   url.searchParams.set('id', id)
   return url.toString()
-}
-
-type Member = { id: string; name: string }
-
-/**
- * Who can read this: the owner, the members granted this one email (each
- * removable), a member to add, and — opened from a record — every email
- * the owner has with it. Saving writes both at once.
- */
-export function WidenDialog({
-  emailId,
-  privacy,
-  open,
-  onOpenChange,
-  onSaved,
-}: {
-  emailId: string
-  privacy: EmailPrivacy
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onSaved: () => void
-}) {
-  const [members, setMembers] = useState<Array<Member> | null>(null)
-  const [record, setRecord] = useState(privacy.record?.on ?? false)
-  const [granted, setGranted] = useState<Array<Member>>(() =>
-    privacy.grantees.map((g) => ({ id: g.id, name: g.name })),
-  )
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!open) return
-    setRecord(privacy.record?.on ?? false)
-    setGranted(privacy.grantees.map((g) => ({ id: g.id, name: g.name })))
-    setError(null)
-    let live = true
-    listMembers()
-      .then((rows) => {
-        if (live)
-          setMembers(rows.filter((m) => !m.banned && m.id !== privacy.owner.id))
-      })
-      .catch(() => {
-        if (live) setMembers([])
-      })
-    return () => {
-      live = false
-    }
-  }, [open, privacy])
-
-  const addable = (members ?? []).filter(
-    (m) => !granted.some((g) => g.id === m.id),
-  )
-
-  async function save() {
-    setSaving(true)
-    try {
-      await setEmailAudience({
-        data: {
-          interactionId: emailId,
-          userIds: granted.map((g) => g.id),
-          record:
-            privacy.record === null
-              ? null
-              : { id: privacy.record.id, workspace: record },
-        },
-      })
-      onSaved()
-      onOpenChange(false)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save')
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="s" className="flex max-h-[70vh] flex-col">
-        <DialogHeader>
-          <DialogTitle>Who can read this</DialogTitle>
-        </DialogHeader>
-        <DialogDescription className="sr-only">
-          The members who read this email
-        </DialogDescription>
-        <div className="-mx-4 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4">
-          <ol className="border-t border-rule">
-            <LedgerRow last={granted.length === 0}>
-              <span className="min-w-0 flex-1 truncate text-body">
-                {privacy.owner.name}
-              </span>
-              <span className="shrink-0 mono text-micro text-graphite">
-                Owner
-              </span>
-            </LedgerRow>
-            {granted.map((g, i) => (
-              <LedgerRow key={g.id} last={i === granted.length - 1}>
-                <span className="min-w-0 flex-1 truncate text-body">
-                  {g.name}
-                </span>
-                <button
-                  type="button"
-                  aria-label={`Remove ${g.name}`}
-                  onClick={() =>
-                    setGranted((prev) => prev.filter((p) => p.id !== g.id))
-                  }
-                  className="focus-ring shrink-0 text-graphite hover:text-foreground"
-                >
-                  <icon.close className="size-4" />
-                </button>
-              </LedgerRow>
-            ))}
-          </ol>
-          {members === null ? (
-            <Twinkle size={14} />
-          ) : addable.length === 0 ? null : (
-            <Select
-              aria-label="Add a person"
-              value=""
-              onChange={(id) => {
-                const m = addable.find((a) => a.id === id)
-                if (m) setGranted((prev) => [...prev, m])
-              }}
-              items={addable.map((m) => ({ value: m.id, label: m.name }))}
-              width="trigger"
-              placeholder="Add a person…"
-            />
-          )}
-          {privacy.record === null ? null : (
-            <label className="flex items-center gap-2.5 text-ui">
-              <Checkbox
-                checked={record}
-                onCheckedChange={setRecord}
-                aria-label={`Every email I have with ${privacy.record.name}`}
-              />
-              Every email I have with {privacy.record.name}
-            </label>
-          )}
-          {error === null ? null : (
-            <p className="text-ui text-destructive">{error}</p>
-          )}
-        </div>
-        <DialogFooter note="Subject, people and date stay visible to all">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
-          </Button>
-          <Button onClick={() => void save()} pending={saving}>
-            Widen
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
 }
 
 /** `File on…` for an attachment: the record search and the space tree. */

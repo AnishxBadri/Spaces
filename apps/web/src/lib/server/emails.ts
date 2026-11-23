@@ -16,7 +16,7 @@ export type {
   EmailParticipant,
   EmailThreadLine,
 } from '../interactions/email-read'
-export type { EmailPrivacy } from '../interactions/email-privacy'
+export type { EmailPrivacy, EmailWider } from '../interactions/email-privacy'
 export type {
   EmailThreadPage,
   EmailThreadRow,
