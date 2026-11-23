@@ -14,7 +14,7 @@ import { EmailDialog, EmailPane } from '#/components/email-dialog'
 import { DraftComposer } from '#/components/email/draft-composer'
 import { PaneHead } from '#/components/email/pane-head'
 import { Band } from '#/components/ledger-section'
-import { NewButton } from '#/components/new-button'
+import { ComposeModal, NewEmailSplit } from '#/components/email/compose-windows'
 import {
   FolderGround,
   ListPage,
@@ -32,6 +32,7 @@ import {
   EMAIL_DRAFTS_QUERY,
   draftStateOf,
   openCompose,
+  useComposeHere,
 } from '#/lib/email/compose'
 import {
   THREADS_STEP,
@@ -61,6 +62,8 @@ import { cn } from '#/lib/utils'
  *   draft. Nothing open leaves the pane empty bone.
  * - Both lists hang under the drafts key, so a save, a send or a trash
  *   anywhere re-reads the Draft marks, the tab's count and the list.
+ * - The head's `New email ⌄` opens the composer as a window over the page,
+ *   from the URL (`modal=email&new=1&draft=`), templates in its menu.
  */
 export const Route = createFileRoute('/_app/email')({
   validateSearch: emailSearch,
@@ -114,6 +117,7 @@ function EmailPage() {
   const filter: ThreadFilter = search.filter ?? 'all'
   const open = search.id ?? null
   const split = useSplit()
+  const composeHere = useComposeHere()
 
   const drafts = useQuery({
     queryKey: DRAFTS_LIST,
@@ -132,12 +136,7 @@ function EmailPage() {
       <PageHeader
         title="Email"
         folds={false}
-        action={
-          <NewButton
-            noun="email"
-            onClick={() => openCompose({ draftId: null })}
-          />
-        }
+        action={<NewEmailSplit variant="primary" onNew={composeHere} />}
       />
       <FolderGround>
         <Tabs
@@ -213,6 +212,7 @@ function EmailPage() {
           if (!o) select(null)
         }}
       />
+      <ComposeModal recordId={null} />
     </ListPage>
   )
 }

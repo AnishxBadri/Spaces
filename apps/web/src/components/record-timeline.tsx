@@ -15,6 +15,8 @@ import type { ReactElement, ReactNode } from 'react'
 import { toast } from 'sonner'
 import { OptionChip, optionLabel, refName } from './attributes/value-editor'
 import { EmailModal } from './email-dialog'
+import { ComposeModal, NewEmailSplit } from './email/compose-windows'
+import { useComposeHere } from '#/lib/email/compose'
 import { NoteKindIcon } from './note-kind-icon'
 import { Band, Day, FoldRow } from './ledger-section'
 import { PickPopover } from './record/details-add'
@@ -236,6 +238,13 @@ const KIND_LABELS: Record<ThreadKind, string> = {
 }
 
 /**
+ * The Interactions toolbar: 48px, the filter left and the acts right. On a
+ * phone the acts wrap under the filter rather than widen the page.
+ */
+const TOOLBAR =
+  'flex min-h-12 shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-2 border-b border-rule px-3 py-2.5'
+
+/**
  * The toolbar's `···` for a viewer with private emails here: their emails
  * with this record, opened to the workspace or not (the record override).
  * Its one item draws as a switch, absent until the state has been read.
@@ -299,6 +308,8 @@ function EmailVisibilityMenu({ recordId }: { recordId: string }) {
  * - Empty, it is its toolbar: `No interactions yet` and `Log interaction`,
  *   which `logInteraction` wraps in the log window. Filled, the head's
  *   `Log interaction` is the one way in.
+ * - With a `record`, the toolbar ends on `New email ⌄`, whose composer
+ *   opens over the record from the URL, To filled from the record.
  */
 export function RecordInteractions({
   items,
@@ -321,17 +332,26 @@ export function RecordInteractions({
     setInteractionsFilter(recordId, kind)
     return () => setInteractionsFilter(recordId, null)
   }, [recordId, kind])
+  const composeHere = useComposeHere('interactions')
+  // The split ends the toolbar; the window it opens reads the URL.
+  const newEmail =
+    record === undefined ? null : (
+      <NewEmailSplit variant="secondary" onNew={composeHere} />
+    )
+  const composer =
+    record === undefined ? null : <ComposeModal recordId={record.id} />
   const threads = threadsOf(interactions)
   if (threads.length === 0)
     return (
-      <div
-        data-interactions-empty
-        className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-rule px-3"
-      >
+      <div data-interactions-empty className={TOOLBAR}>
         <span className="text-ui text-graphite">No interactions yet</span>
-        {logInteraction
-          ? logInteraction(<Button variant="outline">Log interaction</Button>)
-          : null}
+        <div className="ml-auto flex shrink-0 items-center gap-3">
+          {logInteraction
+            ? logInteraction(<Button variant="outline">Log interaction</Button>)
+            : null}
+          {newEmail}
+        </div>
+        {composer}
       </div>
     )
 
@@ -348,7 +368,7 @@ export function RecordInteractions({
   )
   return (
     <div className="flex flex-col">
-      <div className="flex h-12 shrink-0 items-center justify-between gap-3 border-b border-rule px-3">
+      <div data-interactions-toolbar className={TOOLBAR}>
         <Segmented
           label="Show interactions"
           value={kind}
@@ -359,7 +379,7 @@ export function RecordInteractions({
               : { id: k, label: KIND_LABELS[k], count: counts[k] },
           )}
         />
-        <div className="flex shrink-0 items-center gap-3">
+        <div className="ml-auto flex shrink-0 items-center gap-3">
           <Switch checked={withFiles} onCheckedChange={setWithFiles}>
             With files
             {counts.files > 0 ? (
@@ -372,6 +392,7 @@ export function RecordInteractions({
           interactions.some((i) => i.kind === 'email' && i.ownPrivate) ? (
             <EmailVisibilityMenu recordId={record.id} />
           ) : null}
+          {newEmail}
         </div>
       </div>
       {bands.map((b) => (
@@ -404,6 +425,7 @@ export function RecordInteractions({
         />
       ) : null}
       <EmailModal recordId={record?.id ?? null} />
+      {composer}
     </div>
   )
 }

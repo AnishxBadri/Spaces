@@ -614,6 +614,39 @@ describe('the Interactions tab', () => {
     ])
   })
 
+  it('ends the toolbar on New email ⌄ after With files, opening the composer over the record on Interactions', async () => {
+    const el = await mount(<RecordInteractions items={items} record={FLENT} />)
+    const tools = el.querySelector('[data-interactions-toolbar]')
+    const split = tools?.querySelector('[data-split-new]')
+    expect(split?.getAttribute('data-split-new')).toBe('secondary')
+    expect(tools?.lastElementChild?.lastElementChild).toBe(split)
+    await click(button(/^New email$/))
+    const call = navigate.mock.calls.at(-1)?.at(0)
+    const reduce: unknown =
+      typeof call === 'object' && call !== null
+        ? Reflect.get(call, 'search')
+        : null
+    if (typeof reduce !== 'function') throw new Error('no search reducer')
+    expect(reduce({ tab: 'overview' })).toEqual({
+      tab: 'interactions',
+      modal: 'email',
+      new: 1,
+      draft: expect.stringMatching(/^[0-9a-f-]{36}$/),
+    })
+  })
+
+  it('offers New email ⌄ on an empty tab', async () => {
+    const el = await mount(<RecordInteractions items={[]} record={FLENT} />)
+    expect(
+      el.querySelector('[data-interactions-empty] [data-split-new]'),
+    ).not.toBeNull()
+  })
+
+  it('offers no New email without a record', async () => {
+    const el = await mount(<RecordInteractions items={items} />)
+    expect(el.querySelector('[data-split-new]')).toBeNull()
+  })
+
   it('offers no override to a viewer whose emails here are none of theirs', async () => {
     const el = await mount(
       <RecordInteractions

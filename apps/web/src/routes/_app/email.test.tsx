@@ -29,6 +29,7 @@ const fns = vi.hoisted(() => ({
   listEmailThreads: vi.fn(),
   listEmailDrafts: vi.fn(),
   getEmailDraft: vi.fn(),
+  openEmailCompose: vi.fn(),
 }))
 
 vi.mock('#/lib/server-fns', async (importOriginal) => ({
@@ -183,6 +184,7 @@ beforeEach(() => {
   for (const fn of Object.values(fns)) fn.mockReset()
   fns.listEmailThreads.mockResolvedValue(PAGE)
   fns.listEmailDrafts.mockResolvedValue(DRAFTS)
+  fns.openEmailCompose.mockResolvedValue({ draft: null, to: [], record: null })
   fns.getEmailDraft.mockResolvedValue({
     ...DRAFTS[0],
     inReplyToId: T2,
@@ -364,6 +366,29 @@ describe('Threads', () => {
     await settle()
     expect(document.querySelector(`[data-stub-window="${T1}"]`)).not.toBeNull()
     expect(document.querySelector('[data-stub-pane]')).toBeNull()
+  })
+})
+
+describe('New email', () => {
+  it('is the head’s pine split, opening the composer as a window over the page from the URL', async () => {
+    await mount('/email?tab=drafts')
+    const split = document.querySelector('[data-split-new]')
+    expect(split?.getAttribute('data-split-new')).toBe('primary')
+    click(byText('button', 'New email'))
+    await settle()
+    const params = new URLSearchParams(search())
+    expect(params.get('modal')).toBe('email')
+    expect(params.get('new')).toBe('1')
+    expect(params.get('tab')).toBe('drafts')
+    const draft = params.get('draft')
+    expect(draft).toMatch(/^[0-9a-f-]{36}$/)
+    expect(fns.openEmailCompose).toHaveBeenCalledWith({
+      data: { draftId: draft, recordId: null },
+    })
+    const sheet = document.querySelector('[data-compose-window]')
+    expect(sheet?.querySelector(`[data-stub-composer="${draft}"]`)).not.toBe(
+      null,
+    )
   })
 })
 

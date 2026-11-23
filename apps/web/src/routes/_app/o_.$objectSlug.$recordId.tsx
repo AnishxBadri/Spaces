@@ -49,6 +49,7 @@ import { recordPath } from '#/lib/record-path'
 import { readoutDay } from '#/lib/records/readout-format'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { runBinding, usePageActions } from '#/lib/page-actions'
+import { emailRecordAction, useComposeHere } from '#/lib/email/compose'
 import {
   linkedRecordTab,
   recordSearch,
@@ -168,6 +169,7 @@ function ObjectRecordPage() {
   // Interactions are logged with people: only an object that links them
   // logs one.
   const logs = linksPeople(registry)
+  const composeHere = useComposeHere('interactions')
   usePageActions(
     [
       ...(logs
@@ -180,6 +182,7 @@ function ObjectRecordPage() {
             },
           ]
         : []),
+      emailRecordAction(record.name, () => composeHere()),
       { id: 'task', label: 'Add task', key: 'T', run: runBinding('T') },
       fileInSpaceAction({
         id: record.id,

@@ -61,6 +61,7 @@ import { fmtMoney } from '@spaces/core/portfolio/format'
 import { readoutDay, readoutRound } from '#/lib/records/readout-format'
 import { useHotkey } from '#/lib/use-hotkey'
 import { runBinding, usePageActions } from '#/lib/page-actions'
+import { emailRecordAction, useComposeHere } from '#/lib/email/compose'
 import {
   linkedRecordTab,
   recordSearch,
@@ -228,6 +229,7 @@ function DealRecordPage() {
     }
   }
 
+  const composeHere = useComposeHere('interactions')
   usePageActions(
     [
       ...(liveStages.length > 0
@@ -241,6 +243,7 @@ function DealRecordPage() {
           ]
         : []),
       { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
+      emailRecordAction(deal.name, () => composeHere()),
       { id: 'task', label: 'Add task', key: 'T', run: runBinding('T') },
     ],
     deal.name,

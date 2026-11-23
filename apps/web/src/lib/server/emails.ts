@@ -30,6 +30,7 @@ export type {
   RecipientMatch,
   ReplyOpening,
 } from '../interactions/email-drafts'
+export type { ComposeOpening } from '../interactions/email-compose'
 export type { DraftRecipient, EmailDraftMode } from '@spaces/db/schema/drafts'
 export type {
   VariableOption,
@@ -187,6 +188,25 @@ export const getEmailDraft = createServerFn()
       return await effectFn(getDraftProgram)({ id: user.id }, data.id)
     } catch (failure) {
       throw new Error(draftMessage(failure))
+    }
+  })
+
+/**
+ * The composer window's opening: the draft held under `draftId`, else a
+ * new email's To from the record it was started on.
+ */
+export const openEmailCompose = createServerFn()
+  .validator(
+    input(Schema.Struct({ draftId: uuidOrNull, recordId: uuidOrNull })),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { openComposeProgram } = await import('../interactions/email-compose')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(openComposeProgram)({ id: user.id }, data)
+    } catch {
+      throw new Error('Could not open the email')
     }
   })
 

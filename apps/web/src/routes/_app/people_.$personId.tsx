@@ -59,6 +59,7 @@ import { collisionToast } from '#/lib/attributes/collision-toast'
 import { jsonString } from '@spaces/core/json'
 import { fileInSpaceAction } from '#/lib/file-in-space'
 import { runBinding, usePageActions } from '#/lib/page-actions'
+import { emailRecordAction, useComposeHere } from '#/lib/email/compose'
 import {
   linkedRecordTab,
   recordSearch,
@@ -208,9 +209,11 @@ function PersonRecordPage() {
     void router.invalidate()
   }
 
+  const composeHere = useComposeHere('interactions')
   usePageActions(
     [
       { id: 'log', label: 'Log interaction', key: 'L', run: runBinding('L') },
+      emailRecordAction(person.name, () => composeHere()),
       { id: 'task', label: 'Add task', key: 'T', run: runBinding('T') },
       fileInSpaceAction({
         id: person.id,

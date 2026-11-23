@@ -1,5 +1,9 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
+import { useNavigate } from '@tanstack/react-router'
+import { Email } from '#/components/icons'
+import { composeSearch } from '#/lib/modal-search'
+import type { PageAction } from '#/lib/page-actions'
 import type {
   DraftDocument,
   DraftFields,
@@ -16,18 +20,40 @@ import type {
 /** The draft as the composer holds it: its fields and the id it saves under. */
 export type DraftState = DraftFields & { id: string }
 
-/** A new email: nobody, nothing, a fresh id. */
-export function blankDraft(id: string): DraftState {
+/** A new email under `id`: to `to` (a record's prefill), nothing written. */
+export function blankDraft(
+  id: string,
+  to: ReadonlyArray<DraftRecipient> = [],
+): DraftState {
   return {
     id,
     mode: 'new',
     inReplyToId: null,
-    to: [],
+    to: [...to],
     cc: [],
     bcc: [],
     subject: '',
     bodyMd: '',
     attachments: [],
+  }
+}
+
+/** What applying a template copies into a draft. */
+export type TemplateFill = Pick<
+  DraftFields,
+  'subject' | 'bodyMd' | 'attachments'
+>
+
+/** A template applied: its subject, body and files; the recipients stay. */
+export function withTemplate(
+  draft: DraftState,
+  fill: TemplateFill,
+): DraftState {
+  return {
+    ...draft,
+    subject: fill.subject,
+    bodyMd: fill.bodyMd,
+    attachments: fill.attachments,
   }
 }
 
@@ -166,8 +192,18 @@ export function useDraftAutosave<T>(
   return handles.current
 }
 
-/** Which compose window is open, if any: a held draft, or a new email. */
-export type ComposeTarget = { draftId: string } | { draftId: null }
+/**
+ * What the compose window opens on. A draft held under `draftId` opens as
+ * it was; otherwise a new email saves under that id (null mints one), its
+ * To from `recordId` and `templateId` applied.
+ */
+export type ComposeTarget = {
+  draftId: string | null
+  /** The record it was started on: To's prefill and Attach's files. */
+  recordId?: string | null | undefined
+  /** A template applied to a new email as it opens. */
+  templateId?: string | null | undefined
+}
 
 type ComposeState = { compose: ComposeTarget | null }
 
@@ -195,6 +231,38 @@ export function openCompose(target: ComposeTarget) {
 
 export function closeCompose() {
   set(CLOSED)
+}
+
+/**
+ * Opens a new email's window over this page from its URL (`composeSearch`),
+ * a template applied when one is picked. On a record it lands on the
+ * Interactions tab, which the window closes back to.
+ */
+export function useComposeHere(
+  tab: 'interactions' | null = null,
+): (templateId?: string | null) => void {
+  const navigate = useNavigate()
+  return (templateId = null) =>
+    void navigate({
+      to: '.',
+      search: (prev) => ({
+        ...prev,
+        ...(tab === null ? {} : { tab }),
+        ...composeSearch(templateId),
+      }),
+      resetScroll: false,
+    })
+}
+
+/** Cmd-K's `Email <name>` on a record: the record's own composer. */
+export function emailRecordAction(name: string, open: () => void): PageAction {
+  return {
+    id: 'email',
+    label: `Email ${name}`,
+    icon: Email,
+    words: 'email mail compose write send message new',
+    run: open,
+  }
 }
 
 /**

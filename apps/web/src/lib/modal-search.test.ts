@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { modalSearch, openModalId } from './modal-search'
+import {
+  composeSearch,
+  modalSearch,
+  openComposeOf,
+  openModalId,
+} from './modal-search'
 import { linkedRecordTab, recordSearch } from './records/record-tabs'
 
 /**
@@ -25,6 +30,54 @@ describe('modalSearch', () => {
     })
     expect(openModalId({ modal: 'note' }, 'note')).toBeNull()
     expect(openModalId({ modal: 'email', id: ID }, 'note')).toBeNull()
+  })
+})
+
+describe('a new email’s window', () => {
+  const TEMPLATE = '00000000-0000-4000-8000-0000000000e1'
+
+  it('reads ?modal=email&new=1 with the draft’s id and a template', () => {
+    const search = recordSearch.parse({
+      modal: 'email',
+      new: 1,
+      draft: ID,
+      template: TEMPLATE,
+    })
+    expect(openComposeOf(search)).toEqual({
+      draftId: ID,
+      templateId: TEMPLATE,
+    })
+    // It is not the thread window, and it opens over Interactions.
+    expect(openModalId(search, 'email')).toBeNull()
+    expect(linkedRecordTab(search)).toBe('interactions')
+  })
+
+  it('reads a URL with no id yet as a draft to mint, and anything else as none', () => {
+    expect(
+      openComposeOf(modalSearch.parse({ modal: 'email', new: 1 })),
+    ).toEqual({ draftId: null, templateId: null })
+    expect(openComposeOf(modalSearch.parse({ modal: 'email', new: 2 }))).toBe(
+      null,
+    )
+    expect(openComposeOf(modalSearch.parse({ modal: 'note', new: 1 }))).toBe(
+      null,
+    )
+    expect(
+      modalSearch.parse({ modal: 'email', new: 1, draft: 'nope' }),
+    ).toEqual({ modal: 'email', new: 1 })
+  })
+
+  it('mints a fresh id for each new email', () => {
+    const a = composeSearch()
+    const b = composeSearch(TEMPLATE)
+    expect(a).toEqual({ modal: 'email', new: 1, draft: expect.any(String) })
+    expect(b).toEqual({
+      modal: 'email',
+      new: 1,
+      draft: expect.any(String),
+      template: TEMPLATE,
+    })
+    expect(a.draft).not.toBe(b.draft)
   })
 })
 

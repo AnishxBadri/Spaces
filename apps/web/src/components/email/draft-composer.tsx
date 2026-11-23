@@ -27,6 +27,7 @@ import {
   saveInput,
   switchMode,
   useDraftAutosave,
+  withTemplate,
   useDraftsChanged,
 } from '#/lib/email/compose'
 import type { DraftState, ReviewChoices } from '#/lib/email/compose'
@@ -137,6 +138,7 @@ export function DraftComposer({
   above,
   card = false,
   onSaved,
+  onSubject,
   onClose,
 }: {
   initial: DraftState
@@ -156,6 +158,8 @@ export function DraftComposer({
    */
   card?: boolean
   onSaved?: (at: string) => void
+  /** The subject as typed, for a window head that prints it. */
+  onSubject?: (subject: string) => void
   onClose: () => void
 }) {
   const [draft, setDraft] = useState(initial)
@@ -194,6 +198,12 @@ export function DraftComposer({
     return run
   }
   const autosave = useDraftAutosave(draft, dirty, save)
+
+  const subjectTo = useRef(onSubject)
+  subjectTo.current = onSubject
+  useEffect(() => {
+    subjectTo.current?.(draft.subject)
+  }, [draft.subject])
 
   const parentId = initial.inReplyToId
   useEffect(() => {
@@ -324,7 +334,8 @@ export function DraftComposer({
       return
     try {
       const fill = await getEmailTemplate({ data: { id: t.id } })
-      edit(fill)
+      setDraft((d) => withTemplate(d, fill))
+      setDirty(true)
       setReview(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not apply it')
@@ -353,6 +364,8 @@ export function DraftComposer({
   }
 
   const saved = saving ? 'Saving…' : savedLine(savedAt)
+  // A reply's mode row carries the saved line; without it, the foot does.
+  const modeRow = modes !== null && draft.mode !== 'new'
   const variables =
     parseVariables(`${draft.subject}\n${draft.bodyMd}`).length > 0
   const open =
@@ -387,7 +400,10 @@ export function DraftComposer({
     </span>
   ) : review !== null ? (
     "Can't be unsent · goes at once"
-  ) : null
+  ) : modeRow || saved === null ? null : (
+    // Without the mode row, the foot is where the save is told.
+    <span data-saved>{saved}</span>
+  )
 
   return (
     <>

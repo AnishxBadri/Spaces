@@ -1,4 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useEffect, useMemo, useState } from 'react'
+import { toast } from 'sonner'
+import { Email } from '#/components/icons'
+import { SplitNewButton } from '#/components/new-button'
+import { TemplatePicker } from '#/components/templates'
 import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import {
@@ -14,10 +19,12 @@ import {
   closeCompose,
   draftStateOf,
   useComposeState,
+  withTemplate,
 } from '#/lib/email/compose'
 import type { ComposeTarget, DraftState } from '#/lib/email/compose'
-import { getEmailDraft } from '#/lib/server-fns'
-import { DraftComposer, savedLine } from './draft-composer'
+import { openComposeOf } from '#/lib/modal-search'
+import { getEmailTemplate, openEmailCompose } from '#/lib/server-fns'
+import { DraftComposer } from './draft-composer'
 
 /**
  * The full composer, mounted once in the app shell and opened through
@@ -28,9 +35,134 @@ export function ComposeWindows() {
   return <ComposeDialog target={compose} onClose={closeCompose} />
 }
 
-type Loaded = { draft: DraftState; savedAt: string | null }
+/**
+ * The composer a page opens over itself from its URL (`openComposeOf`): a
+ * record's Interactions tab, the Email page. A URL without the draft's id
+ * gets one minted into it, so the open window is always addressable and the
+ * same URL reopens the same draft. Esc or Cancel drops the keys and returns
+ * to the page as it was.
+ */
+export function ComposeModal({ recordId }: { recordId: string | null }) {
+  const search = useSearch({ strict: false })
+  const navigate = useNavigate()
+  const opened = openComposeOf(search)
+  const draftId = opened?.draftId ?? null
+  const templateId = opened?.templateId ?? null
+  const minting = opened !== null && draftId === null
 
-/** The full composer: a held draft read back, or a new email under a fresh id. */
+  useEffect(() => {
+    if (!minting) return
+    void navigate({
+      to: '.',
+      search: (prev) => ({ ...prev, draft: crypto.randomUUID() }),
+      replace: true,
+      resetScroll: false,
+    })
+  }, [minting, navigate])
+
+  const target = useMemo<ComposeTarget | null>(
+    () => (draftId === null ? null : { draftId, recordId, templateId }),
+    [draftId, recordId, templateId],
+  )
+
+  return (
+    <ComposeDialog
+      target={target}
+      onClose={() =>
+        void navigate({
+          to: '.',
+          search: (prev) => ({
+            ...prev,
+            modal: undefined,
+            new: undefined,
+            draft: undefined,
+            template: undefined,
+          }),
+          replace: true,
+          resetScroll: false,
+        })
+      }
+    />
+  )
+}
+
+/**
+ * `New email ⌄`: the left half a new email, the menu the email templates,
+ * each opening the composer with it applied.
+ */
+export function NewEmailSplit({
+  onNew,
+  variant,
+}: {
+  onNew: (templateId: string | null) => void
+  /** Pine in a page head; bordered in a tab's toolbar (E6). */
+  variant: 'primary' | 'secondary'
+}) {
+  return (
+    <SplitNewButton
+      noun="email"
+      variant={variant}
+      onNew={() => onNew(null)}
+      templates={(trigger) => (
+        <TemplatePicker
+          kind="email"
+          context="email"
+          trigger={trigger}
+          onPick={(t) => onNew(t.id)}
+        />
+      )}
+    />
+  )
+}
+
+type Loaded = {
+  draft: DraftState
+  savedAt: string | null
+  record: { id: string; name: string } | null
+}
+
+/** A held draft as it was, else a new email: To prefilled, the template applied. */
+async function openTarget(target: ComposeTarget): Promise<Loaded> {
+  const recordId = target.recordId ?? null
+  const templateId = target.templateId ?? null
+  // A bare new email asks the server nothing.
+  if (target.draftId === null && recordId === null && templateId === null)
+    return {
+      draft: blankDraft(crypto.randomUUID()),
+      savedAt: null,
+      record: null,
+    }
+  const opening = await openEmailCompose({
+    data: { draftId: target.draftId, recordId },
+  })
+  if (opening.draft !== null)
+    return {
+      draft: draftStateOf(opening.draft),
+      savedAt: opening.draft.updatedAt,
+      record: opening.record,
+    }
+  const blank = blankDraft(target.draftId ?? crypto.randomUUID(), opening.to)
+  if (templateId === null)
+    return { draft: blank, savedAt: null, record: opening.record }
+  try {
+    const fill = await getEmailTemplate({ data: { id: templateId } })
+    return {
+      draft: withTemplate(blank, fill),
+      savedAt: null,
+      record: opening.record,
+    }
+  } catch (err) {
+    // The email still opens, without the template.
+    toast.error(err instanceof Error ? err.message : 'Could not apply it')
+    return { draft: blank, savedAt: null, record: opening.record }
+  }
+}
+
+/**
+ * The composer's window: the mail glyph and the serif subject (or `New
+ * email`) in the head; To, Subject, the body and the tool row; the foot's
+ * `Saved` line, Cancel and the primary.
+ */
 function ComposeDialog({
   target,
   onClose,
@@ -40,23 +172,19 @@ function ComposeDialog({
 }) {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [savedAt, setSavedAt] = useState<string | null>(null)
+  const [subject, setSubject] = useState('')
 
   useEffect(() => {
     setLoaded(null)
     setError(null)
-    setSavedAt(null)
+    setSubject('')
     if (target === null) return
-    if (target.draftId === null) {
-      setLoaded({ draft: blankDraft(crypto.randomUUID()), savedAt: null })
-      return
-    }
     let live = true
-    getEmailDraft({ data: { id: target.draftId } })
-      .then((d) => {
+    openTarget(target)
+      .then((l) => {
         if (!live) return
-        setLoaded({ draft: draftStateOf(d), savedAt: d.updatedAt })
-        setSavedAt(d.updatedAt)
+        setLoaded(l)
+        setSubject(l.draft.subject)
       })
       .catch((err: unknown) => {
         if (live)
@@ -68,10 +196,11 @@ function ComposeDialog({
   }, [target])
 
   const title =
-    loaded === null || loaded.draft.mode === 'new'
-      ? 'New email'
-      : loaded.draft.subject || 'Reply'
-  const saved = savedLine(savedAt)
+    subject.trim() !== ''
+      ? subject
+      : loaded === null || loaded.draft.mode === 'new'
+        ? 'New email'
+        : 'Reply'
 
   return (
     <Dialog
@@ -80,13 +209,16 @@ function ComposeDialog({
         if (!open) onClose()
       }}
     >
-      <DialogContent size="l">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription className={saved === null ? 'sr-only' : ''}>
-            {saved ?? 'A new email'}
-          </DialogDescription>
+      <DialogContent size="l" data-compose-window className="h-170">
+        <DialogHeader className="items-center">
+          <Email aria-hidden className="size-5 shrink-0 text-graphite" />
+          <DialogTitle className="min-w-0 flex-1 truncate">{title}</DialogTitle>
         </DialogHeader>
+        <DialogDescription className="sr-only">
+          {loaded?.draft.mode === 'new' || loaded === null
+            ? 'A new email'
+            : 'A draft reply'}
+        </DialogDescription>
         {loaded === null ? (
           <>
             {error === null ? (
@@ -94,7 +226,7 @@ function ComposeDialog({
                 <Twinkle size={29} />
               </div>
             ) : (
-              <p className="text-ui text-destructive">{error}</p>
+              <p className="flex-1 text-ui text-destructive">{error}</p>
             )}
             <DialogFooter>
               <Button variant="outline" onClick={onClose}>
@@ -107,7 +239,9 @@ function ComposeDialog({
             key={loaded.draft.id}
             initial={loaded.draft}
             savedAt={loaded.savedAt}
-            onSaved={setSavedAt}
+            recordId={loaded.record?.id ?? null}
+            recordName={loaded.record?.name ?? null}
+            onSubject={setSubject}
             onClose={onClose}
           />
         )}
