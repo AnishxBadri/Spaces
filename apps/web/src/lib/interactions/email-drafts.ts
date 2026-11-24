@@ -43,6 +43,7 @@ import {
   replyAddresses,
 } from './email-draft-prefill'
 import type { ReplyMode } from './email-draft-prefill'
+import { signatureProgram } from './email-signature'
 
 /**
  * Email drafts: the composer's store, author-private and local only.
@@ -113,10 +114,16 @@ export type DraftRow = {
 /** A draft whose send failed, as Today's notice names it. */
 export type UnsentDraft = { id: string; subject: string }
 
-/** A reply opened from the email window: the draft held, and each mode's start. */
+/**
+ * A reply opened from the email window: the draft held, and each mode's
+ * start. The starts are unsigned; a new reply adds the viewer's signature
+ * once (`replyDraft`), so switching mode carries it as written text.
+ */
 export type ReplyOpening = {
   draft: EmailDraft | null
   modes: { [M in ReplyMode]: DraftFields }
+  /** The viewer's signature; a held draft's body is never signed again. */
+  signature: string
 }
 
 /** A person the recipient search found, with every email alias they hold. */
@@ -448,6 +455,9 @@ export const openReplyProgram = Effect.fn('openReplyProgram')(function* (
     }
   }
   const draft = yield* draftOf(viewer, eq(emailDraft.inReplyToId, parentId))
+  const signature = yield* signatureProgram(viewer).pipe(
+    Effect.mapError((e) => new DraftFailed({ cause: e.cause })),
+  )
   return {
     draft,
     modes: {
@@ -455,6 +465,7 @@ export const openReplyProgram = Effect.fn('openReplyProgram')(function* (
       reply_all: start('reply_all'),
       forward: start('forward'),
     },
+    signature,
   }
 })
 

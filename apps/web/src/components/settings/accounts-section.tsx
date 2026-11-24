@@ -16,6 +16,7 @@ import {
   useSettingsPage,
 } from './settings-section'
 import { BoundFoldersSection } from './bound-folders-section'
+import { EmailSignatureCard } from './email-signature-section'
 import { MailSyncSettings } from './mail-sync-section'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
@@ -100,11 +101,14 @@ export function AccountsSection({
   job,
   view,
   forwarding,
+  signature,
 }: {
   job: AccountPageJob
   view: AccountsView
   /** Email & calendar's Bcc address: the workspace's forwarding mailbox, or null. */
   forwarding?: { address: string | null } | undefined
+  /** Email & calendar's: the reader's own email signature, as stored. */
+  signature?: string | undefined
 }) {
   const { isAdmin } = useSettingsPage()
   const accounts = accountsFor(job, view.connections)
@@ -159,6 +163,9 @@ export function AccountsSection({
       </SettingsGroup>
       {forwarding !== undefined ? (
         <ForwardingAddress address={forwarding.address} />
+      ) : null}
+      {signature !== undefined ? (
+        <EmailSignatureCard stored={signature} />
       ) : null}
     </SettingsSection>
   )

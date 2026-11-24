@@ -5,6 +5,7 @@ import {
   draftRecipientsSchema,
 } from '@spaces/core/json'
 import { uuidString } from '@spaces/core/attributes/registry'
+import { SIGNATURE_MAX } from '../email/signature'
 import { THREAD_FILTERS } from '../email/threads'
 import { requireUser } from './shared'
 import { input } from './input'
@@ -262,6 +263,42 @@ export const openEmailReply = createServerFn()
       return await effectFn(openReplyProgram)({ id: user.id }, data.parentId)
     } catch (failure) {
       throw new Error(draftMessage(failure))
+    }
+  })
+
+/** The reader's own email signature, for Settings › Email & calendar. */
+export const getEmailSignature = createServerFn().handler(async () => {
+  const user = await requireUser()
+  const { signatureProgram } = await import('../interactions/email-signature')
+  const { effectFn } = await import('./effect')
+  try {
+    return await effectFn(signatureProgram)({ id: user.id })
+  } catch {
+    throw new Error('Could not read your signature')
+  }
+})
+
+/** Writes the reader's own signature; blank clears it. */
+export const saveEmailSignature = createServerFn({ method: 'POST' })
+  .validator(
+    input(
+      Schema.Struct({
+        signature: Schema.String.check(Schema.isMaxLength(SIGNATURE_MAX)),
+      }),
+    ),
+  )
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { saveSignatureProgram } =
+      await import('../interactions/email-signature')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(saveSignatureProgram)(
+        { id: user.id },
+        data.signature,
+      )
+    } catch {
+      throw new Error('Could not save your signature')
     }
   })
 

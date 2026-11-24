@@ -100,6 +100,7 @@ const opening = (over: Partial<ComposeOpening> = {}): ComposeOpening => ({
   draft: null,
   to: [DEV],
   record: { id: RECORD, name: 'Flent' },
+  signature: '',
   ...over,
 })
 
@@ -202,6 +203,23 @@ describe('the composer over a page', () => {
     expect(chips()).toEqual(['dev@flent.example'])
     const body = dialog()?.querySelector('textarea')
     expect(body?.value).toBe('Hi —')
+  })
+
+  it('opens a new email with the author’s signature at its foot, a template’s body above it', async () => {
+    const SIG = 'Anish Badri\nPartner, Fund'
+    fns.openEmailCompose.mockResolvedValue(opening({ signature: SIG }))
+    await open({ modal: 'email', new: 1, draft: DRAFT })
+    expect(dialog()?.querySelector('textarea')?.value).toBe(`\n\n${SIG}`)
+    expect(fns.saveEmailDraft).not.toHaveBeenCalled()
+    act(() => root.unmount())
+    root = createRoot(host)
+    fns.getEmailTemplate.mockResolvedValue({
+      subject: 'Diligence next steps',
+      bodyMd: 'Hi —',
+      attachments: [],
+    })
+    await open({ modal: 'email', new: 1, draft: DRAFT, template: TEMPLATE })
+    expect(dialog()?.querySelector('textarea')?.value).toBe(`Hi —\n\n${SIG}`)
   })
 
   it('reopens a draft held under the URL’s id as it was, its saved line in the foot', async () => {

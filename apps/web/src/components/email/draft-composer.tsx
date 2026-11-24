@@ -36,8 +36,10 @@ import {
 } from '#/lib/email/compose'
 import type { DraftHome, DraftState, ReviewChoices } from '#/lib/email/compose'
 import { SIGN_IN_AGAIN } from '#/lib/email/send-words'
+import { bodyWritten } from '#/lib/email/signature'
 import {
   getEmailSender,
+  getEmailSignature,
   getEmailTemplate,
   listEmailVariables,
   listRecordDocuments,
@@ -109,6 +111,15 @@ function typedFills(choices: ReviewChoices) {
     out[email] = cells
   }
   return out
+}
+
+/** The author's signature, or none when it cannot be read: a template still applies. */
+async function readSignature(): Promise<string> {
+  try {
+    return await getEmailSignature()
+  } catch {
+    return ''
+  }
 }
 
 const COULD_NOT_READ: EmailSender = {
@@ -359,11 +370,16 @@ export function DraftComposer({
     }
   }
 
-  /** Applying copies the template's subject, body and files; the recipients stay. */
+  /**
+   * Applying copies the template's subject, body and files; the recipients
+   * stay, and so does the signature at the foot. A body holding only the
+   * signature is not yet written, so it is replaced without asking.
+   */
   async function applyTemplate(t: TemplateRow) {
+    const signature = await readSignature()
     const written =
       draft.subject.trim() !== '' ||
-      draft.bodyMd.trim() !== '' ||
+      bodyWritten(draft.bodyMd, signature) ||
       draft.attachments.length > 0
     if (
       written &&
@@ -377,7 +393,7 @@ export function DraftComposer({
       return
     try {
       const fill = await getEmailTemplate({ data: { id: t.id } })
-      setDraft((d) => withTemplate(d, fill))
+      setDraft((d) => withTemplate(d, fill, signature))
       setDirty(true)
       setReview(null)
     } catch (err) {

@@ -9,6 +9,7 @@ import { companyPeopleProgram } from '#/lib/people/companies'
 import { DraftFailed, getDraftProgram } from './email-drafts'
 import type { EmailDraft } from './email-drafts'
 import { prefillTo } from './email-compose-prefill'
+import { signatureProgram } from './email-signature'
 import type { PrefillPerson, PrefillRecord } from './email-compose-prefill'
 
 /**
@@ -21,6 +22,11 @@ export type ComposeOpening = {
   draft: EmailDraft | null
   to: Array<DraftRecipient>
   record: { id: string; name: string } | null
+  /**
+   * The viewer's signature: a new email's foot, and what a template applied
+   * later keeps there. A held draft's body is never signed again.
+   */
+  signature: string
 }
 
 const query = <T>(run: () => Promise<T>) =>
@@ -128,6 +134,15 @@ export const openComposeProgram = Effect.fn('openComposeProgram')(function* (
             .where(eq(entity.id, recordId)),
         )).at(0)
   const record = row === undefined ? null : { id: row.id, name: row.name }
-  if (draft !== null || row === undefined) return { draft, to: [], record }
-  return { draft, to: prefillTo(yield* prefillRecordOf(row)), record }
+  const signature = yield* signatureProgram(viewer).pipe(
+    Effect.mapError((e) => new DraftFailed({ cause: e.cause })),
+  )
+  if (draft !== null || row === undefined)
+    return { draft, to: [], record, signature }
+  return {
+    draft,
+    to: prefillTo(yield* prefillRecordOf(row)),
+    record,
+    signature,
+  }
 })

@@ -262,6 +262,18 @@ describe('a reply', () => {
       bodyMd: '',
       attachments: [],
     })
+    expect(opened.signature).toBe('')
+  })
+
+  it('carries the viewer’s signature beside starts that stay unsigned', async () => {
+    await db
+      .update(user)
+      .set({ emailSignature: 'Anish Badri' })
+      .where(eq(user.id, ME.id))
+    const opened = await run(openReplyProgram(ME, await anEmail()))
+    expect(opened.signature).toBe('Anish Badri')
+    expect(opened.modes.reply.bodyMd).toBe('')
+    expect(opened.modes.forward.bodyMd).not.toContain('Anish Badri')
   })
 
   it('reply all keeps To and Cc minus every address of the viewer', async () => {

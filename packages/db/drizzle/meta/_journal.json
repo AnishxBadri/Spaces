@@ -680,6 +680,13 @@
       "when": 1795401165633,
       "tag": "0096_email_draft_send_error",
       "breakpoints": true
+    },
+    {
+      "idx": 97,
+      "version": "7",
+      "when": 1795403418421,
+      "tag": "0097_user_email_signature",
+      "breakpoints": true
     }
   ]
 }

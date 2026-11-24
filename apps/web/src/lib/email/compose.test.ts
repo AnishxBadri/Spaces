@@ -3,16 +3,20 @@ import {
   NO_CHOICES,
   blankDraft,
   choicesOf,
+  draftStateOf,
   emailRecordAction,
   messageCount,
   openBlankCount,
   reconnectHref,
   reconnectReturn,
+  replyDraft,
   reviewCopies,
   sendLabel,
+  switchMode,
   withChoices,
   withTemplate,
 } from './compose'
+import { bodyWritten } from './signature'
 
 /**
  * A new email's seams: the blank draft with a record's To, a template
@@ -66,6 +70,121 @@ describe('a new email', () => {
     if (!('run' in action)) throw new Error('no run')
     action.run()
     expect(open).toHaveBeenCalledOnce()
+  })
+})
+
+describe('the signature', () => {
+  const SIG = 'Anish Badri\nPartner, Fund'
+  const QUOTE = [
+    '---------- Forwarded message ----------',
+    'From: dev@flent.example',
+    '',
+    'The deck.',
+  ].join('\n')
+  const start = (mode: 'reply' | 'reply_all' | 'forward') => ({
+    mode,
+    inReplyToId: 'e1',
+    to: mode === 'forward' ? [] : [DEV],
+    cc: [],
+    bcc: [],
+    subject: mode === 'forward' ? 'Fwd: Deck' : 'Re: Deck',
+    bodyMd: mode === 'forward' ? QUOTE : '',
+    attachments: [],
+  })
+  const modes = {
+    reply: start('reply'),
+    reply_all: start('reply_all'),
+    forward: start('forward'),
+  }
+
+  it('sits at the foot of a new email after a blank line, its blank edges trimmed', () => {
+    expect(blankDraft('d1', [DEV], `\n${SIG}  \n\n`).bodyMd).toBe(`\n\n${SIG}`)
+  })
+
+  it('sits at the foot of a reply after a blank line', () => {
+    const reply = replyDraft('d1', modes.reply, SIG)
+    expect(reply).toMatchObject({ id: 'd1', mode: 'reply', to: [DEV] })
+    expect(reply.bodyMd).toBe(`\n\n${SIG}`)
+  })
+
+  it('goes before a forward’s quoted message, once', () => {
+    const forward = replyDraft('d1', modes.forward, SIG)
+    expect(forward.bodyMd).toBe(`\n\n${SIG}\n\n${QUOTE}`)
+    expect(forward.bodyMd.split(SIG)).toHaveLength(2)
+  })
+
+  it('stays as written text when the mode switches, and stays gone once deleted', () => {
+    const reply = {
+      ...replyDraft('d1', modes.reply, SIG),
+      bodyMd: `Thanks Dev.\n\n${SIG}`,
+    }
+    const forward = switchMode(reply, modes.reply, modes.forward)
+    expect(forward.bodyMd).toBe(`Thanks Dev.\n\n${SIG}\n\n${QUOTE}`)
+    expect(switchMode(forward, modes.forward, modes.reply).bodyMd).toBe(
+      `Thanks Dev.\n\n${SIG}`,
+    )
+    const unsigned = { ...reply, bodyMd: 'Thanks Dev.' }
+    expect(switchMode(unsigned, modes.reply, modes.forward).bodyMd).toBe(
+      `Thanks Dev.\n\n${QUOTE}`,
+    )
+  })
+
+  it('keeps its place under a template applied later, once however often one is applied', () => {
+    const fill = { subject: 'Next steps', bodyMd: 'Hi —\n\n', attachments: [] }
+    const once = withTemplate(blankDraft('d1', [DEV], SIG), fill, SIG)
+    expect(once.bodyMd).toBe(`Hi —\n\n${SIG}`)
+    const twice = withTemplate(once, { ...fill, bodyMd: 'Hello again —' }, SIG)
+    expect(twice.bodyMd).toBe(`Hello again —\n\n${SIG}`)
+    // A template saved from a signed draft already carries it.
+    const carried = withTemplate(
+      once,
+      { ...fill, bodyMd: `Hi —\n\n${SIG}` },
+      SIG,
+    )
+    expect(carried.bodyMd).toBe(`Hi —\n\n${SIG}`)
+    // A template applied to an empty body leaves the blank line for the caret.
+    expect(
+      withTemplate(blankDraft('d2', [], SIG), { ...fill, bodyMd: '' }, SIG)
+        .bodyMd,
+    ).toBe(`\n\n${SIG}`)
+  })
+
+  it('is not put back by a template once the author deleted it', () => {
+    const deleted = { ...blankDraft('d1', [DEV], SIG), bodyMd: 'Typed.' }
+    const fill = { subject: 'Next steps', bodyMd: 'Hi —', attachments: [] }
+    expect(withTemplate(deleted, fill, SIG).bodyMd).toBe('Hi —')
+  })
+
+  it('adds nothing when empty', () => {
+    for (const empty of ['', '  \n ', null]) {
+      expect(blankDraft('d1', [], empty).bodyMd).toBe('')
+      expect(replyDraft('d1', modes.reply, empty).bodyMd).toBe('')
+      expect(replyDraft('d1', modes.forward, empty).bodyMd).toBe(QUOTE)
+      expect(
+        withTemplate(
+          blankDraft('d1', [], empty),
+          { subject: 'S', bodyMd: 'Hi —', attachments: [] },
+          empty,
+        ).bodyMd,
+      ).toBe('Hi —')
+    }
+  })
+
+  it('is not added again to a held draft reopened', () => {
+    const held = {
+      ...blankDraft('d1', [DEV], SIG),
+      bodyMd: 'Signature deleted.',
+      updatedAt: '2026-11-20T10:58:00.000Z',
+      sendError: null,
+    }
+    expect(draftStateOf(held).bodyMd).toBe('Signature deleted.')
+  })
+
+  it('alone is not a written body, so a template replaces it without asking', () => {
+    expect(bodyWritten(`\n\n${SIG}`, SIG)).toBe(false)
+    expect(bodyWritten(`Hi\n\n${SIG}`, SIG)).toBe(true)
+    expect(bodyWritten('', '')).toBe(false)
+    expect(bodyWritten(`\n\n${SIG}`, '')).toBe(true)
   })
 })
 

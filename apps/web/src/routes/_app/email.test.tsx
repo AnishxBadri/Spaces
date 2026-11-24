@@ -187,7 +187,12 @@ beforeEach(() => {
   for (const fn of Object.values(fns)) fn.mockReset()
   fns.listEmailThreads.mockResolvedValue(PAGE)
   fns.listEmailDrafts.mockResolvedValue(DRAFTS)
-  fns.openEmailCompose.mockResolvedValue({ draft: null, to: [], record: null })
+  fns.openEmailCompose.mockResolvedValue({
+    draft: null,
+    to: [],
+    record: null,
+    signature: '',
+  })
   fns.getEmailDraft.mockResolvedValue({
     ...DRAFTS[0],
     inReplyToId: T2,

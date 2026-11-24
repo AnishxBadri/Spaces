@@ -6,6 +6,7 @@ import { Email } from '#/components/icons'
 import { connectHref } from '#/lib/connections/products'
 import { composeSearch } from '#/lib/modal-search'
 import type { PageAction } from '#/lib/page-actions'
+import { holdsSignature, signedBody } from './signature'
 import type {
   DraftDocument,
   DraftFields,
@@ -22,10 +23,14 @@ import type {
 /** The draft as the composer holds it: its fields and the id it saves under. */
 export type DraftState = DraftFields & { id: string }
 
-/** A new email under `id`: to `to` (a record's prefill), nothing written. */
+/**
+ * A new email under `id`: to `to` (a record's prefill), nothing written but
+ * the author's signature at the foot.
+ */
 export function blankDraft(
   id: string,
   to: ReadonlyArray<DraftRecipient> = [],
+  signature: string | null = null,
 ): DraftState {
   return {
     id,
@@ -35,9 +40,22 @@ export function blankDraft(
     cc: [],
     bcc: [],
     subject: '',
-    bodyMd: '',
+    bodyMd: signedBody('', signature),
     attachments: [],
   }
+}
+
+/**
+ * A reply, reply-all or forward under `id`, from its mode's start: the
+ * signature after a blank line, above the forwarded message. The starts
+ * stay unsigned, so `switchMode` carries the signature as written text.
+ */
+export function replyDraft(
+  id: string,
+  start: DraftFields,
+  signature: string | null,
+): DraftState {
+  return { ...start, id, bodyMd: signedBody('', signature, start.bodyMd) }
 }
 
 /** What applying a template copies into a draft. */
@@ -46,15 +64,23 @@ export type TemplateFill = Pick<
   'subject' | 'bodyMd' | 'attachments'
 >
 
-/** A template applied: its subject, body and files; the recipients stay. */
+/**
+ * A template applied: its subject, body and files; the recipients stay.
+ * The signature the draft still holds stays at the foot, under the
+ * template's body, once: a template that already carries it is taken as is.
+ */
 export function withTemplate(
   draft: DraftState,
   fill: TemplateFill,
+  signature: string | null = null,
 ): DraftState {
+  const keep =
+    holdsSignature(draft.bodyMd, signature) &&
+    !holdsSignature(fill.bodyMd, signature)
   return {
     ...draft,
     subject: fill.subject,
-    bodyMd: fill.bodyMd,
+    bodyMd: keep ? signedBody(fill.bodyMd, signature) : fill.bodyMd,
     attachments: fill.attachments,
   }
 }

@@ -136,18 +136,14 @@ type Loaded = {
   record: { id: string; name: string } | null
 }
 
-/** A held draft as it was, else a new email: To prefilled, the template applied. */
+/**
+ * A held draft as it was, else a new email: To prefilled, the author's
+ * signature at the foot, the template applied above it.
+ */
 async function openTarget(target: ComposeTarget): Promise<Loaded> {
   const recordId = target.recordId ?? null
   const templateId = target.templateId ?? null
-  // A bare new email asks the server nothing.
-  if (target.draftId === null && recordId === null && templateId === null)
-    return {
-      draft: blankDraft(crypto.randomUUID()),
-      savedAt: null,
-      notSent: null,
-      record: null,
-    }
+  // Even a bare new email asks: the signature is the author's, on the server.
   const opening = await openEmailCompose({
     data: { draftId: target.draftId, recordId },
   })
@@ -158,12 +154,16 @@ async function openTarget(target: ComposeTarget): Promise<Loaded> {
       notSent: opening.draft.sendError,
       record: opening.record,
     }
-  const blank = blankDraft(target.draftId ?? crypto.randomUUID(), opening.to)
+  const blank = blankDraft(
+    target.draftId ?? crypto.randomUUID(),
+    opening.to,
+    opening.signature,
+  )
   const fresh = { savedAt: null, notSent: null, record: opening.record }
   if (templateId === null) return { draft: blank, ...fresh }
   try {
     const fill = await getEmailTemplate({ data: { id: templateId } })
-    return { draft: withTemplate(blank, fill), ...fresh }
+    return { draft: withTemplate(blank, fill, opening.signature), ...fresh }
   } catch (err) {
     // The email still opens, without the template.
     toast.error(err instanceof Error ? err.message : 'Could not apply it')

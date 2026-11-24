@@ -45,7 +45,7 @@ import type {
   EmailPrivacy,
   ReplyOpening,
 } from '#/lib/server-fns'
-import { draftStateOf } from '#/lib/email/compose'
+import { draftStateOf, replyDraft } from '#/lib/email/compose'
 import type { DraftState } from '#/lib/email/compose'
 import { openModalId } from '#/lib/modal-search'
 import { useClock } from '#/components/clock'
@@ -358,7 +358,11 @@ function EmailWindow({
         opened.draft === null
           ? {
               modes: opened.modes,
-              draft: { ...opened.modes[mode], id: crypto.randomUUID() },
+              draft: replyDraft(
+                crypto.randomUUID(),
+                opened.modes[mode],
+                opened.signature,
+              ),
               savedAt: null,
               notSent: null,
             }

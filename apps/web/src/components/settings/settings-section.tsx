@@ -392,12 +392,15 @@ export function rowOpens(open: () => void) {
  * - `hint` is for cost, privacy or something irreversible only; any
  *   other explanation is a tooltip on the control, or nothing.
  * - `onOpen`: the row's Edit, opened from anywhere on the row.
+ * - `top`: a control taller than the row (a text box) hangs from the top,
+ *   the label level with its first line.
  */
 export function SettingsRow({
   label,
   hint,
   end,
   onOpen,
+  top = false,
   children,
 }: {
   label: ReactNode
@@ -405,6 +408,7 @@ export function SettingsRow({
   /** State or action, right: a status square, or `Set up ›`. */
   end?: ReactNode
   onOpen?: (() => void) | undefined
+  top?: boolean
   children?: ReactNode
 }) {
   return (
@@ -412,12 +416,18 @@ export function SettingsRow({
       data-settings-row
       {...(onOpen === undefined ? {} : { onClick: rowOpens(onOpen) })}
       className={cn(
-        'flex min-h-12 items-center gap-6 border-b border-rule px-(--inset) py-2',
+        'flex min-h-12 gap-6 border-b border-rule px-(--inset) py-2',
+        top ? 'items-start' : 'items-center',
         onOpen !== undefined &&
           'cursor-pointer transition-colors duration-150 ease-out-quart hover:bg-bone',
       )}
     >
-      <div className="flex w-[13.125rem] shrink-0 flex-col gap-0.5">
+      <div
+        className={cn(
+          'flex w-[13.125rem] shrink-0 flex-col gap-0.5',
+          top && 'pt-2.5',
+        )}
+      >
         <span className="text-ui font-medium">{label}</span>
         {hint ? <span className="text-label text-graphite">{hint}</span> : null}
       </div>

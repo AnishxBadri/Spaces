@@ -906,6 +906,7 @@ describe('a reply (E3)', () => {
         ],
       }),
     },
+    signature: '',
   }
 
   const typeBody = (value: string) => {
@@ -964,6 +965,30 @@ describe('a reply (E3)', () => {
     expect(buttons('Cancel')).toHaveLength(1)
     expect(buttons('Review')).toHaveLength(1)
     expect(buttons('Send')).toHaveLength(0)
+  })
+
+  it('opens a reply with the author’s signature at its foot, and a forward with it above the forwarded message', async () => {
+    fns.getEmail.mockResolvedValue({
+      ...HTML,
+      body: { kind: 'text', text: 'Q3 closed ahead of plan.' },
+    })
+    fns.openEmailReply.mockResolvedValue({
+      ...OPENING,
+      signature: 'Anish Badri\nPartner, Fund',
+    })
+    await open(RECORD)
+    act(() => buttons('Reply')[0]?.click())
+    await settle()
+    expect(body()).toBe('\n\nAnish Badri\nPartner, Fund')
+    typeBody('Thanks Jane.\n\nAnish Badri\nPartner, Fund')
+    act(() =>
+      [...document.querySelectorAll<HTMLElement>('[role="radio"]')]
+        .find((t) => t.textContent === 'Forward')
+        ?.click(),
+    )
+    expect(body()).toBe(
+      'Thanks Jane.\n\nAnish Badri\nPartner, Fund\n\n---------- Forwarded message ----------',
+    )
   })
 
   it('reviews the reply in place: the draft card turns into the card as it goes, the foot Back to draft and Send', async () => {

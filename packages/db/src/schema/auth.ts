@@ -33,6 +33,10 @@ export const user = pgTable('user', {
   updatedAt: timestamp('updated_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
+  // The app's, not Better Auth's: the adapter writes only its own fields and
+  // reads back only those, so a nullable column here is invisible to it.
+  // Plain text the composer adds once to a new email and a reply; null is none.
+  emailSignature: text('email_signature'),
 })
 
 export const session = pgTable('session', {

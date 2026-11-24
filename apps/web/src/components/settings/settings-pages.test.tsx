@@ -41,6 +41,9 @@ const writes = vi.hoisted(() => ({
     url: 'http://localhost/api/blob/zip',
   })),
   saveMailbox: vi.fn(async () => ({ queued: true })),
+  saveEmailSignature: vi.fn(async ({ data }: { data: { signature: string } }) =>
+    data.signature.trim(),
+  ),
   setSensitivityDefault: vi.fn(
     async ({ data }: { data: { sensitivity: string } }) => data.sensitivity,
   ),
@@ -587,6 +590,7 @@ const loaders: Record<string, () => object> = {
   'email-calendar': () => ({
     view: accounts,
     address: 'deals@in.fund.example',
+    signature: '',
   }),
   'email-calendar/$connectionId': () => ({ view: accounts }),
   'meeting-notes': () => meetingNotes,
@@ -1047,6 +1051,50 @@ describe('saving', () => {
     expect(bar()?.getAttribute('data-shown')).toBe('false')
   })
 
+  it('saves the email signature through the bar, with no account connected', async () => {
+    const original = loaders['email-calendar']
+    loaders['email-calendar'] = () => ({
+      view: { ...accounts, connections: [] },
+      address: null,
+      signature: '',
+    })
+    try {
+      await mount('/settings/email-calendar')
+      expect(document.body.textContent).toContain('No accounts connected.')
+      const card = Array.from(
+        document.querySelectorAll('[data-settings-group]'),
+      )
+        .find((g) => g.querySelector('h3')?.textContent === 'Email')
+        ?.closest('.card')
+      const box = card?.querySelector('textarea[aria-label="Email signature"]')
+      if (!(box instanceof HTMLTextAreaElement)) throw new Error('no signature')
+      expect(box.className).toContain('font-serif')
+      // The card comes after what the page already drew.
+      const heads = Array.from(
+        document.querySelectorAll('[data-settings-group] h3'),
+      ).map((h) => h.textContent)
+      expect(heads).toEqual(['Accounts', 'Bcc address', 'Email'])
+
+      const setter = Object.getOwnPropertyDescriptor(
+        HTMLTextAreaElement.prototype,
+        'value',
+      )?.set
+      await act(async () => {
+        setter?.call(box, 'Anish Badri\nPartner, Fund')
+        box.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      expect(bar()?.getAttribute('data-shown')).toBe('true')
+      expect(bar()?.textContent).toContain('1 change')
+      await click(saveControls().at(0))
+      expect(writes.saveEmailSignature).toHaveBeenCalledWith({
+        data: { signature: 'Anish Badri\nPartner, Fund' },
+      })
+      expect(bar()?.getAttribute('data-shown')).toBe('false')
+    } finally {
+      loaders['email-calendar'] = original
+    }
+  })
+
   it('saves a switch at once, without the bar', async () => {
     await mount('/settings/email-forwarding')
     const tls = document.querySelector('button[role="switch"]')
@@ -1420,6 +1468,7 @@ describe('the accounts pages, by the job an account does', () => {
     loaders['email-calendar'] = () => ({
       view: { ...accounts, installed: [], enabled: [] },
       address: null,
+      signature: '',
     })
     try {
       await mount('/settings/email-calendar')

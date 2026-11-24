@@ -15,6 +15,7 @@ import { truncateAndReseed } from '#/test/reseed'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
 import { saveDraftProgram } from './email-drafts'
 import { openComposeProgram } from './email-compose'
+import { saveSignatureProgram } from './email-signature'
 
 /**
  * The composer's opening read: To from the record a new email starts on
@@ -145,7 +146,12 @@ describe('openComposeProgram', () => {
     expect((await open(orphan)).to).toEqual([])
     const lp = await anEntity('custom', 'An LP')
     expect((await open(lp)).to).toEqual([])
-    expect(await open(null)).toEqual({ draft: null, to: [], record: null })
+    expect(await open(null)).toEqual({
+      draft: null,
+      to: [],
+      record: null,
+      signature: '',
+    })
   })
 
   it('reopens a draft held under the id as it was, with no prefill', async () => {
@@ -176,5 +182,27 @@ describe('openComposeProgram', () => {
     const opened = await open(dev, randomUUID())
     expect(opened.draft).toBeNull()
     expect(opened.to.map((r) => r.email)).toEqual(['dev@flent.example'])
+  })
+
+  it("carries the viewer's own signature, and a held draft's body as saved", async () => {
+    await run(saveSignatureProgram(ME, '  Anish Badri\nPartner, Fund\n\n'))
+    expect((await open(null)).signature).toBe('Anish Badri\nPartner, Fund')
+    const id = randomUUID()
+    await run(
+      saveDraftProgram(ME, {
+        id,
+        mode: 'new',
+        inReplyToId: null,
+        to: [],
+        cc: [],
+        bcc: [],
+        subject: '',
+        bodyMd: 'Written, signature deleted.',
+        attachments: [],
+      }),
+    )
+    const held = await open(null, id)
+    expect(held.signature).toBe('Anish Badri\nPartner, Fund')
+    expect(held.draft?.bodyMd).toBe('Written, signature deleted.')
   })
 })
