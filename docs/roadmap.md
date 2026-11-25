@@ -63,6 +63,7 @@ Plus Email (project 35: the thread as message cards with the reply as its last c
 - `SPA-471` `deps-1` — drop `@tailwindcss/typography` (unused) and `dotenv`/`dotenv-cli` (Node 22 reads env files); the site sets in IBM Plex. Project 40; `afk`.
 - `SPA-472` `errors-1` — a failed query shows its area's plain line and logs the cause; every failure class carries a message; one query failure per area; unknown `/api` paths answer 404 (D117). Project 40; `afk`.
 - `SPA-490` `toasts-1` — an error toast closes after 10 seconds; only one whose failure shows nowhere else stays until dismissed. Project 40; `afk`.
+- `SPA-491` `files-delete` — a file on the Files page has a `···` menu with Delete…, behind the delete confirm; a linked Drive or Box file stays in Drive. Project 40; `afk`.
 - `SPA-486` `mcp-schema` — an MCP tool's JSON Schema is generated from its Effect decoder; a live MCP client check. Project 40; `afk`.
 - `SPA-487` `schema-tidy` — one plain-record guard, the registry's error wording, no exports kept only for tests. Project 40; `afk`.
 - `SPA-488` `auth-links` — `/join` and `/reset` require their token; a link without one says so. Project 40; `afk`.
