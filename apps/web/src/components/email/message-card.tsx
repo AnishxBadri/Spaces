@@ -22,7 +22,7 @@ import type {
   EmailParticipant,
   EmailThreadLine,
 } from '#/lib/server-fns'
-import { splitQuotedText, trimQuotedHtml } from './quoted'
+import { isForward, splitQuotedText, trimQuotedHtml } from './quoted'
 
 /**
  * One message of a thread as a card on the bone ground: folded to a 40px
@@ -272,8 +272,15 @@ function EmailFrame({ srcdoc }: { srcdoc: string }) {
   const frame = useRef<HTMLIFrameElement>(null)
   const [height, setHeight] = useState(240)
   const measure = useCallback(() => {
-    const doc = frame.current?.contentDocument
-    if (doc) setHeight(doc.documentElement.scrollHeight)
+    const el = frame.current
+    const doc = el?.contentDocument
+    if (!el || !doc) return
+    // A document is never shorter than its viewport, so a two-line body is
+    // read with the frame collapsed or it keeps the height it started at.
+    el.style.height = '0px'
+    const held = doc.documentElement.scrollHeight
+    el.style.height = `${String(held)}px`
+    setHeight(held)
   }, [])
   return (
     <iframe
@@ -322,8 +329,11 @@ function MessageBody({ email }: { email: EmailDetail }) {
   const [quoted, setQuoted] = useState(false)
   const body = email.body
   const trimmed = useMemo(
-    () => (body.kind === 'html' ? trimQuotedHtml(body.srcdoc) : null),
-    [body],
+    () =>
+      body.kind === 'html'
+        ? trimQuotedHtml(body.srcdoc, isForward(email.subject))
+        : null,
+    [body, email.subject],
   )
   const split = useMemo(
     () => (body.kind === 'text' ? splitQuotedText(body.text) : null),

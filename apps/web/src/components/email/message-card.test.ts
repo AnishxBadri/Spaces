@@ -1,7 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { JSDOM } from 'jsdom'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import type { EmailDetail, EmailThreadLine } from '#/lib/server-fns'
 import { senderLine, threadCards } from './message-card'
-import { splitQuotedText } from './quoted'
+import { isForward, splitQuotedText, trimQuotedHtml } from './quoted'
 
 /**
  * A message card's header line, written one way everywhere (sender →
@@ -168,5 +169,46 @@ describe('quoted history', () => {
   it('keeps a body that is nothing but history, and one with none', () => {
     expect(splitQuotedText('> only quoted').quoted).toBeNull()
     expect(splitQuotedText('Plain note.').quoted).toBeNull()
+  })
+})
+
+describe('quoted history in HTML', () => {
+  const outlook = [
+    '<!doctype html><html><head></head><body><div class="WordSection1">',
+    '<p>Kindly confirm by tomorrow.</p>',
+    '<div><div style="border:none;border-top:solid #E1E1E1 1.0pt">',
+    '<p><b>From:</b> Dev Shah <b>Sent:</b> 24 November <b>To:</b> Anish</p>',
+    '</div></div><p>The earlier proposal.</p></div></body></html>',
+  ].join('')
+
+  beforeAll(() => {
+    const { window } = new JSDOM('')
+    vi.stubGlobal('DOMParser', window.DOMParser)
+    vi.stubGlobal('Node', window.Node)
+  })
+  afterAll(() => vi.unstubAllGlobals())
+
+  it('folds desktop Outlook from its ruled From and Sent header', () => {
+    const cut = trimQuotedHtml(outlook)
+    expect(cut).toContain('Kindly confirm by tomorrow.')
+    expect(cut).not.toContain('Sent:')
+    expect(cut).not.toContain('The earlier proposal.')
+  })
+
+  it('leaves the same header alone in a forward, where it opens the content', () => {
+    expect(isForward('FW: Proposal')).toBe(true)
+    expect(isForward('Fwd: Proposal')).toBe(true)
+    expect(isForward('Re: Proposal')).toBe(false)
+    expect(isForward(null)).toBe(false)
+    expect(trimQuotedHtml(outlook, true)).toBeNull()
+  })
+
+  it('folds a Gmail quote block and keeps a body with none', () => {
+    const gmail =
+      '<!doctype html><html><head></head><body><div>Thanks.</div><div class="gmail_quote">On Tue, Dev wrote: the file</div></body></html>'
+    expect(trimQuotedHtml(gmail)).not.toContain('the file')
+    expect(
+      trimQuotedHtml('<!doctype html><html><body><p>Plain.</p></body></html>'),
+    ).toBeNull()
   })
 })
