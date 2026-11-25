@@ -64,9 +64,9 @@ Plus Email (project 35: the thread as message cards with the reply as its last c
 - `SPA-454` `tasks-3` — a record's and a space's Tasks section: everyone's open tasks, five rows then `n more ›`, Undo on a tick (D113). Project 36; `afk`, after SPA-450.
 - `SPA-455` `tasks-4` — Today's tasks and the sidebar's `n due` are your own; a task opens in the window (D113). Project 36; `afk`, after SPA-450.
 - `SPA-456` `tasks-5` — a task made from an action item keeps its write-up; pending items head Tasks › Open (D113). Project 36; `migration`, `afk`, after SPA-442 and SPA-451.
-- `SPA-471` `deps-1` — drop `@tailwindcss/typography` (unused) and `dotenv`/`dotenv-cli` (Node 22 reads env files); the site sets in IBM Plex. Project 43; `afk`.
-- `SPA-472` `errors-1` — a failed query shows its area's plain line and logs the cause; every failure class carries a message; one query failure per area; unknown `/api` paths answer 404 (D117). Project 43; `afk`.
-- `SPA-490` `toasts-1` — an error toast closes after 10 seconds; only one whose failure shows nowhere else stays until dismissed. Project 43; `afk`.
+- `SPA-471` `deps-1` — drop `@tailwindcss/typography` (unused) and `dotenv`/`dotenv-cli` (Node 22 reads env files); the site sets in IBM Plex. Project 40; `afk`.
+- `SPA-472` `errors-1` — a failed query shows its area's plain line and logs the cause; every failure class carries a message; one query failure per area; unknown `/api` paths answer 404 (D117). Project 40; `afk`.
+- `SPA-490` `toasts-1` — an error toast closes after 10 seconds; only one whose failure shows nowhere else stays until dismissed. Project 40; `afk`.
 - `SPA-486` `mcp-schema` — an MCP tool's JSON Schema is generated from its Effect decoder; a live MCP client check. Project 40; `afk`.
 - `SPA-487` `schema-tidy` — one plain-record guard, the registry's error wording, no exports kept only for tests. Project 40; `afk`.
 - `SPA-488` `auth-links` — `/join` and `/reset` require their token; a link without one says so. Project 40; `afk`.
