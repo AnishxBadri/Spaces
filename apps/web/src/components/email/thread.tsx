@@ -8,7 +8,8 @@ import type { FileActions, ReplyMode } from './message-card'
 /**
  * An email thread as a column of message cards, oldest first, the newest
  * last: the window's own message open, every earlier one folded until a
- * click unfolds it in place. While a draft is written every card folds,
+ * click unfolds it in place, and an open one folds again from its header.
+ * While a draft is written every card folds,
  * the draft standing under them as the last card.
  * - It draws only the cards; the bone ground that holds them is the caller's,
  *   so a window and a page pane can each frame it.
@@ -35,6 +36,8 @@ export function EmailThread({
     drafting ? new Set() : new Set([email.id]),
   )
   const cards = threadCards(email.thread.earlier, email)
+  const fold = (id: string) =>
+    setOpen((prev) => new Set([...prev].filter((held) => held !== id)))
   return (
     <>
       <Categories categories={email.categories} />
@@ -47,6 +50,7 @@ export function EmailThread({
               today={today}
               actions={actions}
               onDraft={onDraft}
+              onFold={() => fold(head.id)}
             />
           ) : (
             <EarlierCard
@@ -56,6 +60,7 @@ export function EmailThread({
               today={today}
               actions={actions}
               onDraft={onDraft}
+              onFold={() => fold(head.id)}
             />
           )
         ) : (
@@ -78,12 +83,14 @@ function EarlierCard({
   today,
   actions,
   onDraft,
+  onFold,
 }: {
   id: string
   recordId: string | null
   today: string
   actions: FileActions
   onDraft: (messageId: string, mode: ReplyMode) => void
+  onFold: () => void
 }) {
   const [email, setEmail] = useState<EmailDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -110,6 +117,7 @@ function EarlierCard({
         today={today}
         actions={actions}
         onDraft={onDraft}
+        onFold={onFold}
       />
     )
   return (

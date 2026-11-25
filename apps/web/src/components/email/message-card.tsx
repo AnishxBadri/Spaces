@@ -522,17 +522,20 @@ export type ReplyMode = 'reply' | 'reply_all' | 'forward'
 /**
  * An open message: its header (the line opens the address block, then the
  * stamp and the message's own `···`), its body, and its files under a rule.
+ * The header's free width, stamp included, folds the card back to its line.
  */
 export function OpenCard({
   email,
   today,
   actions,
   onDraft,
+  onFold,
 }: {
   email: EmailDetail
   today: string
   actions: FileActions
   onDraft: (messageId: string, mode: ReplyMode) => void
+  onFold: () => void
 }) {
   const [addresses, setAddresses] = useState(false)
   return (
@@ -548,11 +551,20 @@ export function OpenCard({
           data-sender-line
           aria-expanded={addresses}
           onClick={() => setAddresses((v) => !v)}
-          className="focus-ring min-w-0 flex-1 truncate text-left text-ui"
+          className="focus-ring min-w-0 truncate text-left text-ui"
         >
           <HeaderLine head={email} folded={false} tips />
         </button>
-        <span className={STAMP}>{messageStamp(email.occurredAt, today)}</span>
+        <button
+          type="button"
+          data-fold
+          aria-label="Fold this message"
+          title="Fold"
+          onClick={onFold}
+          className="focus-ring flex min-w-22 flex-1 items-center justify-end self-stretch"
+        >
+          <span className={STAMP}>{messageStamp(email.occurredAt, today)}</span>
+        </button>
         <MoreMenu
           variant="row"
           label={`message from ${senderPart(email.from).text}`}
