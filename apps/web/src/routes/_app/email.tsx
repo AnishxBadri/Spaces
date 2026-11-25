@@ -63,7 +63,9 @@ import { cn } from '#/lib/utils'
  * the list is the page and a thread opens in the email window. Not an
  * inbox: nothing is unread, archived or sent apart.
  * - The open item is the URL's `id`: the thread's newest message, or the
- *   draft. Nothing open leaves the pane empty bone.
+ *   draft. In two panes Threads opens its first thread when nothing is
+ *   addressed, so the right pane is never bare beside a list; a draft opens
+ *   only when picked.
  * - Both lists hang under the drafts key, so a save, a send or a trash
  *   anywhere re-reads the Draft marks, the tab's count and the list.
  * - The head's `New email ⌄` opens the composer as a window over the page,
@@ -277,6 +279,17 @@ function ThreadsFolder({
   )
   const total = pages?.at(-1)?.total ?? 0
   const groups = useMemo(() => byWeek(threads, today), [threads, today])
+
+  // Once per list, so a pane that closes itself stays closed and a thread
+  // opened below the split is never one the reader did not pick.
+  const first = threads.at(0)?.id ?? null
+  const listed = `${filter}\n${q}`
+  const opened = useRef<string | null>(null)
+  useEffect(() => {
+    if (split !== true || first === null || opened.current === listed) return
+    opened.current = listed
+    if (open === null) onSelect(first)
+  }, [split, first, listed, open, onSelect])
 
   return (
     <FolderBody label="Threads" className="min-h-0 flex-1 flex-row">

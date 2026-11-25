@@ -312,8 +312,16 @@ describe('Threads', () => {
     // A bare row still reads its subject and its day.
     expect(row(T3)?.textContent).toBe('Seeded hello9 Oct')
     expect(text('[data-table-foot]')).toEqual(['3 of 312·Load 50 more'])
-    // Nothing selected: the pane is bare.
-    expect(document.querySelector('[data-open-pane]')?.children).toHaveLength(0)
+    // Nothing addressed: the first thread opens, so the pane is never bare.
+    expect(search()).toContain(T1)
+    expect(document.querySelector(`[data-stub-pane="${T1}"]`)).not.toBeNull()
+  })
+
+  it('keeps the thread the URL addresses instead of the first', async () => {
+    await mount(`/email?id=${T2}`)
+    expect(search()).toContain(T2)
+    expect(document.querySelector(`[data-stub-pane="${T2}"]`)).not.toBeNull()
+    expect(document.querySelector(`[data-stub-pane="${T1}"]`)).toBeNull()
   })
 
   it('asks again under each of the three filters', async () => {
@@ -355,21 +363,24 @@ describe('Threads', () => {
 
   it('opens the selected thread in the right pane at 1440', async () => {
     await mount('/email')
-    click(document.querySelector(`[data-thread="${T1}"] button`))
+    click(document.querySelector(`[data-thread="${T2}"] button`))
     await settle()
-    expect(search()).toContain(T1)
+    expect(search()).toContain(T2)
     expect(
       document
-        .querySelector(`[data-thread="${T1}"]`)
+        .querySelector(`[data-thread="${T2}"]`)
         ?.hasAttribute('data-selected'),
     ).toBe(true)
-    expect(document.querySelector(`[data-stub-pane="${T1}"]`)).not.toBeNull()
+    expect(document.querySelector(`[data-stub-pane="${T2}"]`)).not.toBeNull()
     expect(document.querySelector('[data-stub-window]')).toBeNull()
   })
 
   it('opens it in the email window below the split instead', async () => {
     win.happyDOM.setViewport({ width: 900, height: 900 })
     await mount('/email')
+    // One pane: nothing opens until a row is picked.
+    expect(document.querySelector('[data-stub-window]')).toBeNull()
+    expect(search()).not.toContain('id=')
     click(document.querySelector(`[data-thread="${T1}"] button`))
     await settle()
     expect(document.querySelector(`[data-stub-window="${T1}"]`)).not.toBeNull()
