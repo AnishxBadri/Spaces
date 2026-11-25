@@ -21,7 +21,7 @@ export function useDeleteDraft(): {
   async function deleteDraft(id: string, settle?: () => Promise<void>) {
     const sure = await confirm({
       title: 'Delete this draft?',
-      body: 'What you wrote here goes.',
+      note: "Can't be undone",
       action: 'Delete',
       kind: 'destructive',
     })
