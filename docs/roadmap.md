@@ -43,29 +43,30 @@ Plus Email (project 35: the thread as message cards with the reply as its last c
 ## Open
 
 - `SPA-389` `ai-b` — the mandate in every judging lane, and cached tokens on the ledger. Project 31; `migration`, `hitl`: the owner confirms AI column answers may change under the mandate.
-- `SPA-437` `heads-2` — an index page's head is 48px and never folds; a page about one thing keeps 104 (D114). `afk`.
-- `SPA-438` — a Button inside a menu or dialog trigger keeps `data-slot="button"`, so the folded head's buttons are all 26px and the split create's halves line up. `afk`.
-- `SPA-439` — a note's preview strips its markdown on the notes list, a record's notes and Ask. `afk`.
+- `SPA-437` `heads-2` — an index page's head is 48px and never folds; a page about one thing keeps 104 (D114). Project 41; `afk`.
+- `SPA-438` — a Button inside a menu or dialog trigger keeps `data-slot="button"`, so the folded head's buttons are all 26px and the split create's halves line up. Project 41; `afk`.
+- `SPA-439` — a note's preview strips its markdown on the notes list, a record's notes and Ask. Project 41; `afk`.
 - `SPA-440` `meetings-1` — the Meetings page: Upcoming and Past tabs, a person chip (`Mine` by default), thread rows, a `No write-up` band with a recorder's grace hour, `Log interaction` in the head, a fixed pane (D112). Project 34; `afk`.
 - `SPA-441` `meetings-2` — Prep lives only in an upcoming meeting's window: a cited brief where the write-up will go, `Ask about this`, `Save as note` (D112). Project 34; `afk`, after SPA-429.
 - `SPA-442` `meetings-3` — `Write it up` opens the note window on any page; action items are read from every shared write-up and decided in the meeting window and on Today under Tasks (D112). Project 34; `afk`, after SPA-429.
 - `SPA-443` `meetings-4` — calendar sync keeps only timed, ordinary, non-private events with an outside attendee off the exclude list; `Remove from Spaces…` is remembered (D112). Project 34; `migration`, `afk`, google-calendar bump.
 - `SPA-444` `meetings-5` — Today's Write-ups are yours with the grace hour; the day strip's head names the next meeting and shows `Join ↗` near a call (D112). Project 34; `afk`, after SPA-440.
 - `SPA-445` `meetings-6` — a record's Interactions tab opens with an `Upcoming` band; `This week` holds only the past; the `Next meeting` readout opens the meeting (D112). Project 34; `afk`.
-- `SPA-446` — a multi-value field's rows: clicking a value copies it, remove is its own action with Undo, rows lead with the value's own icon. `afk`.
-- `SPA-447` — Add to Team lists likely people before you type (this company's interaction participants first) and no rail picker opens empty. `afk`.
-- `SPA-452` `record-tabs` — the many side of a paired relationship is a record tab with a table (Team, Associated deals, People, Companies, custom objects'); the rail keeps a three-row preview with `All n ›` (D115). `afk`.
-- `SPA-453` `rail-icons` — every rail attribute label leads with its type's 16px glyph; section heads stay bare. `afk`.
-- `SPA-457` `empty-states` — each kind's empty page draws its dithered noun, title and create button, no sentence; a filter that matched nothing is one icon-and-line row (D116). `afk`.
-- `SPA-458` `head-quick` — a record head offers New note and New task as two icons before its verbs (A4). After SPA-450. `afk`.
-- `SPA-459` `rail-set` — the rail's `n empty` row opens in place into `Set <attribute>` rows, then `New attribute…` and `Fewer`. `afk`.
+- `SPA-446` — a multi-value field's rows: clicking a value copies it, remove is its own action with Undo, rows lead with the value's own icon. Project 42; `afk`.
+- `SPA-447` — Add to Team lists likely people before you type (this company's interaction participants first) and no rail picker opens empty. Project 42; `afk`.
+- `SPA-452` `record-tabs` — the many side of a paired relationship is a record tab with a table (Team, Associated deals, People, Companies, custom objects'); the rail keeps a three-row preview with `All n ›` (D115). Project 42; `afk`.
+- `SPA-453` `rail-icons` — every rail attribute label leads with its type's 16px glyph; section heads stay bare. Project 42; `afk`.
+- `SPA-457` `empty-states` — each kind's empty page draws its dithered noun, title and create button, no sentence; a filter that matched nothing is one icon-and-line row (D116). Project 41; `afk`.
+- `SPA-458` `head-quick` — a record head offers New note and New task as two icons before its verbs (A4). Project 42; `afk`, after SPA-450.
+- `SPA-459` `rail-set` — the rail's `n empty` row opens in place into `Set <attribute>` rows, then `New attribute…` and `Fewer`. Project 42; `afk`.
 - `SPA-450` `tasks-1` — one task window for new and edit; `T` opens it on every page; the row menu drops its two edit windows (D113). Project 36; `afk`.
 - `SPA-451` `tasks-2` — the Tasks page: a fixed pane, a person chip (`Mine` by default), plain bands, a Done log in week bands (D113). Project 36; `afk`, after SPA-450 and SPA-440.
 - `SPA-454` `tasks-3` — a record's and a space's Tasks section: everyone's open tasks, five rows then `n more ›`, Undo on a tick (D113). Project 36; `afk`, after SPA-450.
 - `SPA-455` `tasks-4` — Today's tasks and the sidebar's `n due` are your own; a task opens in the window (D113). Project 36; `afk`, after SPA-450.
 - `SPA-456` `tasks-5` — a task made from an action item keeps its write-up; pending items head Tasks › Open (D113). Project 36; `migration`, `afk`, after SPA-442 and SPA-451.
-- `SPA-471` `deps-1` — drop `@tailwindcss/typography` (unused) and `dotenv`/`dotenv-cli` (Node 22 reads env files); the site sets in IBM Plex. `afk`.
-- `SPA-472` `errors-1` — a failed query shows its area's plain line and logs the cause; every failure class carries a message; one query failure per area; unknown `/api` paths answer 404 (D117). `afk`.
+- `SPA-471` `deps-1` — drop `@tailwindcss/typography` (unused) and `dotenv`/`dotenv-cli` (Node 22 reads env files); the site sets in IBM Plex. Project 43; `afk`.
+- `SPA-472` `errors-1` — a failed query shows its area's plain line and logs the cause; every failure class carries a message; one query failure per area; unknown `/api` paths answer 404 (D117). Project 43; `afk`.
+- `SPA-490` `toasts-1` — an error toast closes after 10 seconds; only one whose failure shows nowhere else stays until dismissed. Project 43; `afk`.
 - `SPA-486` `mcp-schema` — an MCP tool's JSON Schema is generated from its Effect decoder; a live MCP client check. Project 40; `afk`.
 - `SPA-487` `schema-tidy` — one plain-record guard, the registry's error wording, no exports kept only for tests. Project 40; `afk`.
 - `SPA-488` `auth-links` — `/join` and `/reset` require their token; a link without one says so. Project 40; `afk`.
