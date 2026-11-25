@@ -590,7 +590,7 @@ export function AppSidebar({
         <DropdownMenu>
           <DropdownMenuTrigger
             className={cn(
-              'flex min-w-0 flex-1 items-center gap-2.5 px-4 text-left transition-colors',
+              'flex min-w-0 flex-1 items-center gap-2.5 px-4 text-left',
               'hover:bg-bone-deep',
               'focus-ring-inset',
             )}
@@ -608,6 +608,16 @@ export function AppSidebar({
             onSignOut={signOut}
           />
         </DropdownMenu>
+        <IconTip label="Settings" keys={chord('G ,')} side="top">
+          <Link
+            to="/settings"
+            aria-label="Settings"
+            {...(onNavigate ? { onClick: onNavigate } : {})}
+            className="focus-ring-inset flex w-13 shrink-0 items-center justify-center text-graphite hover:bg-bone-deep hover:text-foreground"
+          >
+            <Settings className="size-4" />
+          </Link>
+        </IconTip>
       </div>
     </div>
   )
@@ -959,7 +969,7 @@ function CollapsedSidebar({
             to="/ask"
             aria-label="Ask"
             data-ask-row
-            className="focus-ring-inset flex h-10 w-12 items-center justify-center text-graphite transition-colors hover:bg-bone-deep hover:text-foreground aria-[current=page]:text-foreground"
+            className="focus-ring-inset flex h-10 w-12 items-center justify-center text-graphite hover:bg-bone-deep hover:text-foreground aria-[current=page]:text-foreground"
             activeProps={{ 'aria-current': 'page' }}
           >
             <ChatOperational className="size-4" />
@@ -970,7 +980,7 @@ function CollapsedSidebar({
             <DropdownMenuTrigger
               data-account-row
               aria-label={`Account — ${user.name}`}
-              className="focus-ring-inset flex h-13 w-12 items-center justify-center border-t border-hairline transition-colors hover:bg-bone-deep"
+              className="focus-ring-inset flex h-13 w-12 items-center justify-center border-t border-hairline hover:bg-bone-deep"
             >
               <InitialsSquare name={user.name} />
             </DropdownMenuTrigger>
@@ -1006,7 +1016,8 @@ function IconTip({
   children: React.ReactNode
 }) {
   return (
-    <Tooltip>
+    // 100ms, not the app's 300: the rail is scanned by hovering.
+    <Tooltip delayDuration={100}>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
       <TooltipContent side={side}>
         {keys === undefined ? (
@@ -1045,7 +1056,7 @@ function CollapsedNavLink({
         to={to}
         {...(params ? { params } : {})}
         aria-label={children}
-        className="focus-ring flex h-[1.875rem] w-8 shrink-0 items-center justify-center rounded-md border border-transparent transition-colors hover:bg-bone-deep aria-[current=page]:border-hairline aria-[current=page]:bg-paper"
+        className="focus-ring flex h-[1.875rem] w-8 shrink-0 items-center justify-center rounded-md border border-transparent hover:bg-bone-deep aria-[current=page]:border-hairline aria-[current=page]:bg-paper"
         activeProps={{ 'aria-current': 'page' }}
       >
         <Icon className="size-4 shrink-0" />
@@ -1178,7 +1189,7 @@ function NavLink({
         explicitUndefined: true,
       }}
       className={cn(
-        'flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-md border border-transparent pr-2.5 text-ui text-foreground transition-colors',
+        'flex h-[1.875rem] shrink-0 items-center gap-2.5 rounded-md border border-transparent pr-2.5 text-ui text-foreground',
         indent ? 'pl-8.5' : 'pl-2.5',
         'hover:bg-bone-deep',
         'focus-ring',
