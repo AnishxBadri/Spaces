@@ -53,6 +53,12 @@ export type EmailMeta = {
   /** The mailbox's own preview of the body (Gmail's `snippet`), when it sent one. */
   snippet?: string
   /**
+   * The Message-ID this workspace minted for a message it sent, when the
+   * mailbox filed the copy under another (Gmail replaces it). The send looks
+   * its outgoing row up by this.
+   */
+  sent_as?: string
+  /**
    * Derived display text, written once by the summarize and classify
    * lanes under the sensitivity gate and never rewritten: a one-line summary
    * and category labels. Absent until a lane answers.

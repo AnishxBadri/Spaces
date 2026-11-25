@@ -16,7 +16,12 @@ import type {
   OutgoingEmail,
   PayloadActionInput,
 } from '@spaces/sdk'
-import { UPLOAD_BOUNDARY, buildMime, uploadBody } from './mime.ts'
+import {
+  SPACES_ID_HEADER,
+  UPLOAD_BOUNDARY,
+  buildMime,
+  uploadBody,
+} from './mime.ts'
 import type { OutgoingAttachment } from './mime.ts'
 import {
   GMAIL_SEND,
@@ -37,6 +42,9 @@ import {
  * sent through `messages.send` with `gmail.send`.
  * - Threads: the parent's Gmail thread is found by its Message-ID, and the
  *   message carries `In-Reply-To` and `References` from the host.
+ * - Gmail replaces a consumer mailbox's Message-ID with its own, so the
+ *   host's id also rides in a kept `X-` header, and "already holds" looks
+ *   there when the Message-ID search finds nothing.
  * - Idempotent by the host's Message-ID: a message the mailbox already
  *   holds under it is not sent again, only filed.
  * - The sent copy, as the mailbox keeps it and under its label names, goes
@@ -45,6 +53,18 @@ import {
  *   mail is gone.
  * - A failure says what Gmail said; the host shows it and keeps the draft.
  */
+
+/** How many lately sent messages the renamed-copy search reads. */
+const RENAMED_SEARCH = 10
+
+/** A message as `format=metadata` returns it, for the one header asked. */
+const keptHeaders = Schema.Struct({
+  payload: Schema.Struct({
+    headers: Schema.Array(
+      Schema.Struct({ name: Schema.String, value: Schema.String }),
+    ).pipe(Schema.withDecodingDefault(Effect.succeed([]))),
+  }),
+})
 
 const mailbox = Schema.Struct({
   email: Schema.String.check(Schema.isMinLength(3)),
@@ -202,7 +222,45 @@ export const send = Effect.fn('gmail.send')(function* (
     return Option.isSome(page) ? (page.value.messages.at(0) ?? null) : null
   })
 
-  const held = yield* byMessageId(message.messageId)
+  /**
+   * The sent copy Gmail filed under an id of its own: among what the
+   * mailbox lately sent to the first recipient, the one whose kept header
+   * carries the host's id. Null when there is none.
+   */
+  const byKeptHeader = Effect.fn('gmail.send.byKeptHeader')(function* (
+    id: string,
+    to: string | undefined,
+  ) {
+    const page = Schema.decodeUnknownOption(messagesPage)(
+      yield* get(
+        url('/users/me/messages', {
+          q: `in:sent newer_than:30d${to === undefined ? '' : ` to:${to}`}`,
+          maxResults: String(RENAMED_SEARCH),
+        }),
+      ),
+    )
+    if (Option.isNone(page)) return null
+    for (const candidate of page.value.messages) {
+      const read = Schema.decodeUnknownOption(keptHeaders)(
+        yield* get(
+          url(`/users/me/messages/${candidate.id}`, {
+            format: 'metadata',
+            metadataHeaders: SPACES_ID_HEADER,
+          }),
+        ),
+      )
+      if (
+        Option.isSome(read) &&
+        read.value.payload.headers.some((h) => h.value.includes(id))
+      )
+        return candidate
+    }
+    return null
+  })
+
+  const held =
+    (yield* byMessageId(message.messageId)) ??
+    (yield* byKeptHeader(message.messageId, message.to.at(0)?.email))
   let gmailId: string
   if (held !== null) {
     yield* log.info('already in the mailbox; not sent again', {

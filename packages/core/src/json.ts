@@ -151,6 +151,7 @@ const emailMeta = Schema.Struct({
   mime_blob_sha: Schema.NullOr(Schema.String),
   labels: Schema.optionalKey(strings),
   snippet: Schema.optionalKey(Schema.String),
+  sent_as: Schema.optionalKey(Schema.String),
   summary: Schema.optionalKey(Schema.String),
   categories: Schema.optionalKey(strings),
 }).annotate(strict)

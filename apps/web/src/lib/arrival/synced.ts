@@ -80,6 +80,33 @@ const refused = (reason: string): EmailResult => ({
   reason,
 })
 
+/** The header the Gmail plugin repeats the host's Message-ID under. */
+const SPACES_ID =
+  /^x-spaces-message-id:[ \t]*<?(spaces-[^<>\s@]+@[^<>\s@]+)>?[ \t]*$/im
+
+/**
+ * The Message-ID this workspace minted for a message it sent through the
+ * mailbox, read from the copy's headers; null on any other mail.
+ * - Gmail replaces `Message-ID` with its own and keeps this header, so the
+ *   minted id is the only thing the send can find its outgoing row by.
+ * - Only the mailbox's own mail is believed: anyone can write a header.
+ */
+export function mintedIdOf(
+  raw: Uint8Array | string,
+  from: string | null,
+  mailbox: string,
+): string | null {
+  if (from === null || from.toLowerCase() !== mailbox.toLowerCase()) return null
+  const text = Buffer.from(raw).toString('latin1')
+  const end = text.search(/\r?\n\r?\n/)
+  // A long header may arrive folded onto a second line.
+  const head = (end === -1 ? text : text.slice(0, end)).replace(
+    /\r?\n[ \t]+/g,
+    ' ',
+  )
+  return SPACES_ID.exec(head)?.at(1) ?? null
+}
+
 export const logSyncedEmailProgram = Effect.fn('logSyncedEmail')(function* (
   ctx: EmailLaneContext,
   input: EmailInput,
@@ -103,35 +130,41 @@ export const logSyncedEmailProgram = Effect.fn('logSyncedEmail')(function* (
     return refused(`${arrival.refusal.reason}: ${arrival.refusal.detail}`)
   const message = arrival.message
 
-  const excluded = mailExclusion(
-    {
-      sender: message.from?.email ?? null,
-      participants: message.participants.map((p) => p.email),
-      labels: input.labels,
-    },
-    box.settings.exclude,
-  )
-  if (excluded !== null)
-    return refused(`${excluded.reason}: ${excluded.detail}`)
+  // A message the member sent from this workspace is filed whatever the
+  // lists and the internal rule say: they wrote it here, and its send waits
+  // on this row to know the mail went.
+  const sentAs = mintedIdOf(input.raw, message.from?.email ?? null, box.address)
+  if (sentAs === null) {
+    const excluded = mailExclusion(
+      {
+        sender: message.from?.email ?? null,
+        participants: message.participants.map((p) => p.email),
+        labels: input.labels,
+      },
+      box.settings.exclude,
+    )
+    if (excluded !== null)
+      return refused(`${excluded.reason}: ${excluded.detail}`)
 
-  // Who "we" are is the participants module's, read now; the mailbox's own
-  // address is ours even when it is not the owner's sign-in address.
-  const identity = yield* Effect.tryPromise({
-    try: () => workspaceIdentity(box.integrationId),
-    catch: (cause) => new SyncedMailFailed({ cause }),
-  })
-  const internal = internalMailRefusal({
-    forwarded: message.forwarded,
-    decisions: decideParticipants({
-      from: message.from,
-      to: message.to,
-      cc: message.cc,
-      ownDomains: identity.ownDomains,
-      memberEmails: [...identity.memberEmails, box.address],
-    }),
-  })
-  if (internal !== null)
-    return refused(`${internal.reason}: ${internal.detail}`)
+    // Who "we" are is the participants module's, read now; the mailbox's own
+    // address is ours even when it is not the owner's sign-in address.
+    const identity = yield* Effect.tryPromise({
+      try: () => workspaceIdentity(box.integrationId),
+      catch: (cause) => new SyncedMailFailed({ cause }),
+    })
+    const internal = internalMailRefusal({
+      forwarded: message.forwarded,
+      decisions: decideParticipants({
+        from: message.from,
+        to: message.to,
+        cc: message.cc,
+        ownDomains: identity.ownDomains,
+        memberEmails: [...identity.memberEmails, box.address],
+      }),
+    })
+    if (internal !== null)
+      return refused(`${internal.reason}: ${internal.detail}`)
+  }
 
   const filed = yield* fileArrivalProgram(
     message,
@@ -145,6 +178,7 @@ export const logSyncedEmailProgram = Effect.fn('logSyncedEmail')(function* (
         providerMessageId: input.providerMessageId,
       },
       ...(input.snippet === undefined ? {} : { snippet: input.snippet }),
+      ...(sentAs === null ? {} : { sentAs }),
     },
   ).pipe(Effect.mapError((e) => new SyncedMailFailed({ cause: e.cause })))
   return filed.kind === 'duplicate'

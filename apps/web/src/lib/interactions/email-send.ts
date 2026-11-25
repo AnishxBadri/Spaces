@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { Context, Effect, Layer, Schema } from 'effect'
-import { and, asc, eq, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull, ne, or, sql } from 'drizzle-orm'
 import { OUTGOING_EMAIL_LIMIT_BYTES, decodeManifest } from '@spaces/sdk'
 import type { EmailAddress, OutgoingEmail } from '@spaces/sdk'
 import {
@@ -506,17 +506,41 @@ export function settledOf(jobs: ReadonlyArray<QueuedJob> | null): Settled {
   return { _tag: 'pending' }
 }
 
+/**
+ * The outgoing rows already held, by the Message-ID minted here.
+ * - A mailbox that keeps the minted id files the row under it.
+ * - Gmail replaces it with its own, so the row is also found by the minted
+ *   id its copy carried back (`meta.sent_as`).
+ */
 const heldIds = Effect.fn('heldMessageIds')(function* (
   messageIds: ReadonlyArray<string>,
 ) {
+  const wanted = new Set(messageIds)
+  const sentAs = sql<string | null>`${interaction.meta}->>'sent_as'`
   const rows = yield* query(() =>
     db
-      .select({ id: interaction.id, messageId: interaction.messageId })
+      .select({
+        id: interaction.id,
+        messageId: interaction.messageId,
+        sentAs,
+      })
       .from(interaction)
-      .where(inArray(interaction.messageId, [...messageIds])),
+      .where(
+        and(
+          eq(interaction.kind, 'email'),
+          or(
+            inArray(interaction.messageId, [...wanted]),
+            inArray(sentAs, [...wanted]),
+          ),
+        ),
+      ),
   )
   return new Map(
-    rows.flatMap((r) => (r.messageId === null ? [] : [[r.messageId, r.id]])),
+    rows.flatMap((r) =>
+      [r.messageId, r.sentAs].flatMap((key): Array<[string, string]> =>
+        key !== null && wanted.has(key) ? [[key, r.id]] : [],
+      ),
+    ),
   )
 })
 

@@ -43,7 +43,7 @@ export const DEFAULT_EXCLUDE_LABELS = [
 export const manifest = defineManifest({
   manifestVersion: 1,
   id: 'gmail',
-  version: '0.1.1',
+  version: '0.1.2',
   sdk: '^2.0',
   name: 'Gmail',
   roles: ['email-calendar'],

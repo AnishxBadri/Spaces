@@ -135,11 +135,20 @@ const textPart = (mime: string, text: string): Array<string> => [
   base64Lines(utf8(text)),
 ]
 
+/**
+ * The header that carries the host's Message-ID a second time. Gmail
+ * replaces `Message-ID` with one of its own on a consumer mailbox and keeps
+ * an `X-` header, so this is how the sent copy is known again: by the host
+ * when it files the copy, and by the send job before it would send twice.
+ */
+export const SPACES_ID_HEADER = 'X-Spaces-Message-Id'
+
 /** The message's RFC 5322 text. */
 export const buildMime = (message: OutgoingMessage): string => {
   const list = (ms: ReadonlyArray<Mailbox>) => ms.map(formatMailbox).join(', ')
   const head = [
     `Message-ID: <${message.messageId}>`,
+    `${SPACES_ID_HEADER}: <${message.messageId}>`,
     `Date: ${message.date.toUTCString()}`,
     `From: ${formatMailbox(message.from)}`,
     ...(message.to.length === 0 ? [] : [`To: ${list(message.to)}`]),

@@ -84,6 +84,8 @@ export type FileOptions = {
   labels: ReadonlyArray<string> | null
   /** The mailbox's preview of the body (Gmail's `snippet`), when it sent one. */
   snippet?: string
+  /** The Message-ID this workspace minted, on the copy of a message it sent. */
+  sentAs?: string
   /** The synced mailbox's owner; null on the forwarded lane. */
   mailboxOwner: string | null
   /**
@@ -110,6 +112,7 @@ export function emailMetaOf(
   labels: ReadonlyArray<string> | null,
   mimeBlobSha: string | null,
   snippet?: string,
+  sentAs?: string,
 ): EmailMeta {
   return {
     kind: 'email',
@@ -123,6 +126,7 @@ export function emailMetaOf(
     mime_blob_sha: mimeBlobSha,
     ...(labels === null ? {} : { labels: [...labels] }),
     ...(snippet === undefined ? {} : { snippet }),
+    ...(sentAs === undefined ? {} : { sent_as: sentAs }),
   }
 }
 
@@ -371,6 +375,7 @@ export const fileArrivalProgram = Effect.fn('fileArrival')(function* (
             options.labels,
             mimeBlobSha,
             options.snippet,
+            options.sentAs,
           ),
           body: {
             title: message.subject ?? '',
