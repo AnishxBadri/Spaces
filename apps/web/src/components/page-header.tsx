@@ -83,7 +83,8 @@ export function PageHeader({
             <div
               data-head-actions
               data-folded={false}
-              className="flex shrink-0 items-center gap-2"
+              // The folded bar's sizing: every 48px bar's buttons are 26px.
+              className="flex shrink-0 items-center gap-2 [&_[data-size=icon]]:w-6.5 [&_[data-slot=button]]:h-6.5"
             >
               {action}
             </div>
