@@ -116,7 +116,6 @@ function Button({
 
   const button = (
     <Comp
-      data-slot="button"
       data-variant={variant}
       data-size={size}
       data-pending={pending ? '' : undefined}
@@ -129,6 +128,9 @@ function Button({
       }}
       style={held}
       {...props}
+      // After the spread: a Radix trigger wrapping this with `asChild` passes
+      // its own `data-slot`, and the folded head sizes buttons by this one.
+      data-slot="button"
     >
       {children}
     </Comp>
