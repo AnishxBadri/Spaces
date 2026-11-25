@@ -8,7 +8,7 @@ import {
   useHeadFold,
   useXlPane,
 } from '#/components/head-fold'
-import { icon } from '#/components/icons'
+import { icon, Time } from '#/components/icons'
 import { EmptyRow, SectionHead } from '#/components/ledger-section'
 import { Card, PageBody } from '#/components/page-header'
 import { Twinkle } from '#/components/twinkle'
@@ -925,10 +925,12 @@ export function RailRow({
           data-property-label
           className={cn(
             PROPERTY_LABEL_LANE,
-            'text-label break-words text-graphite',
+            'flex items-start gap-2 text-label text-graphite',
           )}
         >
-          {label}
+          {/* A lane readout is a time (last contact, next meeting). */}
+          <Time aria-hidden className="size-4 shrink-0" />
+          <span className="min-w-0 truncate">{label}</span>
         </div>
         <div
           data-property-value

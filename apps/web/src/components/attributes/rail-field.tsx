@@ -6,6 +6,7 @@ import { AttributeDialog } from './attribute-dialog'
 import type { EditableAttribute } from './attribute-dialog'
 import { MONO_VALUE_TYPES, ValueEditor } from './value-editor'
 import type { RefNames, RegistryEntry } from './value-editor'
+import { attributeIcon } from './type-icon'
 import {
   PropertyCell,
   REJECT_HOLD_MS,
@@ -62,6 +63,7 @@ export function RailField({
 }) {
   const [editing, setEditing] = useState(false)
   const { error, attempt, reject, save } = useRejectedWrite(def.slug, onSave)
+  const TypeIcon = attributeIcon(def)
 
   return (
     <PropertyCell
@@ -70,9 +72,12 @@ export function RailField({
       reject={reject}
       label={
         <>
+          <TypeIcon aria-hidden className="mr-1 size-4 shrink-0" />
           <span
-            className="min-w-0"
-            {...(def.description ? { title: def.description } : {})}
+            className="min-w-0 truncate"
+            title={
+              def.description ? `${def.name}: ${def.description}` : def.name
+            }
           >
             {def.name}
           </span>

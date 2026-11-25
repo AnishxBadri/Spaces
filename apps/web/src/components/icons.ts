@@ -115,6 +115,7 @@ import {
   TagGroup as CarbonTagGroup,
   Template,
   TextFont as CarbonTextFont,
+  Time as CarbonTime,
   TextLongParagraph,
   TrashCan,
   Unlink,
@@ -290,6 +291,7 @@ export const Sunrise = carbon(CarbonSunrise, 'sunrise')
 export const Table = carbon(CarbonTable, 'table')
 export const TagGroup = carbon(CarbonTagGroup, 'tag--group')
 export const TextFont = carbon(CarbonTextFont, 'text--font')
+export const Time = carbon(CarbonTime, 'time')
 export const User = carbon(CarbonUser, 'user')
 export const UserMultiple = carbon(CarbonUserMultiple, 'user--multiple')
 export const WarningAlt = carbon(CarbonWarningAlt, 'warning--alt')
