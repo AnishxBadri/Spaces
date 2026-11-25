@@ -399,7 +399,7 @@ function PeoplePage() {
   return (
     <ListPage>
       <PageHeader
-        folds={false}
+        index
         title="People"
         titleId={titleId}
         action={

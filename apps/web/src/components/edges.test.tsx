@@ -406,7 +406,7 @@ describe('E10 · one ink object on a page: the folder', () => {
     ]) {
       const text = read(`routes/_app/${list}.tsx`)
       expect(text, list).toMatch(/<ListPage(?: fixed=\{asTable\})?>/)
-      expect(text, list).toMatch(/folds=\{(?:false|!asTable)\}/)
+      expect(text, list).toMatch(/<PageHeader\b[^/]*?\n\s+index\n/)
       // Nothing on a list pins under a folded head any more.
       expect(text, list).not.toMatch(/FolderGround pinned|pinUnder/)
     }
@@ -845,6 +845,7 @@ describe('E7 · one icon list, one brand mark', () => {
       .sort()
     // Each of these draws data or our own concept, never a logo.
     expect(svgs).toEqual([
+      'components/dither-noun.tsx',
       'components/dither.tsx',
       'components/files/file-glyph.tsx',
       'components/files/file-row.tsx',

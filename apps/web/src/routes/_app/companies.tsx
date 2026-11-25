@@ -430,7 +430,7 @@ function CompaniesPage() {
   return (
     <ListPage>
       <PageHeader
-        folds={false}
+        index
         title="Companies"
         titleId={titleId}
         action={

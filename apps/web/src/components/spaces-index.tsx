@@ -96,6 +96,7 @@ export function SpacesIndexPage({
   return (
     <div className="flex min-h-full flex-col">
       <PageHeader
+        index
         title="Spaces"
         action={
           spaces.length > 0 ? (

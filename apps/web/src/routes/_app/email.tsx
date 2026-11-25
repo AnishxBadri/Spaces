@@ -153,7 +153,7 @@ function EmailPage() {
     <ListPage>
       <PageHeader
         title="Email"
-        folds={false}
+        index
         action={<NewEmailSplit variant="primary" onNew={composeHere} />}
       />
       <FolderGround>

@@ -4,7 +4,7 @@ import {
   useRouteContext,
   useRouter,
 } from '@tanstack/react-router'
-import { CheckboxChecked, icon } from '#/components/icons'
+import { icon } from '#/components/icons'
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { tasksSearch } from '#/lib/route-search'
@@ -245,6 +245,7 @@ function TasksPage() {
   return (
     <div className="flex min-h-full flex-col">
       <PageHeader
+        index
         title="Tasks"
         action={
           empty ? undefined : (
@@ -298,11 +299,8 @@ function TasksPage() {
 
       {empty ? (
         <EmptyState
-          icon={CheckboxChecked}
-          title="Nothing to chase yet"
-          body={
-            'Tasks put dates on judgment calls — "revisit when their round closes", "chase the data room", "re-mark after the bridge". Link them to records so they show up where you work.'
-          }
+          kind="tasks"
+          title="No tasks yet"
           action={<TaskComposer hotkey="t" />}
         />
       ) : (

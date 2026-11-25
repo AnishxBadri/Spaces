@@ -449,7 +449,7 @@ function ObjectListPage() {
   return (
     <ListPage>
       <PageHeader
-        folds={false}
+        index
         title={object.plural}
         titleId={titleId}
         action={

@@ -74,8 +74,8 @@ function MandatePage() {
       <div className="flex min-h-full flex-col">
         <PageHeader title="Mandate" description={<span>Not written</span>} />
         <EmptyState
+          kind="notes"
           title="State your mandate"
-          body="Where you invest, at what stage, at what check size, and why. Deals outside it get a quiet flag, never a block — edge cases are the job."
           action={
             <Button
               disabled={creating}

@@ -339,7 +339,7 @@ describe('the folded head', () => {
   it('never folds a list page’s head: no bar, no watched title, the actions in place', () => {
     mount(
       <div className="flex min-h-full flex-col">
-        <PageHeader title="Companies" folds={false} action={<LogButton />} />
+        <PageHeader title="Companies" index action={<LogButton />} />
         <main data-body>Rows</main>
       </div>,
     )

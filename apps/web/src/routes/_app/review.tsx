@@ -4,7 +4,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { reviewSearch } from '#/lib/route-search'
-import { EmptyState } from '#/components/empty-state'
+import { EmptyLine, EmptyState } from '#/components/empty-state'
 import { SuggestionCard } from '#/components/inbox/suggestion-card'
 import { ColumnRunGroup } from '#/components/inbox/column-run-group'
 import { DiscoveryGroup } from '#/components/inbox/discovery-group'
@@ -249,6 +249,7 @@ function InboxPage() {
   return (
     <div className="flex min-h-full flex-col">
       <PageHeader
+        index
         title="Review"
         action={<ScanAction />}
         tabs={
@@ -278,17 +279,9 @@ function InboxPage() {
           ) : null}
 
           {rows.length === 0 ? (
-            <EmptyState
-              icon={MailAll}
-              title="Nothing to review"
-              body="Nothing waits on you. Duplicate pairs appear here when two records claim the same domain or their names look alike; suggestions appear when a provider proposes a value."
-            />
+            <EmptyState kind="tasks" title="Nothing to review" />
           ) : visible.length === 0 ? (
-            <EmptyState
-              icon={MailAll}
-              title="Nothing in this lane"
-              body="The other lane still has open items — switch to All to see them."
-            />
+            <EmptyLine icon={MailAll}>Nothing in this lane</EmptyLine>
           ) : null}
           {mounted.length === 0 ? null : (
             <ul className="flex max-w-220 flex-col gap-3 empty:hidden">

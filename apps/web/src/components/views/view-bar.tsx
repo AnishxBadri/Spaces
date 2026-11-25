@@ -150,8 +150,8 @@ export function ViewBar({
   plural: string
   /** Names for reference values, so a chip reads a name, not an id. */
   refNames?: RefNames | undefined
-  /** Stick under the folded head bar while the page scrolls. */
-  pinned?: boolean | undefined
+  /** Stick under the head while the page scrolls; `index` under an index head. */
+  pinned?: boolean | 'index' | undefined
   /** The open view's name carries this id: the table under it names itself by it. */
   labelId?: string | undefined
 }) {

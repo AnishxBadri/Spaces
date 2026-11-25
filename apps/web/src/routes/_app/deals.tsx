@@ -427,7 +427,7 @@ function DealsPage() {
       <PageHeader
         title="Deals"
         titleId={titleId}
-        folds={!asTable}
+        index
         action={
           firstRun ? (
             listMenu
@@ -473,7 +473,7 @@ function DealsPage() {
               onSaved={() => router.invalidate()}
               canEdit={(v) => v.createdBy === me?.id || me?.role === 'admin'}
               // The board's page scrolls, so its bar pins; a table's never does.
-              pinned={!asTable}
+              pinned={asTable ? false : 'index'}
               refNames={refNames}
               lead={
                 <StageChip

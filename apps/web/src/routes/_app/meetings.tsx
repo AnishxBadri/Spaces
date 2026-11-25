@@ -103,6 +103,7 @@ function MeetingsPage() {
   return (
     <div className="flex min-h-full flex-col">
       <PageHeader
+        index
         title="Meetings"
         tabs={
           <Tabs

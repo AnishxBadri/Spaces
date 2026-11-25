@@ -1,7 +1,7 @@
 import { Link } from '@tanstack/react-router'
 import { CreateCompanyDialog } from '#/components/create-company-dialog'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
-import { DitherBlock } from '#/components/dither'
+import { DitherNoun } from '#/components/dither-noun'
 import { Button } from '#/components/ui/button'
 import { openUploadDialog } from '#/lib/upload-dialog-store'
 
@@ -14,7 +14,7 @@ export function FirstRun({ registry }: { registry: Array<RegistryEntry> }) {
   return (
     <div className="flex flex-1 items-center justify-center px-3 py-16">
       <div className="flex max-w-md flex-col items-center gap-4 text-center">
-        <DitherBlock tone="ink" />
+        <DitherNoun kind="companies" />
         <h2 className="font-serif text-xl leading-6 font-semibold">
           Bring in what you already have.
         </h2>

@@ -3,7 +3,7 @@ import { Checkmark } from '#/components/icons'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { ReactNode } from 'react'
-import { DitherBlock } from '#/components/dither'
+import { DitherNoun } from '#/components/dither-noun'
 import { PageHeader } from '#/components/page-header'
 import { Button } from '#/components/ui/button'
 import { Select } from '#/components/ui/select'
@@ -324,7 +324,7 @@ export function DropZone({
             : 'border-rule bg-paper hover:bg-bone',
         )}
       >
-        <DitherBlock />
+        <DitherNoun kind="files" />
         <span className="font-serif text-xl leading-6 font-semibold">
           {busy
             ? 'Reading the spreadsheet…'

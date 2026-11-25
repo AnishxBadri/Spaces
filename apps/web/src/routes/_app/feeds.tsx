@@ -205,7 +205,7 @@ function FeedsPage() {
     <ListPage>
       <PageHeader
         title="Feeds"
-        folds={false}
+        index
         // Below `md` the line sits on the title's baseline, as the narrow
         // board draws it; from `md` the button keeps the head's top line.
         className="max-md:items-baseline"

@@ -16,12 +16,15 @@ import { cn } from '#/lib/utils'
  * edge, the `···` ending 24px from the right, level with the last control of
  * the content under it; one ink line under, 104px tall at least, so every
  * page's title and line land on the same lines. Scrolled past its title, it
- * folds to `HeadBar` — except on a list page (`folds={false}`), whose head
- * never folds.
+ * folds to `HeadBar`.
+ * - `index`: a page of many things. The head is the 48px bar itself, level
+ *   with the sidebar head, and never folds: the title and any readout on one
+ *   line, no eyebrow. From `md` it pins at the top; below it scrolls away
+ *   under the phone top bar.
  * - `tabs` is the page's folder bar, set on the bone ground under the line
- *   (`FolderGround`); scrolled, it pins under the folded bar rather than
- *   riding into it. A list's count is on its All tab; a page with no tab bar
- *   puts it in the title (`HeadCount`).
+ *   (`FolderGround`); scrolled, it pins under the head rather than riding
+ *   into it. A list's count is on its All tab; a page with no tab bar puts
+ *   it in the title (`HeadCount`).
  */
 export function PageHeader({
   eyebrow,
@@ -30,7 +33,7 @@ export function PageHeader({
   description,
   action,
   tabs,
-  folds = true,
+  index = false,
   titleId,
   className,
 }: {
@@ -39,25 +42,61 @@ export function PageHeader({
   title: ReactNode
   /** Mono beside the title once the head folds: Today's `Thu 15 Oct`. */
   foldMeta?: ReactNode
-  /** Mono readout under the title — counts, last touch. Never prose. */
+  /** Mono readout under the title — counts, last touch. Never prose. On an index head it sits on the title's line and truncates first. */
   description?: ReactNode
   action?: ReactNode
   /** The page's `Tabs` bar; pins under the folded bar. */
   tabs?: ReactNode
-  /**
-   * False on a list page (`ListPage`): from `md` the page never scrolls, and
-   * below it the head simply scrolls away.
-   */
-  folds?: boolean | undefined
+  /** A page of many things: the 48px head that never folds. */
+  index?: boolean | undefined
   /** The title's id, for what it names: a list's table. */
   titleId?: string | undefined
   className?: string
 }) {
-  const head = useHeadFold(folds)
-  const fold = folds ? head.fold : OPEN
+  const head = useHeadFold(!index)
+  const fold = index ? OPEN : head.fold
+  if (index) {
+    return (
+      <>
+        <header
+          data-index-head
+          className={cn(
+            'flex h-12 shrink-0 items-center justify-between gap-4 border-b border-hairline bg-paper md:sticky md:top-0 md:z-sticky',
+            PAGE_EDGE,
+            className,
+          )}
+        >
+          <div className="flex min-w-0 items-baseline gap-5">
+            <h1 id={titleId} className="shrink-0 title-serif">
+              {title}
+            </h1>
+            {description ? (
+              <div className="min-w-0 truncate mono text-label text-graphite">
+                {description}
+              </div>
+            ) : null}
+          </div>
+          {action ? (
+            <div
+              data-head-actions
+              data-folded={false}
+              className="flex shrink-0 items-center gap-2"
+            >
+              {action}
+            </div>
+          ) : null}
+        </header>
+        {tabs ? (
+          <FolderGround pinned="index" data-head-tabs>
+            {tabs}
+          </FolderGround>
+        ) : null}
+      </>
+    )
+  }
   return (
     <>
-      {folds ? <HeadBar fold={fold} title={title} meta={foldMeta} /> : null}
+      <HeadBar fold={fold} title={title} meta={foldMeta} />
       <header
         className={cn(
           // One height on every page, the title on one line from the top:
@@ -97,6 +136,12 @@ export function PageHeader({
   )
 }
 
+/**
+ * Pins a folder bar under an index head: below `md` the head has scrolled
+ * away, so the bar sits under the phone top bar; from `md`, under the head.
+ */
+const PIN_UNDER_INDEX_HEAD = 'sticky top-12 z-sticky'
+
 /** The page edge: the title, and every card's content, sit 24px in. */
 export const PAGE_EDGE = 'px-6'
 
@@ -106,7 +151,7 @@ export const PAGE_EDGE = 'px-6'
  * and the bar leave and scrolls its rows inside. Below `md` the page scrolls
  * with the window, as a phone expects: the head scrolls away and the table's
  * column head pins under the top bar (`RecordTable` splits its table there).
- * Pair it with `PageHeader folds={false}` and a `PageBody` given `min-h-0`.
+ * Pair it with `PageHeader index` and a `PageBody` given `min-h-0`.
  * - `fixed={false}` keeps the same element as a page that scrolls (the
  *   Deals board), so switching shape never remounts what is inside.
  * - `from="xl"`: a tabbed record or a space, a pane only where its rail sits
@@ -176,7 +221,8 @@ export function FolderGround({
   ...data
 }: {
   children: ReactNode
-  pinned?: boolean | undefined
+  /** `index`: under an index head, which scrolls away below `md`. */
+  pinned?: boolean | 'index' | undefined
   className?: string | undefined
 } & { [k: `data-${string}`]: string | boolean | undefined }) {
   return (
@@ -184,7 +230,9 @@ export function FolderGround({
       {...data}
       className={cn(
         'shrink-0 bg-bone px-3 pt-3',
-        pinned && PIN_UNDER_HEAD_BAR,
+        pinned === 'index'
+          ? PIN_UNDER_INDEX_HEAD
+          : pinned && PIN_UNDER_HEAD_BAR,
         className,
       )}
     >

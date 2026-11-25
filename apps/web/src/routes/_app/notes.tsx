@@ -7,7 +7,6 @@ import {
 import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { EmptyState } from '#/components/empty-state'
-import { Page } from '#/components/icons'
 import { Band, Day, FoldRow, LedgerRow } from '#/components/ledger-section'
 import { NewButton, SplitNewButton } from '#/components/new-button'
 import { NOTE_KIND_LABEL, NoteKindIcon } from '#/components/note-kind-icon'
@@ -35,7 +34,7 @@ const STATE_CARD = '[&>[data-list-state]]:border-b-0'
 function NotesPending() {
   return (
     <div className="flex min-h-full flex-col">
-      <PageHeader title="Notes" />
+      <PageHeader index title="Notes" />
       <PageBody>
         <Card label="Notes" className={STATE_CARD}>
           <ListLoadingRow plural="Notes" />
@@ -51,7 +50,7 @@ function NotesLoadFailed({ error }: { error: unknown }) {
   useLoggedRouteError(error)
   return (
     <div className="flex min-h-full flex-col">
-      <PageHeader title="Notes" />
+      <PageHeader index title="Notes" />
       <PageBody>
         <Card label="Notes" className={STATE_CARD}>
           <ListErrorRow
@@ -119,6 +118,7 @@ function NotesPage() {
   return (
     <div className="flex min-h-full flex-col">
       <PageHeader
+        index
         title="Notes"
         action={
           notes.length > 0 ? (
@@ -149,9 +149,8 @@ function NotesPage() {
 
       {notes.length === 0 ? (
         <EmptyState
-          icon={Page}
+          kind="notes"
           title="No notes yet"
-          body="Write in blocks, @mention any company or space, and the graph builds itself — backlinks land on every mentioned record."
           action={<NewButton noun="note" shortcut="N" onClick={newNote} />}
         />
       ) : (

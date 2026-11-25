@@ -271,7 +271,7 @@ function DocumentsPage() {
       <PageHeader
         title="Files"
         titleId={titleId}
-        folds={false}
+        index
         action={
           /* The upload door on the shelf that lists what it produces. The
              dialog lives in the app shell; the chassis and ⌘K open it too. */

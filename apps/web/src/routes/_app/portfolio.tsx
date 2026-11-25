@@ -299,7 +299,7 @@ function PortfolioPage() {
   return (
     <ListPage>
       <PageHeader
-        folds={false}
+        index
         title={
           <HeadCount
             title="Portfolio"
