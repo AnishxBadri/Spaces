@@ -126,7 +126,7 @@ page's 800px column (E4) (`components/head-fold.tsx`).
   edge like every other.
 - **E2 · One ink line under the head.** A single 1px ink line (`border-hairline`), never
   the double, and the head is paper on every page; a line inside the head and between
-  rows stays the rule. An index page's head is 48px (D114): the title at the page step,
+  rows stays the rule. An index page's head is 48px (D114): the title at the head step,
   any mono notice on its baseline, actions at 32px, never folded, pinned from `md` where
   the page scrolls. A page about one thing keeps the 104px head; on a page that scrolls it
   folds to the 48px bar
@@ -208,6 +208,7 @@ which a test keeps in sync.
 | `ui`      | 13 / 20        | the table and form workhorse        |
 | `body`    | 14 / 20        | running text in UI, composer inputs |
 | `title`   | 15 / 22        | a name inside a readout cell        |
+| `head`    | 17 / 24        | an index page's title, 48px head    |
 | `page`    | 22 / 28        | page titles                         |
 | `display` | 26 / 32        | record names                        |
 
