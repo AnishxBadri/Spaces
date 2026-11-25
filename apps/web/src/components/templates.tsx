@@ -86,10 +86,11 @@ export function TemplatePicker({
             Loading…
           </DropdownMenuItem>
         ) : items.length === 0 ? (
-          <DropdownMenuItem icon={<icon.template />} disabled>
-            No templates yet — save one from an existing{' '}
+          // A sentence, not an item: it wraps, where an item is one 28px line.
+          <p className="px-2 py-1.5 text-label text-graphite">
+            No templates yet. Save one from an existing{' '}
             {kind === 'record' ? (objectKind ?? 'record') : kind}.
-          </DropdownMenuItem>
+          </p>
         ) : (
           items.map((t) => {
             // The kind lane, drawn the way the notes index draws it:
