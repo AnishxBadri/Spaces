@@ -67,10 +67,9 @@ export function PageHeader({
           )}
         >
           <div className="flex min-w-0 items-baseline gap-5">
-            {/* The folded bar's title step: every 48px bar reads alike. */}
             <h1
               id={titleId}
-              className="shrink-0 font-serif text-title font-semibold"
+              className="shrink-0 font-serif text-head font-semibold"
             >
               {title}
             </h1>

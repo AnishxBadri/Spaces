@@ -202,6 +202,7 @@
    *   ui      13px  Body/UI — the table + form workhorse
    *   body    14px  Body/UI — default running text in UI
    *   title   15px  Title — section headers, panel titles
+   *   head    17px  Headline — an index page's title in its 48px head
    *   page    22px  Headline — page titles
    *   display 26px  Headline — record names
    */
@@ -217,6 +218,8 @@
   --text-body--line-height: 1.25rem;
   --text-title: 0.9375rem;
   --text-title--line-height: 1.375rem;
+  --text-head: 1.0625rem;
+  --text-head--line-height: 1.5rem;
   --text-page: 1.375rem;
   --text-page--line-height: 1.75rem;
   --text-display: 1.625rem;

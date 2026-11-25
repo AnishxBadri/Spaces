@@ -36,6 +36,7 @@ export const NAMED_STEPS = [
   { name: 'ui', rem: 0.8125, lineRem: 1.25 },
   { name: 'body', rem: 0.875, lineRem: 1.25 },
   { name: 'title', rem: 0.9375, lineRem: 1.375 },
+  { name: 'head', rem: 1.0625, lineRem: 1.5 },
   { name: 'page', rem: 1.375, lineRem: 1.75 },
   { name: 'display', rem: 1.625, lineRem: 2 },
 ]
