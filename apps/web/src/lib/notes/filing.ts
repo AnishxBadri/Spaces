@@ -45,9 +45,9 @@ export type NoteFilingFailure =
  * default covers `term` and anything a later kind adds.
  */
 const KIND_REFUSAL: Record<string, string> = {
-  space: 'A space is filed into, not against — use “Filed in space”.',
-  note: 'A note is not filed against another note; mention it instead.',
-  document: 'A document is filed against a record, not against a note.',
+  space: 'A space is not a record: file the note under it as a space.',
+  note: 'A note is not filed under another note; mention it instead.',
+  document: 'A document is filed under a record, not under a note.',
 }
 
 /** The sentence the client is shown; a `Schema.TaggedError` carries none. */
@@ -95,7 +95,7 @@ const readTarget = Effect.fn('filing.readTarget')(function* (
 ): Effect.fn.Return<void, NoteQueryFailed | FilingTargetRejected> {
   if (targetId === noteId)
     return yield* new FilingTargetRejected({
-      reason: 'A note cannot be filed against itself.',
+      reason: 'A note cannot be filed under itself.',
     })
 
   const rows = yield* query(() =>
@@ -121,7 +121,7 @@ const readTarget = Effect.fn('filing.readTarget')(function* (
     return yield* new FilingTargetRejected({
       reason:
         KIND_REFUSAL[row.kind] ??
-        `A note is filed against a company, person, deal or custom record — not a ${row.kind}.`,
+        `A note is filed under a company, person, deal or custom record — not a ${row.kind}.`,
     })
 })
 

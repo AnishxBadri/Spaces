@@ -441,19 +441,19 @@ describe('the email window', () => {
         'Open',
         'Download',
         'Keep a copy',
-        'File on…',
+        'File under…',
       ])
     })
 
     it('offers neither once the mailbox is disconnected', async () => {
       fns.getEmail.mockResolvedValue(withFile('gone'))
       await open()
-      expect(await openMenu(MENU)).toEqual(['Open', 'File on…'])
+      expect(await openMenu(MENU)).toEqual(['Open', 'File under…'])
     })
 
     it('offers Download alone once a copy is kept', async () => {
       await open()
-      expect(await openMenu(MENU)).toEqual(['Open', 'Download', 'File on…'])
+      expect(await openMenu(MENU)).toEqual(['Open', 'Download', 'File under…'])
     })
 
     it('downloads through the mailbox, not storage', async () => {
@@ -483,7 +483,7 @@ describe('the email window', () => {
         data: { documentId: 'd1' },
       })
       expect(fns.getEmail).toHaveBeenCalledTimes(2)
-      expect(await openMenu(MENU)).toEqual(['Open', 'Download', 'File on…'])
+      expect(await openMenu(MENU)).toEqual(['Open', 'Download', 'File under…'])
     })
 
     it('puts the Source line with Keep a copy beside the viewer, and keeping re-reads the file', async () => {
@@ -607,7 +607,7 @@ describe('who reads it', () => {
     expect(
       dialog()?.querySelector('[data-category="pitch"]')?.textContent,
     ).toBe('Pitch')
-    expect(await windowMenu()).toEqual(['Copy link', 'File on a deal…'])
+    expect(await windowMenu()).toEqual(['Copy link', 'File under…'])
   })
 
   it('says nothing at the foot for the owner’s own private mail', async () => {
@@ -664,7 +664,7 @@ describe('who reads it', () => {
     expect(footNote()).toBe('Shared by Anish')
   })
 
-  it('holds Open in Gmail, Copy link, File on a deal…, Who can read this…, then Unlink', async () => {
+  it('holds Open in Gmail, Copy link, File under…, Who can read this…, then Unlink', async () => {
     fns.getEmail.mockResolvedValue({
       ...OWN,
       gmailUrl: 'https://mail.google.com/mail/#search/rfc822msgid%3Aq3%40acme',
@@ -674,7 +674,7 @@ describe('who reads it', () => {
     expect(await windowMenu()).toEqual([
       'Open in Gmail',
       'Copy link',
-      'File on a deal…',
+      'File under…',
       'Who can read this…',
       '—',
       'Unlink from Flent…',

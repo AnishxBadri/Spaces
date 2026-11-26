@@ -51,7 +51,7 @@ type LinkRelation = (typeof linkRelation.enumValues)[number]
 /** Read from the note's side: the note does this to the other record. */
 const OUTGOING: Record<LinkRelation, string> = {
   mentions: 'mentioned here',
-  tagged_in: 'filed against',
+  tagged_in: 'filed under',
   contact_at: 'contact at',
   derived_from: 'derived from',
   supersedes: 'supersedes',
@@ -61,7 +61,7 @@ const OUTGOING: Record<LinkRelation, string> = {
 /** The other record does this to the note. */
 const INCOMING: Record<LinkRelation, string> = {
   mentions: 'mentions this note',
-  tagged_in: 'filed against this note',
+  tagged_in: 'filed under this note',
   contact_at: 'contact at',
   derived_from: 'derived from this note',
   supersedes: 'supersedes this note',
@@ -184,7 +184,7 @@ export const noteDeleteImpactProgram = Effect.fn('noteDeleteImpactProgram')(
       unlinks: [
         ...spaces.map((s) => ({
           name: s.name,
-          meta: 'filed in space',
+          meta: 'filed under',
           kind: 'space',
           objectLabel: null,
           objectIcon: null,

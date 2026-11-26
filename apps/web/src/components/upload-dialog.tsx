@@ -208,9 +208,9 @@ export function UploadDialog() {
 
         <div className="space-y-4">
           <div className="space-y-1.5">
-            <p className="text-label text-graphite">File against</p>
+            <p className="text-label text-graphite">File under</p>
             <Segmented
-              label="File against"
+              label="File under"
               value={mode}
               options={MODES}
               onChange={(next) => {

@@ -288,13 +288,13 @@ describe('the target allowlist is the server’s', () => {
     refusals.push(['note', noteFilingMessage(noteFailure)])
 
     expect(refusals).toEqual([
-      ['space', 'A space is filed into, not against — use “Filed in space”.'],
-      ['document', 'A document is filed against a record, not against a note.'],
+      ['space', 'A space is not a record: file the note under it as a space.'],
+      ['document', 'A document is filed under a record, not under a note.'],
       [
         'term',
-        'A note is filed against a company, person, deal or custom record — not a term.',
+        'A note is filed under a company, person, deal or custom record — not a term.',
       ],
-      ['note', 'A note is not filed against another note; mention it instead.'],
+      ['note', 'A note is not filed under another note; mention it instead.'],
     ])
 
     // Not one edge was written by any of it.
@@ -314,7 +314,7 @@ describe('the target allowlist is the server’s', () => {
     )
     expect(itself).toBeInstanceOf(FilingTargetRejected)
     expect(noteFilingMessage(itself)).toBe(
-      'A note cannot be filed against itself.',
+      'A note cannot be filed under itself.',
     )
 
     const gone = await Effect.runPromise(

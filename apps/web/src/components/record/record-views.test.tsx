@@ -569,7 +569,7 @@ describe('the Interactions tab', () => {
     expect(await openMenu('call c')).toEqual([
       'Write up',
       'Copy link',
-      'File on a deal…',
+      'File under…',
       'Unlink from Flent…',
     ])
   })
@@ -584,7 +584,7 @@ describe('the Interactions tab', () => {
     expect(await openMenu('meeting m')).toEqual([
       'Open',
       'Copy link',
-      'File on a deal…',
+      'File under…',
     ])
   })
 

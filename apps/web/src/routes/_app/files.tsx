@@ -158,7 +158,7 @@ function DocumentsPage() {
       }),
       col.accessor((r) => chipSortKey(r.records.map((x) => x.name)), {
         id: 'records',
-        header: 'Filed against',
+        header: 'Filed under',
         size: 180,
         cell: (info) => (
           <ChipLane

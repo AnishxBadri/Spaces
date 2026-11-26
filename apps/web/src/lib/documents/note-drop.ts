@@ -76,7 +76,7 @@ export function noteDropFiledIn(
   }
   return names.length === 0
     ? UNFILED_NOTE_MESSAGE
-    : `Filed in ${names.join(', ')}`
+    : `Filed under ${names.join(', ')}`
 }
 
 /**

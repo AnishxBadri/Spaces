@@ -521,7 +521,7 @@ describe('Files', () => {
       [...document.querySelectorAll('[role="columnheader"]')]
         .map((h) => text(h))
         .filter((h) => h !== ''),
-    ).toEqual(['File', 'Filed against', 'Space', 'Added by', 'Date', 'Size'])
+    ).toEqual(['File', 'Filed under', 'Space', 'Added by', 'Date', 'Size'])
   })
 
   it('the exception lane: Extracting…, or Failed with Re-read', async () => {

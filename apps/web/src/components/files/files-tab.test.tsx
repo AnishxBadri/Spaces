@@ -935,7 +935,7 @@ describe('email attachments whose file stays in Gmail', () => {
     expect(row?.querySelector('[data-file-end]')?.textContent.trim()).toBe('')
   })
 
-  it('offers Download, Keep a copy and File on… while the mailbox answers, and keeps the copy', async () => {
+  it('offers Download, Keep a copy and File under… while the mailbox answers, and keeps the copy', async () => {
     fns.keepDocumentCopy.mockResolvedValue({ _tag: 'kept' })
     await mountRow(docs[1])
     await openMenu('AtmosFlight_Investor_Deck.pdf')
@@ -946,7 +946,7 @@ describe('email attachments whose file stays in Gmail', () => {
       'Open',
       'Download',
       'Keep a copy',
-      'File on…',
+      'File under…',
       'Change kind',
       'Remove…',
     ])

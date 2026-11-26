@@ -51,11 +51,14 @@ function NotePage() {
   useNoteLeaveGuard(save.hasPending, save.flushNow)
 
   usePageActions([
-    fileInSpaceAction({
-      id: note.id,
-      name: title || 'Untitled',
-      filedIds: note.spaces.map((s) => s.id),
-    }),
+    fileInSpaceAction(
+      {
+        id: note.id,
+        name: title || 'Untitled',
+        filedIds: note.spaces.map((s) => s.id),
+      },
+      'note',
+    ),
   ])
 
   return (

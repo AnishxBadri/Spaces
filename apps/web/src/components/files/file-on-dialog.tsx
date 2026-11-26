@@ -49,7 +49,7 @@ export function FileOnDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent size="s">
         <DialogHeader>
-          <DialogTitle>File on…</DialogTitle>
+          <DialogTitle>File under…</DialogTitle>
           <DialogDescription className="min-w-0 truncate">
             {doc.filename}
           </DialogDescription>

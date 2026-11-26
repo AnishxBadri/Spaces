@@ -183,7 +183,7 @@ function FileOnDialog({
     <Dialog open={attachment !== null} onOpenChange={onOpenChange}>
       <DialogContent size="s">
         <DialogHeader>
-          <DialogTitle>File on…</DialogTitle>
+          <DialogTitle>File under…</DialogTitle>
           <DialogDescription className="min-w-0 truncate">
             {attachment?.name}
           </DialogDescription>
@@ -387,7 +387,7 @@ function EmailWindow({
   async function unlink(from: { id: string; name: string }) {
     const ok = await confirm({
       title: `Unlink from ${from.name}?`,
-      body: `${email?.subject || 'This email'} leaves ${from.name}. It stays on every other record it is filed on.`,
+      body: `${email?.subject || 'This email'} leaves ${from.name}. It stays on every other record it is filed under.`,
       action: 'Unlink',
     })
     if (!ok) return
@@ -422,7 +422,7 @@ function EmailWindow({
             copy: () => emailLink(email.id),
           },
           {
-            label: 'File on a deal…',
+            label: 'File under…',
             icon: <icon.fileOn />,
             opens: true,
             onSelect: () => setFilingDeal(true),
@@ -470,13 +470,17 @@ function EmailWindow({
           open={filingDeal}
           onOpenChange={setFilingDeal}
           trigger={<span aria-hidden className="size-0" />}
-          placeholder="File on a deal…"
+          placeholder="File under a deal…"
           search={searchDeals}
           onPick={async (deal) => {
             const { filed } = await fileInteractionOnEntity({
               data: { interactionId: id, entityId: deal.id },
             })
-            toast(filed ? `Filed on ${deal.name}` : `Already on ${deal.name}`)
+            toast(
+              filed
+                ? `Filed under ${deal.name}`
+                : `Already filed under ${deal.name}`,
+            )
             void router.invalidate()
           }}
         />

@@ -59,7 +59,7 @@ export function decisionWords(
       return words('Add task')
     case 'identity': {
       const claim = page === null ? null : readIdentityPayload(item.payload)
-      return words(claim === null ? 'Accept' : `File on ${claim.name}`)
+      return words(claim === null ? 'Accept' : `File under ${claim.name}`)
     }
     case 'attribute_patch':
     case 'document_kind':

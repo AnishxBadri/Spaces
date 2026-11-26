@@ -80,7 +80,7 @@ const query = <T>(run: () => Promise<T>) =>
 
 /** The refusal a document with no deal in its filing gets. */
 export const NO_DEAL =
-  'The document is not filed on a deal, so its terms have nowhere to belong'
+  'The document is not filed under a deal, so its terms have nowhere to belong'
 
 /**
  * The sentence a failed run leaves on its job — and so what the Files tab's
@@ -315,10 +315,10 @@ const keyTermsInRun = Effect.fn('keyTerms.inRun')(function* (
       : []),
     ...(deals.length > 1
       ? [
-          `The document is filed on ${String(deals.length)} deals; the same terms are proposed on each.`,
+          `The document is filed under ${String(deals.length)} deals; the same terms are proposed on each.`,
         ]
       : []),
-    'Accepting writes a shared note filed on the deal, derived from the document. Nothing is written to the deal’s fields.',
+    'Accepting writes a shared note filed under the deal, derived from the document. Nothing is written to the deal’s fields.',
   ].join('\n')
 
   const suggestions: Array<Suggestion> = []

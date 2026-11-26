@@ -188,14 +188,14 @@ async function pageTarget(
         message:
           page.kind === 'person'
             ? 'Accept the identity first: these fields apply to the person it matches or creates'
-            : `File the page on a ${what} first: these fields apply to the ${what} it is filed on`,
+            : `File the page under a ${what} first: these fields apply to the ${what} it is filed under`,
       },
     ])
   if (filed.length > 1)
     throw invalid([
       {
         slug: 'record',
-        message: `The page is filed on more than one ${what}: these fields apply to one`,
+        message: `The page is filed under more than one ${what}: these fields apply to one`,
       },
     ])
   return only.id
@@ -653,7 +653,7 @@ async function acceptRefileDocumentInTx(
     throw invalid([
       {
         slug: 'fromEntityId',
-        message: `${move.documentName} is no longer filed on ${move.fromName}`,
+        message: `${move.documentName} is no longer filed under ${move.fromName}`,
       },
     ])
   const { filed } = await fileDocumentInTx(tx, actor.id, {

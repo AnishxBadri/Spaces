@@ -139,7 +139,7 @@ export function FileViewerSidebar({
         />
       </Section>
 
-      <Section label="Filed on" count={doc.filedIn.length}>
+      <Section label="Filed under" count={doc.filedIn.length}>
         {doc.filedIn.map((edge) => (
           <FiledOnLine
             key={`${edge.kind}-${edge.id}`}
@@ -443,7 +443,7 @@ function FileOn({
           <span aria-hidden className="text-primary">
             +
           </span>
-          File on…
+          File under…
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-72">
@@ -533,7 +533,7 @@ function RecordPicker({
       <Input
         value={query}
         disabled={disabled}
-        placeholder="File on a record…"
+        placeholder="File under a record…"
         onChange={(e) => setQuery(e.target.value)}
         className="h-7 text-label"
       />
@@ -603,7 +603,7 @@ function SpacePicker({
   return (
     <div className="mt-1.5">
       <Select
-        aria-label="File this document into a space"
+        aria-label="File this document under a space"
         value=""
         disabled={disabled}
         onChange={onPick}
@@ -619,7 +619,7 @@ function SpacePicker({
           ),
         }))}
         width="content"
-        placeholder="+ File into a space…"
+        placeholder="+ File under a space…"
         searchPlaceholder="Search spaces…"
         emptyLabel="No space matches."
         className="h-7 w-full rounded-none border-dashed bg-transparent px-2 text-label text-graphite hover:text-foreground"

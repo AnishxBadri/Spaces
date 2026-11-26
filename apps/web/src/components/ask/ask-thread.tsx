@@ -733,7 +733,7 @@ export function SaveAsNote({
       size="sm"
       pending={saving}
       disabled={saving || saved}
-      title="Write this answer as a note filed on the records it cited"
+      title="Write this answer as a note filed under the records it cited"
       onClick={async () => {
         setSaving(true)
         try {

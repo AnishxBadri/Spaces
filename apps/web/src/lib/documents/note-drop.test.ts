@@ -148,7 +148,7 @@ describe('a file dropped on a note body', () => {
     expect(fileAgainstForNote([space, space])).toEqual([
       { kind: 'space', entityId: space.id },
     ])
-    expect(noteDropFiledIn([space, space])).toBe('Filed in One')
+    expect(noteDropFiledIn([space, space])).toBe('Filed under One')
   })
 
   it('names the spaces it filed into, in order', () => {
@@ -157,7 +157,7 @@ describe('a file dropped on a note body', () => {
         { id: 'a', name: 'Hydrogen' },
         { id: 'b', name: 'Climate' },
       ]),
-    ).toBe('Filed in Hydrogen, Climate')
+    ).toBe('Filed under Hydrogen, Climate')
   })
 })
 

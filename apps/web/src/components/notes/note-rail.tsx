@@ -272,8 +272,8 @@ function FileOnPicker({
   )
   return (
     <PickPopover
-      trigger={<AddValue>File on…</AddValue>}
-      placeholder="File on a record or space…"
+      trigger={<AddValue>File under…</AddValue>}
+      placeholder="File under a record or space…"
       eager
       search={search}
       lead={(hit) => <KindIcon of={hit.of} />}
@@ -317,10 +317,10 @@ function FiledOn({
   )
   return (
     <LaneGroup name="filed-on">
-      <LaneRow label="Filed on">
+      <LaneRow label="Filed under">
         {n === 0 ? (
           <Value>
-            <span className="text-ui text-graphite">Not filed</span>
+            <span className="text-ui text-graphite">Unfiled</span>
           </Value>
         ) : null}
         {note.filedAgainst.map((r) => (

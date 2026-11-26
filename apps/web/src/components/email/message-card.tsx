@@ -455,7 +455,7 @@ function fileMenu(
       actions.keeper,
     ),
     {
-      label: 'File on…',
+      label: 'File under…',
       icon: <icon.fileOn />,
       opens: true,
       onSelect: () => actions.onFileOn(a),

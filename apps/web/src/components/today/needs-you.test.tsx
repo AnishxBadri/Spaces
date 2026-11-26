@@ -360,7 +360,7 @@ describe('a proposal row', () => {
       'captured identity',
       suggestion({ kind: 'identity', payload: { name: 'Priya Raman' } }),
       { title: 'Priya Raman — LinkedIn', url: null },
-      'File on Priya Raman',
+      'File under Priya Raman',
     ],
     ['task', suggestion({ kind: 'task' }), null, 'Add task'],
     [

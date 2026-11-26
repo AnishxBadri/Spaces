@@ -795,7 +795,7 @@ describe('the rail', () => {
       }),
     )
     expect([...host.querySelectorAll('[data-rail-label]')].map(text)).toEqual([
-      'Filed on',
+      'Filed under',
       'Mentions',
       'Mentioned in',
       'Visible to',
@@ -829,17 +829,17 @@ describe('the rail', () => {
     expect(aside?.some((c) => /^(bg|border)/.test(c))).toBe(false)
   })
 
-  it('Filed on: records then spaces, each led by its kind icon, no kind word, ending + File on…', () => {
+  it('Filed under: records then spaces, each led by its kind icon, no kind word, ending + File under…', () => {
     const filedRail = rail(
       fixture({ filedAgainst: [FLENT, FUND], spaces: [FINTECH] }),
     )
     expect(group(filedRail, 'filed-on')).toEqual({
-      labels: ['Filed on'],
+      labels: ['Filed under'],
       values: [
         '[Company] Flent×',
         '[Fund] Seed Fund II×',
         '[Space] Fintech×',
-        '+File on…',
+        '+File under…',
       ],
     })
     const section = filedRail.querySelector('[data-rail-section="filed-on"]')
@@ -864,7 +864,7 @@ describe('the rail', () => {
     expect(filedRail.querySelector('a[href="/spaces/s1"]')).not.toBeNull()
   })
 
-  it('Filed on keeps an archived space: its name graphite, the state word after it', () => {
+  it('Filed under keeps an archived space: its name graphite, the state word after it', () => {
     const host = rail(
       fixture({
         spaces: [FINTECH, { id: 's9', name: 'Harbour', archived: true }],
@@ -873,7 +873,7 @@ describe('the rail', () => {
     expect(group(host, 'filed-on')?.values).toEqual([
       '[Space] Fintech×',
       '[Space] Harbourarchived×',
-      '+File on…',
+      '+File under…',
     ])
     expect(host.querySelector('a[href="/spaces/s1"]')?.className).toContain(
       'text-foreground',
@@ -883,10 +883,10 @@ describe('the rail', () => {
     )
   })
 
-  it('Filed on with nothing filed: Not filed, then + File on…', () => {
+  it('Filed under with nothing filed: Unfiled, then + File under…', () => {
     expect(group(rail(fixture()), 'filed-on')).toEqual({
-      labels: ['Filed on'],
-      values: ['Not filed', '+File on…'],
+      labels: ['Filed under'],
+      values: ['Unfiled', '+File under…'],
     })
   })
 
@@ -992,10 +992,10 @@ describe('the rail’s controls', () => {
     })
   })
 
-  it('files on a space from + File on…, offered before anything is typed', async () => {
+  it('files under a space from + File under…, offered before anything is typed', async () => {
     mountRail(fixture({ spaces: [FINTECH] }))
     const add = [...document.querySelectorAll('button')].find(
-      (b) => text(b) === '+File on…',
+      (b) => text(b) === '+File under…',
     )
     click(add)
     await settle(200)
@@ -1016,12 +1016,12 @@ describe('the rail’s controls', () => {
   it('files on a record found by search from the same picker', async () => {
     mountRail(fixture())
     const add = [...document.querySelectorAll('button')].find(
-      (b) => text(b) === '+File on…',
+      (b) => text(b) === '+File under…',
     )
     click(add)
     await settle()
     const input = document.querySelector<HTMLInputElement>(
-      'input[aria-label="File on a record or space"]',
+      'input[aria-label="File under a record or space"]',
     )
     if (input === null) throw new Error('no picker field')
     act(() => {

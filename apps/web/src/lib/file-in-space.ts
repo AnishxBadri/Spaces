@@ -81,6 +81,11 @@ export function newSpaceRow(
   return { name, root: bestRow === undefined ? null : rootOf(bestRow, byId) }
 }
 
+const WORDS = {
+  record: { label: 'File in a space…', mode: 'File in', prep: 'in' },
+  note: { label: 'File under…', mode: 'File under', prep: 'under' },
+} as const
+
 /**
  * Cmd-K's "File in a space…": asks for the space in the palette, files the
  * record there with `tagIntoSpace`, and stays open for another.
@@ -88,19 +93,25 @@ export function newSpaceRow(
  *   the space and files the record in it.
  * - The row's lane says how many spaces hold it now: `in 2 now`.
  * - The list is the space picker's own `listSpaces`.
+ * - `subject` picks the words: a record joins a space, a note is filed
+ *   under one (`File under…`, `under 2 now`).
  */
-export function fileInSpaceAction(record: {
-  id: string
-  name: string
-  filedIds: ReadonlyArray<string>
-}): PageAction {
+export function fileInSpaceAction(
+  record: {
+    id: string
+    name: string
+    filedIds: ReadonlyArray<string>
+  },
+  subject: 'record' | 'note' = 'record',
+): PageAction {
+  const say = WORDS[subject]
   const filed = new Set(record.filedIds)
   let rows: Array<SpaceRow> = []
 
   async function fileIn(spaceId: string, label: string) {
     await tagIntoSpace({ data: { entityId: record.id, spaceId } })
     filed.add(spaceId)
-    toast(`Filed ${record.name} in ${label}`)
+    toast(`Filed ${record.name} ${say.prep} ${label}`)
   }
 
   function create(
@@ -143,12 +154,14 @@ export function fileInSpaceAction(record: {
 
   return {
     id: 'file-in-space',
-    label: 'File in a space…',
+    label: say.label,
     icon: icon.fileIn,
     words: 'tag space file',
-    ...(filed.size > 0 ? { meta: `in ${String(filed.size)} now` } : {}),
+    ...(filed.size > 0
+      ? { meta: `${say.prep} ${String(filed.size)} now` }
+      : {}),
     step: {
-      mode: 'File in',
+      mode: say.mode,
       subject: record.name,
       placeholder: 'Find a space…',
       heading: 'Spaces',

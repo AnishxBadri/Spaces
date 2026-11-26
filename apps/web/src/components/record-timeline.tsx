@@ -524,7 +524,7 @@ function ThreadMenu({
   async function unlink(from: { id: string; name: string }) {
     const ok = await confirm({
       title: `Unlink from ${from.name}?`,
-      body: `${item.subject || 'This interaction'} leaves ${from.name}. It stays on every other record it is filed on.`,
+      body: `${item.subject || 'This interaction'} leaves ${from.name}. It stays on every other record it is filed under.`,
       action: 'Unlink',
     })
     if (!ok) return
@@ -554,7 +554,7 @@ function ThreadMenu({
       : []),
     { label: 'Copy link', icon: <icon.copyLink />, copy: link },
     {
-      label: 'File on a deal…',
+      label: 'File under…',
       icon: <icon.fileOn />,
       opens: true,
       onSelect: () => setFiling(true),
@@ -584,13 +584,17 @@ function ThreadMenu({
         open={filing}
         onOpenChange={setFiling}
         trigger={<span aria-hidden className="size-0" />}
-        placeholder="File on a deal…"
+        placeholder="File under a deal…"
         search={searchDeals}
         onPick={async (deal) => {
           const { filed } = await fileInteractionOnEntity({
             data: { interactionId: item.id, entityId: deal.id },
           })
-          toast(filed ? `Filed on ${deal.name}` : `Already on ${deal.name}`)
+          toast(
+            filed
+              ? `Filed under ${deal.name}`
+              : `Already filed under ${deal.name}`,
+          )
           void router.invalidate()
         }}
       />

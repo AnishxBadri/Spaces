@@ -323,7 +323,7 @@ describe('flattenInbox', () => {
       ),
     )
     expect(row.who).toBe('Captured')
-    expect(row.primary).toBe('File on Priya Raman')
+    expect(row.primary).toBe('File under Priya Raman')
   })
 
   it('gives a registry proposal Add option', () => {

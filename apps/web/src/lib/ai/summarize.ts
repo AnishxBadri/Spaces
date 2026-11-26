@@ -446,7 +446,7 @@ const summarizeInRun = Effect.fn('summarize.inRun')(function* (
     payload,
     rationale: [
       `Summarized ${source.what} on the synthesize lane, from ${String(items.length)} context item${items.length === 1 ? '' : 's'}; ${String(cited.length)} cited inline.`,
-      `Accepting writes a shared note filed against ${record.name}, derived from ${source.name}.`,
+      `Accepting writes a shared note filed under ${record.name}, derived from ${source.name}.`,
     ].join('\n'),
     refs: cited,
     runId,

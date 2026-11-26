@@ -177,9 +177,11 @@ export async function ledgerTargetOf(
     .orderBy(asc(entity.canonicalName))
   const only = held.at(0)
   if (only === undefined)
-    return skip('Not filed on a company the portfolio holds')
+    return skip('Not filed under a company the portfolio holds')
   if (held.length > 1)
-    return skip('Filed on more than one held company: whose ledger is unclear')
+    return skip(
+      'Filed under more than one held company: whose ledger is unclear',
+    )
   return {
     ok: true,
     target: {

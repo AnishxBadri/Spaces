@@ -411,9 +411,9 @@ describe('deleteNote', () => {
     expect(impact.title).toBe(`Teardown ${tag}`)
     expect(impact.unlinks.map((u) => u.meta).sort()).toEqual([
       'derived from this note',
-      'filed against',
-      'filed in space',
-      'filed in space',
+      'filed under',
+      'filed under',
+      'filed under',
       'mentioned here',
       'mentioned here',
     ])

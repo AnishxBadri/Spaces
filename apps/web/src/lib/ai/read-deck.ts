@@ -150,7 +150,7 @@ export function readDeckMessage(failure: ReadDeckFailure): string {
     case 'SensitivityReadFailed':
       return 'Could not read the record’s sensitivity'
     case 'SensitivityEntityNotFound':
-      return 'A record the deck is filed against no longer exists'
+      return 'A record the deck is filed under no longer exists'
     case 'ProviderCallFailed':
       return `${completeMessage(failure)}: ${providerFailure(failure.cause).message}`
     case 'SuggestionNotFound':
@@ -470,7 +470,7 @@ const readDeckInRun = Effect.fn('readDeck.inRun')(function* (
   }
   if (targets.length === 0)
     return yield* new ReadDeckRefused({
-      message: 'The deck is not filed against a company or a deal',
+      message: 'The deck is not filed under a company or a deal',
     })
 
   const asOf = input.asOf ?? new Date().toISOString()
@@ -726,7 +726,7 @@ function captureRationale(read: Read, against: Against, title: string): string {
   lines.push(
     read.subject !== null
       ? `These apply to the ${what} the identity above matches or creates, once it is accepted.`
-      : `These apply to the ${what} the page is filed on.`,
+      : `These apply to the ${what} the page is filed under.`,
   )
   if (read.heldBack.length > 0)
     lines.push(

@@ -270,7 +270,7 @@ export function FileRow({
           ...(doc.fromEmail
             ? [
                 {
-                  label: 'File on…',
+                  label: 'File under…',
                   icon: <icon.fileOn />,
                   opens: true,
                   onSelect: () => setFilingOn(true),
@@ -526,7 +526,7 @@ export function removeConfirmOptions(
     return {
       leaves,
       title: `Remove ${doc.filename}?`,
-      body: `It is also filed on ${names}, so it stays on the server and leaves only ${recordName}.`,
+      body: `It is also filed under ${names}, so it stays on the server and leaves only ${recordName}.`,
       rows: elsewhere.map((e: FilingEdge) => ({
         name: `Stays on ${e.name}`,
         meta: e.kind === 'space' ? 'space' : e.entityKind,

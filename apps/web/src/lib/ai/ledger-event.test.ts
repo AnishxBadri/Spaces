@@ -580,7 +580,7 @@ describe('the revision lane', () => {
     const unheld = await capTable(company.entityId, true)
     expect(await ledgerTargetOf(unheld)).toEqual({
       ok: false,
-      reason: 'Not filed on a company the portfolio holds',
+      reason: 'Not filed under a company the portfolio holds',
     })
     const { companyId } = await heldCompany()
     const held = await capTable(companyId, true)
