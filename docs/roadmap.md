@@ -63,7 +63,15 @@ Plus Email (project 35: the thread as message cards with the reply as its last c
 - `SPA-471` `deps-1` — drop `@tailwindcss/typography` (unused) and `dotenv`/`dotenv-cli` (Node 22 reads env files); the site sets in IBM Plex. Project 40; `afk`.
 - `SPA-472` `errors-1` — a failed query shows its area's plain line and logs the cause; every failure class carries a message; one query failure per area; unknown `/api` paths answer 404 (D117). Project 40; `afk`.
 - `SPA-490` `toasts-1` — an error toast closes after 10 seconds; only one whose failure shows nowhere else stays until dismissed. Project 40; `afk`.
-- `SPA-491` `files-delete` — a file on the Files page has a `···` menu with Delete…, behind the delete confirm; a linked Drive or Box file stays in Drive. Project 40; `afk`.
+- `SPA-492` `files-1` — three shared parts: the search field with its clear cell, the Ask star cell, the window's ink close and `Open as a page` (D119). Project 44; `afk`.
+- `SPA-493` `files-2` — files and notes are filed under things: `File under…`, `Filed under`, `Unfiled`, `Unfile from <name>` (D118). Project 44; `afk`.
+- `SPA-494` `files-3` — a file opens in a window at `?modal=file&id=` from anywhere, and the window opens as a page at `/files/<id>`; one head for both (D118). Project 44; `afk`, after SPA-492.
+- `SPA-495` `files-4` — the viewer's tool bar and body: pages in one column, a page rail, find in the file's text (D118). Project 44; `afk`, after SPA-494.
+- `SPA-496` `files-5` — the viewer's rail: `Filed under` rows with their paths, versions as a dot timeline, source; no checksum (D118). Project 44; `afk`, after SPA-493 and SPA-494.
+- `SPA-497` `files-6` — `Unfile from <name>` with Undo and `Delete…` behind the drawn confirm, on the Files page, the viewer and a record's Files tab; only a reader may delete; a History line survives (D118). Project 44; `afk`, after SPA-494.
+- `SPA-498` `files-7` — the Files page as a ledger: kind tabs, an Unfiled band with `File under <guess>`, two-line rows with the file's first line. Project 44; `hitl`: the owner has not yet said to build the list.
+- `SPA-499` `files-8` — filter, arrange and search on the Files page. Project 44; `hitl`, with SPA-498.
+- `SPA-500` `files-9` — adding files without a dialog: drop anywhere, a duplicate check, a record guess. Project 44; `hitl`, with SPA-498.
 - `SPA-486` `mcp-schema` — an MCP tool's JSON Schema is generated from its Effect decoder; a live MCP client check. Project 40; `afk`.
 - `SPA-487` `schema-tidy` — one plain-record guard, the registry's error wording, no exports kept only for tests. Project 40; `afk`.
 - `SPA-488` `auth-links` — `/join` and `/reset` require their token; a link without one says so. Project 40; `afk`.
