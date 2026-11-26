@@ -1,4 +1,5 @@
-import { ChatOperational, icon } from '#/components/icons'
+import { icon } from '#/components/icons'
+import { AskMark } from '#/components/ui/ask-control'
 import { useState } from 'react'
 import { useSensitiveItem } from '#/components/sensitive-toggle'
 import type { SensitivityState } from '#/components/sensitive-toggle'
@@ -69,7 +70,7 @@ function Menu({
   const items: Array<MoreMenuEntry> = [
     {
       label: 'Ask about this',
-      icon: <ChatOperational className="size-4" />,
+      icon: <AskMark />,
       onSelect: () => openAsk(),
     },
     {

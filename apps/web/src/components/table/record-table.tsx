@@ -19,7 +19,6 @@ import type {
 import { FolderGround } from '#/components/page-header'
 import { ArrowDown, ArrowUp, ChevronSort, icon } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
-import { useHotkey } from '#/lib/use-hotkey'
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -31,7 +30,7 @@ import {
   MenuCheck,
 } from '#/components/ui/dropdown-menu'
 import { Checkbox } from '#/components/ui/checkbox'
-import { Input } from '#/components/ui/input'
+import { SearchField } from '#/components/ui/search-field'
 import { TabDivider, Tabs } from '#/components/ui/tabs'
 import type { TabItem } from '#/components/ui/tabs'
 import { ListFoot } from './list-foot'
@@ -962,8 +961,8 @@ function AiTag() {
 export const AfterSort = createContext<ReactNode>(null)
 
 /**
- * The rest of a list's bar after the views' Filter: Sort, then the search box
- * alone at the right with its `/`. Columns is not here: it ends the column
+ * The rest of a list's bar after the views' Filter: Sort, then the search
+ * field alone at the right with its `/`. Columns is not here: it ends the column
  * head row. One lane for every list, object or shelf.
  */
 export function TableTools<T>({
@@ -983,35 +982,20 @@ export function TableTools<T>({
   beforeSearch?: ReactNode
 }) {
   const afterSort = useContext(AfterSort)
-  const search = useRef<HTMLInputElement>(null)
-  useHotkey('/', () => search.current?.focus())
   return (
     <>
       <SortMenu table={table} />
       {afterSort}
       <span className="flex-1" />
       {beforeSearch}
-      <span className="relative ml-1 flex shrink-0 items-center">
-        <Input
-          ref={search}
-          type="search"
-          value={filter}
-          onChange={(e) => onFilterChange(e.target.value)}
-          placeholder={filterPlaceholder}
-          aria-label={filterLabel}
-          aria-keyshortcuts="/"
-          className="h-6.5 w-45 bg-paper pr-6 text-ui"
-        />
-        {filter === '' ? (
-          <kbd
-            aria-hidden
-            data-search-key
-            className="pointer-events-none absolute right-1.5 border border-rule px-1 mono text-field text-graphite"
-          >
-            /
-          </kbd>
-        ) : null}
-      </span>
+      <SearchField
+        value={filter}
+        onValueChange={onFilterChange}
+        placeholder={filterPlaceholder}
+        label={filterLabel}
+        slash
+        className="ml-1 w-45"
+      />
     </>
   )
 }

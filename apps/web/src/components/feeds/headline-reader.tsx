@@ -1,5 +1,6 @@
 import { useClock } from '#/components/clock'
-import { ChatOperational, icon } from '#/components/icons'
+import { icon } from '#/components/icons'
+import { AskMark } from '#/components/ui/ask-control'
 import { Twinkle } from '#/components/twinkle'
 import { Button } from '#/components/ui/button'
 import { MoreMenu } from '#/components/ui/more-menu'
@@ -45,7 +46,7 @@ export function HeadlineReader({
       : [{ label: 'Copy link', icon: <icon.copyLink />, copy: () => url }]),
     {
       label: 'Ask about this',
-      icon: <ChatOperational />,
+      icon: <AskMark />,
       title: 'Ask with this headline and its link',
       onSelect: () => openAsk({ draft: askDraft(h) }),
       opens: true,

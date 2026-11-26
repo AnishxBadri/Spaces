@@ -2,6 +2,7 @@ import { WarningAlt } from '#/components/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PDFDocumentProxy } from 'unpdf/pdfjs'
+import { AskButton } from './ui/ask-control'
 import { Button } from './ui/button'
 import {
   Dialog,
@@ -12,6 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog'
+import { WindowControls } from './ui/window-controls'
 import { FileGlyph } from './files/file-glyph'
 import { followWord } from './files/revision-ledger'
 import type { RecordDocument } from './files/types'
@@ -30,7 +32,8 @@ import { cn } from '#/lib/utils'
 
 /**
  * The file viewer: a window over the page rather than a route, so Back
- * undoes reading position and not the look. Closes from its foot.
+ * undoes reading position and not the look. Closes from the ink close at the
+ * end of its head.
  *
  * **Nothing here relaxes the download hardening.** Blobs are served as
  * `application/octet-stream; attachment` (an uploaded `.html` served inline
@@ -178,11 +181,11 @@ export function DocumentPreview({
   onOpenChange: (open: boolean) => void
   /** The column right of the page. */
   sidebar?: ReactNode
-  /** Foot actions, left of Cancel. */
+  /** Foot actions, right of Ask. */
   foot?: ReactNode
   /**
    * The files of one message, stepped from the foot (`‹ File 1 of 2 ›`),
-   * which then ends on Done: opened over its thread, it has nothing to cancel.
+   * which then ends on Done.
    */
   steps?: ViewerSteps | null
 }) {
@@ -416,6 +419,7 @@ function PreviewBody({
             </Button>
           )}
         </div>
+        <WindowControls />
       </DialogHeader>
 
       <div className="flex min-h-0 flex-1">
@@ -447,8 +451,7 @@ function PreviewBody({
       {/* The foot, breakout cancelled like the head's. */}
       <DialogFooter className="mx-0 mt-0 mb-0 shrink-0">
         <DialogClose asChild>
-          <Button
-            variant="ghost"
+          <AskButton
             className="mr-auto"
             title="Ask with this file as the scope"
             onClick={() => {
@@ -457,15 +460,17 @@ function PreviewBody({
             }}
           >
             Ask about this
-          </Button>
+          </AskButton>
         </DialogClose>
         {foot}
-        {steps === null ? null : <FileStepper {...steps} />}
-        <DialogClose asChild>
-          <Button variant="outline">
-            {steps === null ? 'Cancel' : 'Done'}
-          </Button>
-        </DialogClose>
+        {steps === null ? null : (
+          <>
+            <FileStepper {...steps} />
+            <DialogClose asChild>
+              <Button variant="outline">Done</Button>
+            </DialogClose>
+          </>
+        )}
       </DialogFooter>
     </>
   )

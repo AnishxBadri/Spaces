@@ -856,6 +856,8 @@ describe('E7 · one icon list, one brand mark', () => {
       'components/space-overview.tsx',
       'components/today/day-strip.tsx',
       'components/twinkle.tsx',
+      'components/ui/ask-control.tsx',
+      'components/ui/window-controls.tsx',
       'components/wordmark.tsx',
       'lib/email/sanitize.ts',
       'lib/members/workspace-logo-file.ts',

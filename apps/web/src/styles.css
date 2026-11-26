@@ -834,6 +834,33 @@
 }
 
 /**
+ * The Ask mark at work (`AskMark`'s `working`): its two checker halves take
+ * turns, 400ms each, by opacity alone. Under reduced motion the base layer's
+ * rule ends the animation at once, so each half falls back to its resting
+ * opacity: the first shown, the second hidden.
+ */
+@keyframes ask-frame {
+  0% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@utility ask-frame-a {
+  animation: ask-frame 800ms step-end infinite;
+}
+
+@utility ask-frame-b {
+  opacity: 0;
+  animation: ask-frame 800ms step-end -400ms infinite;
+}
+
+/**
  * Composer wash (design contract, Motion). A row a composer
  * just created lands washed in bone, and the wash fades out over 250ms: the
  * eye is told where the new row went without the list moving a pixel.
@@ -1011,6 +1038,13 @@
   textarea,
   [role='button'] {
     touch-action: manipulation;
+  }
+
+  /* The browser's own search clear has no hover, no focus and no Firefox:
+     `SearchField` draws a real one, so the native one is hidden everywhere. */
+  input[type='search']::-webkit-search-cancel-button,
+  input[type='search']::-webkit-search-decoration {
+    display: none;
   }
 
   @media (pointer: coarse) {

@@ -25,7 +25,7 @@ import { PortfolioHeadlineStrip } from '#/components/portfolio-headline'
 import { useTablePrefs } from '#/components/table/use-table-prefs'
 import { Button } from '#/components/ui/button'
 import { MenuCheck } from '#/components/ui/dropdown-menu'
-import { Input } from '#/components/ui/input'
+import { SearchField } from '#/components/ui/search-field'
 import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
 import { useClock } from '#/components/clock'
@@ -348,22 +348,14 @@ function PortfolioPage() {
           <div className="flex min-h-0 flex-1 flex-col">
             {showSearch ? (
               <div className="flex h-11 shrink-0 items-center border-x border-t border-rule bg-bone px-2.75">
-                <Input
+                <SearchField
                   autoFocus
                   value={globalFilter}
-                  onChange={(e) => setGlobalFilter(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key !== 'Escape') return
-                    e.preventDefault()
-                    setGlobalFilter('')
-                    setSearching(false)
-                  }}
-                  onBlur={() => {
-                    if (globalFilter === '') setSearching(false)
-                  }}
+                  onValueChange={setGlobalFilter}
+                  onClose={() => setSearching(false)}
                   placeholder="Search holdings"
-                  aria-label="Search holdings"
-                  className="h-6.5 w-45 bg-paper text-ui"
+                  label="Search holdings"
+                  className="w-45"
                 />
               </div>
             ) : null}

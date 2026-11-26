@@ -26,7 +26,7 @@ import { ThreadRow } from '#/components/record/thread-row'
 import { ListFoot } from '#/components/table/list-foot'
 import { ListErrorRow, ListLoadingRow } from '#/components/table/list-states'
 import { Twinkle } from '#/components/twinkle'
-import { Input } from '#/components/ui/input'
+import { SearchField } from '#/components/ui/search-field'
 import { MoreMenu } from '#/components/ui/more-menu'
 import { Segmented } from '#/components/ui/segmented'
 import { FolderBody, Tabs } from '#/components/ui/tabs'
@@ -393,8 +393,8 @@ function itemOf(t: EmailThreadRow) {
 const SEARCH_QUIET_MS = 250
 
 /**
- * The search icon, which opens a field in its place. The field asks once
- * typing pauses; Escape empties and closes it.
+ * The folded search field, which opens in place of its icon. It asks once
+ * typing pauses; `Esc` empties and folds it.
  */
 function ThreadSearch({
   q,
@@ -403,7 +403,6 @@ function ThreadSearch({
   q: string
   onSearch: (q: string) => void
 }) {
-  const [opened, setOpened] = useState(q !== '')
   const [text, setText] = useState(q)
   const latest = useRef(onSearch)
   latest.current = onSearch
@@ -414,33 +413,14 @@ function ThreadSearch({
     return () => clearTimeout(timer)
   }, [text, q])
 
-  if (!opened)
-    return (
-      <button
-        type="button"
-        aria-label="Search threads"
-        onClick={() => setOpened(true)}
-        className="focus-ring flex size-7 shrink-0 items-center justify-center rounded-md border border-rule text-graphite transition-colors hover:text-foreground"
-      >
-        <icon.search aria-hidden className="size-4" />
-      </button>
-    )
   return (
-    <Input
-      autoFocus
-      type="search"
-      aria-label="Search threads"
-      placeholder="Search threads…"
+    <SearchField
+      fold
       value={text}
-      onChange={(e) => setText(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.key !== 'Escape') return
-        e.preventDefault()
-        setText('')
-        latest.current('')
-        setOpened(false)
-      }}
-      className="h-7 max-w-60 min-w-0 flex-1"
+      onValueChange={setText}
+      label="Search threads"
+      placeholder="Search threads…"
+      className="max-w-60 min-w-0 flex-1"
     />
   )
 }

@@ -77,6 +77,7 @@ import {
   Locked as CarbonLocked,
   Logout,
   MagicWand,
+  Maximize,
   MailAll as CarbonMailAll,
   Menu,
   MisuseOutline,
@@ -172,6 +173,8 @@ export const icon = {
   open: carbon(View, 'view'),
   /** Leaves the app (`Open ↗`) for a place with no mark of its own. */
   openOutside: carbon(Launch, 'launch'),
+  /** A window's thing opened as its own page, in the app. */
+  openAsPage: carbon(Maximize, 'maximize'),
   upload: carbon(Upload, 'upload'),
   download: carbon(Download, 'download'),
   enrich: carbon(MagicWand, 'magic-wand'),
