@@ -22,6 +22,7 @@ export function FilesToolbar({
   onSearch,
   filter,
   arrange,
+  found,
   labelId,
 }: {
   tab: FilesTab
@@ -36,6 +37,8 @@ export function FilesToolbar({
   filter?: ReactNode
   /** The arrange menu's place (`By date`), before the search. */
   arrange?: ReactNode
+  /** What the search found, in the field: `3 files · 9 places`. */
+  found?: string | undefined
   /** The open tab's label carries this id: the list is named by it. */
   labelId?: string | undefined
 }) {
@@ -47,7 +50,12 @@ export function FilesToolbar({
   return (
     <FolderGround>
       <div className="flex pb-2 md:hidden">
-        <FilesSearch q={q} onSearch={onSearch} className="w-full" />
+        <FilesSearch
+          q={q}
+          onSearch={onSearch}
+          found={found}
+          className="w-full"
+        />
       </div>
       <Tabs
         label="Files by kind"
@@ -69,7 +77,13 @@ export function FilesToolbar({
             <span className="flex-1" />
             {filter}
             {arrange}
-            <FilesSearch q={q} onSearch={onSearch} slash className="w-65" />
+            <FilesSearch
+              q={q}
+              onSearch={onSearch}
+              found={found}
+              slash
+              className="w-65"
+            />
           </>
         }
       />
@@ -84,10 +98,12 @@ function FilesSearch({
   q,
   onSearch,
   slash = false,
+  found,
   className,
 }: {
   q: string
   onSearch: (q: string) => void
+  found: string | undefined
   slash?: boolean
   className: string
 }) {
@@ -108,6 +124,8 @@ function FilesSearch({
       label="Search names and text"
       placeholder="Search names and text"
       slash={slash}
+      // Only while the field holds what the list was read with.
+      count={text.trim() === q ? found : undefined}
       className={className}
     />
   )

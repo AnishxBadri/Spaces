@@ -34,14 +34,19 @@ import { cn } from '#/lib/utils'
  * - Narrower panes drop the lanes from the right of the name inward: the
  *   facts below `xl`, the source below `lg`, the filing below `md`, where
  *   the row's `···` still files it.
+ * - Under a search, a file whose text matched reads the match's page and
+ *   the line around it, and the facts lane how many more places matched.
  */
 export function FilesRow({
   row,
   onOpen,
+  band,
 }: {
   row: FilesLedgerRow
-  /** Opens the file's window over the page. */
+  /** Opens the file's window over the page (at the hit's page). */
   onOpen: () => void
+  /** The record or space whose band it stands in: its lane leaves it out. */
+  band?: string | undefined
 }) {
   const { now } = useClock()
 
@@ -81,16 +86,29 @@ export function FilesRow({
             </span>
           )}
         </span>
-        <TextLine row={row} />
+        {row.hit !== null && row.extractionStatus === 'done' ? (
+          <HitLine hit={row.hit} />
+        ) : (
+          <TextLine row={row} />
+        )}
       </div>
-      <span
-        data-file-facts
-        className="hidden w-47.5 shrink-0 truncate mono text-micro text-graphite xl:block"
-      >
-        {factsLine(row)}
-      </span>
+      {row.hit === null ? (
+        <span
+          data-file-facts
+          className="hidden w-47.5 shrink-0 truncate mono text-micro text-graphite xl:block"
+        >
+          {factsLine(row)}
+        </span>
+      ) : (
+        <span
+          data-file-more
+          className="hidden w-47.5 shrink-0 truncate mono text-micro text-graphite md:block"
+        >
+          {row.hit.more}
+        </span>
+      )}
       <span className="hidden w-55 shrink-0 items-center gap-2 md:flex">
-        <FiledLane row={row} />
+        <FiledLane row={row} band={band} />
       </span>
       <span className="hidden w-45 shrink-0 items-center gap-2 lg:flex">
         <SourceLane source={row.source} />
@@ -180,10 +198,43 @@ function TextLine({ row }: { row: FilesLedgerRow }) {
 }
 
 /**
- * Where it is filed: its first record or space and a mono `+n` for the
- * rest; unfiled, the guess as one button and `Other…`, or `File under…`.
+ * A search hit: the page in mono (`p. 5`, a sheet's name), then the line
+ * around the match with the match in medium.
  */
-function FiledLane({ row }: { row: FilesLedgerRow }) {
+function HitLine({ hit }: { hit: NonNullable<FilesLedgerRow['hit']> }) {
+  return (
+    <span
+      data-file-line="hit"
+      className="flex h-4 min-w-0 items-baseline gap-2 text-label"
+    >
+      {hit.label === null ? null : (
+        <span className="shrink-0 mono text-micro text-foreground">
+          {hit.label}
+        </span>
+      )}
+      <span className="min-w-0 truncate text-graphite">
+        {hit.before}
+        <mark className="bg-transparent font-medium text-foreground">
+          {hit.match}
+        </mark>
+        {hit.after}
+      </span>
+    </span>
+  )
+}
+
+/**
+ * Where it is filed: its first record or space and a mono `+n` for the
+ * rest, leaving out the band's own; unfiled, the guess as one button and
+ * `Other…`, or `File under…`.
+ */
+function FiledLane({
+  row,
+  band,
+}: {
+  row: FilesLedgerRow
+  band: string | undefined
+}) {
   if (row.unfiled)
     return row.guess === null ? (
       <FileUnderPopover documentId={row.id} className={FILE_UNDER_BUTTON}>
@@ -201,9 +252,11 @@ function FiledLane({ row }: { row: FilesLedgerRow }) {
       </>
     )
 
-  const record = row.records.at(0)
-  const space = row.spaces.at(0)
-  const rest = row.records.length + row.spaces.length - 1
+  const records = row.records.filter((r) => r.id !== band)
+  const spaces = row.spaces.filter((sp) => sp.id !== band)
+  const record = records.at(0)
+  const space = spaces.at(0)
+  const rest = records.length + spaces.length - 1
   const href =
     record !== undefined
       ? recordPath(record)

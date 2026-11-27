@@ -411,3 +411,24 @@ export const fileUnderOptionsProgram = Effect.fn('fileUnderOptions')(function* (
     bands.push({ label: 'Recent', options: yield* newestRecords(BAND_ROWS) })
   return { filed, bands }
 })
+
+/**
+ * The records and spaces a list can be narrowed to, as the `File under…`
+ * popover finds them but for no one file: typed, the kind bands; with
+ * nothing typed, what the reader filed under last, or the newest records.
+ */
+export const filingTargetsProgram = Effect.fn('fileUnder.targets')(function* (
+  viewer: { readonly id: string },
+  q: string,
+) {
+  const tree = yield* spaceTreeProgram()
+  const typed = q.trim()
+  if (typed !== '') return yield* searchBands(typed, tree)
+  const recent = yield* recentFilingTargetsProgram(viewer, tree)
+  return [
+    {
+      label: 'Recent',
+      options: recent.length > 0 ? recent : yield* newestRecords(BAND_ROWS),
+    },
+  ] satisfies Array<FileUnderBand>
+})

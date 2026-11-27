@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
+import type { FilesFilters, FilesGroup, FilesSort } from './files-filter'
 
 // The test databases carry no `pgboss` schema, and the birth of a document
 // enqueues extraction — see `#/test/queue-stub`.
@@ -40,7 +41,7 @@ async function aCompany(name: string): Promise<string> {
 /** A file born with its text read and cut into chunks. */
 async function aFile(input: {
   filename: string
-  kind: 'deck' | 'legal' | 'other'
+  kind: 'deck' | 'legal' | 'article' | 'other'
   chunks: ReadonlyArray<string>
   fileUnder: string | null
   createdAt?: string
@@ -96,12 +97,60 @@ async function aFile(input: {
   return id
 }
 
-async function ledger(tab: 'all' | 'legal') {
+type Read = {
+  tab?: 'all' | 'legal'
+  q?: string
+  filters?: Partial<FilesFilters>
+  group?: FilesGroup
+  sort?: FilesSort
+}
+
+async function ledger(tabOrRead: 'all' | 'legal' | Read = {}) {
+  const read = typeof tabOrRead === 'string' ? { tab: tabOrRead } : tabOrRead
   const { Effect } = await import('effect')
   const { filesLedgerProgram } = await import('./files-ledger')
+  const { NO_FILTERS } = await import('./files-filter')
   return Effect.runPromise(
-    filesLedgerProgram({ viewer: await actor(), tab, limit: 50, q: '' }),
+    filesLedgerProgram({
+      viewer: await actor(),
+      tab: read.tab ?? 'all',
+      limit: 200,
+      q: read.q ?? '',
+      filters: { ...NO_FILTERS, ...read.filters },
+      group: read.group ?? 'date',
+      sort: read.sort ?? 'newest',
+    }),
   )
+}
+
+async function facets(read: Read = {}) {
+  const { Effect } = await import('effect')
+  const { filesFacetsProgram } = await import('./files-facets')
+  const { NO_FILTERS } = await import('./files-filter')
+  return Effect.runPromise(
+    filesFacetsProgram({
+      viewer: await actor(),
+      tab: read.tab ?? 'all',
+      q: read.q ?? '',
+      filters: { ...NO_FILTERS, ...read.filters },
+    }),
+  )
+}
+
+/** Sets columns a born file does not choose: its text, link, state. */
+async function setDocument(
+  id: string,
+  patch: {
+    url?: string
+    extractedText?: string
+    extractionStatus?: 'failed'
+    bytesState?: 'remote'
+  },
+) {
+  const { eq } = await import('drizzle-orm')
+  const { db } = await import('@spaces/db')
+  const { document } = await import('@spaces/db/schema')
+  await db.update(document).set(patch).where(eq(document.entityId, id))
 }
 
 describe('filesLedgerProgram', () => {
@@ -167,5 +216,125 @@ describe('filesLedgerProgram', () => {
     expect(legal.rows.map((r) => r.id)).toContain(terms)
     expect(legal.total).toBe(all.counts.legal)
     expect(legal.counts).toEqual(all.counts)
+  })
+
+  it('narrows by each facet, and a chip counts the rows it then shows', async () => {
+    const tag = 'ledger-2'
+    const acme = await aCompany('Quillon Harbour')
+    const deck = await aFile({
+      filename: `${tag} deck.pdf`,
+      kind: 'deck',
+      chunks: ['A deck'],
+      fileUnder: acme,
+    })
+    const sheet = await aFile({
+      filename: `${tag} cohorts.xlsx`,
+      kind: 'other',
+      chunks: ['Cohorts'],
+      fileUnder: null,
+    })
+    await setDocument(sheet, { extractionStatus: 'failed' })
+    const page = await aFile({
+      filename: `${tag} clipped page`,
+      kind: 'article',
+      chunks: ['A clipped page'],
+      fileUnder: acme,
+    })
+    await setDocument(page, {
+      url: 'https://example.com/a-page',
+      bytesState: 'remote',
+    })
+    const mine = (rows: ReadonlyArray<{ id: string; filename: string }>) =>
+      rows.filter((r) => r.filename.startsWith(tag)).map((r) => r.id)
+
+    // Each chip's count, read with nothing on, is the total once it is on.
+    const none = await facets()
+    const on = [
+      [{ type: ['pdf' as const] }, none.type.pdf, [deck]],
+      [{ type: ['sheet' as const] }, none.type.sheet, [sheet]],
+      [{ type: ['web' as const] }, none.type.web, [page]],
+      [{ from: ['link' as const] }, none.from.link, [page]],
+      [{ from: ['upload' as const] }, none.from.upload, [deck, sheet]],
+      [{ unfiled: true }, none.unfiled, [sheet]],
+      [{ look: ['unread' as const] }, none.look.unread, [sheet]],
+      [{ look: ['text-only' as const] }, none.look['text-only'], [page]],
+    ] as const
+    for (const [filters, count, ids] of on) {
+      const read = await ledger({ filters })
+      expect(read.total).toBe(count)
+      expect(read.counts.all).toBe(count)
+      expect(mine(read.rows).sort()).toEqual([...ids].sort())
+    }
+    expect(none.shown).toBe(none.total)
+
+    // Under a record: only its files; the other facets count under it.
+    const under = await ledger({ filters: { under: acme } })
+    expect(mine(under.rows).sort()).toEqual([deck, page].sort())
+    expect(under.named.under).toBe('Quillon Harbour')
+    const underFacets = await facets({ filters: { under: acme } })
+    expect(underFacets.shown).toBe(2)
+    expect(underFacets.type.pdf).toBe(1)
+    expect(underFacets.from.link).toBe(1)
+    const both = await ledger({ filters: { under: acme, type: ['pdf'] } })
+    expect(both.rows.map((r) => r.id)).toEqual([deck])
+
+    // Grouped by record, its band counts every file under it; sorted by
+    // name, the unfiled row still leads.
+    const grouped = await ledger({ group: 'record', sort: 'name' })
+    expect(grouped.groups[acme]).toBe(2)
+    const named = mine(grouped.rows)
+    expect(named).toEqual([sheet, page, deck])
+  })
+
+  it('finds a word inside a deck and names its page, counting every place', async () => {
+    const tag = 'ledger-3'
+    const deck = await aFile({
+      filename: `${tag} deck.pdf`,
+      kind: 'deck',
+      chunks: [],
+      fileUnder: null,
+    })
+    await setDocument(deck, {
+      extractedText: [
+        '[Page 1]',
+        'Welcome',
+        '',
+        '[Page 2]',
+        'We manage 2,140 Zorbleases across Bengaluru and Pune',
+        '',
+        '[Page 3]',
+        'Nothing here',
+        '',
+        '[Page 4]',
+        'zorbleases again, and zorbleases',
+        '',
+        '[Page 6]',
+        'one more zorblease',
+      ].join('\n'),
+    })
+    const named = await aFile({
+      filename: `${tag} zorbleases list.pdf`,
+      kind: 'other',
+      chunks: ['Nothing that matches'],
+      fileUnder: null,
+    })
+
+    const read = await ledger({ q: 'zorblease' })
+    expect(read.rows.map((r) => r.id).sort()).toEqual([deck, named].sort())
+    expect(read.total).toBe(2)
+    const hit = read.rows.find((r) => r.id === deck)?.hit
+    expect(hit).toEqual({
+      total: 4,
+      page: 2,
+      label: 'p. 2',
+      before: 'We manage 2,140 ',
+      match: 'Zorblease',
+      after: 's across Bengaluru and Pune',
+      more: '+3 on p. 4, 6',
+    })
+    // A file found by its name alone has no hit, and the toolbar's places
+    // are the places the rows' hits count.
+    expect(read.rows.find((r) => r.id === named)?.hit).toBeNull()
+    expect(read.places).toBe(4)
   })
 })

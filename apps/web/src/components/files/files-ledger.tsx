@@ -1,22 +1,38 @@
-import { useMemo } from 'react'
+import { useId, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { useClock } from '../clock'
+import { KindIcon } from '../kind-icon'
 import { Band } from '../ledger-section'
+import { FoldBand } from '../list/fold-band'
 import { ListFoot } from '../table/list-foot'
 import { FolderBody } from '../ui/tabs'
 import { useDeletingFiles } from './delete-file'
 import { FilesRow } from './files-row'
 import { UnfiledBand } from './unfiled-band'
-import type { FilesLedger as Ledger } from '#/lib/documents/files-ledger'
-import { filesBands } from '#/lib/documents/files-ledger-view'
+import type {
+  FilesLedger as Ledger,
+  FilesLedgerRow,
+} from '#/lib/documents/files-ledger'
+import type { FilesGroup, FilesSort } from '#/lib/documents/files-filter'
+import { filesBands, filesGroupBands } from '#/lib/documents/files-ledger-view'
+import type { FilesGroupBand } from '#/lib/documents/files-ledger-view'
 
 /**
- * The Files page's folder body: `Unfiled` first, then the date bands, the
- * rows scrolling inside the folder while the foot (`50 of 214 · Load 50
- * more`) holds its bottom. A file whose delete is in flight is left out at
- * once.
+ * The Files page's folder body: the filter chips when any are on, then
+ * `Unfiled` first in every grouping, then the bands the grouping draws
+ * (dates, records, sources, adders, or none), the rows scrolling inside the
+ * folder while the foot (`50 of 214 · Load 50 more`) holds its bottom. A
+ * file whose delete is in flight is left out at once.
+ * - Grouped by record, each record or space is a band that folds, with its
+ *   count; a file under two stands in both, and its lane names only what
+ *   the band does not. Which bands are folded lasts while the list stays
+ *   grouped by record; it is not kept in the address.
  */
 export function FilesLedger({
   ledger,
+  group,
+  sort,
+  head,
   labelledBy,
   step,
   loading,
@@ -25,6 +41,10 @@ export function FilesLedger({
   empty,
 }: {
   ledger: Ledger
+  group: FilesGroup
+  sort: FilesSort
+  /** Over the rows, under the tab bar: the filters that are on. */
+  head?: ReactNode
   /** The ids that name the list: the page's title and the open tab. */
   labelledBy: string
   /** Rows a `Load n more` adds. */
@@ -32,8 +52,8 @@ export function FilesLedger({
   /** More rows are being read. */
   loading: boolean
   onLoadMore: () => void
-  /** Opens a file's window over the page. */
-  onOpen: (id: string) => void
+  /** Opens a file's window over the page, at a page when given. */
+  onOpen: (id: string, page: number | null) => void
   /** What the folder says when the tab or the search holds nothing. */
   empty: string
 }) {
@@ -43,11 +63,29 @@ export function FilesLedger({
     () => ledger.rows.filter((r) => !deleting.has(r.id)),
     [ledger.rows, deleting],
   )
-  const bands = useMemo(() => filesBands(rows, today), [rows, today])
+  const grouped = useMemo(
+    () => (group === 'date' ? null : filesGroupBands(rows, group)),
+    [rows, group],
+  )
+  const bands = useMemo(() => {
+    if (grouped !== null) return grouped
+    const dated = filesBands(rows, today)
+    // Oldest first turns the date bands over; `Unfiled` still leads.
+    return sort === 'oldest'
+      ? [
+          ...dated.filter((b) => b.key === 'unfiled'),
+          ...dated.filter((b) => b.key !== 'unfiled').reverse(),
+        ]
+      : dated
+  }, [rows, today, grouped, sort])
   const gone = ledger.rows.length - rows.length
+  // A row opens at the page its search hit names.
+  const open = (row: FilesLedgerRow) => onOpen(row.id, row.hit?.page ?? null)
+  const byId = new Map(rows.map((r) => [r.id, r]))
 
   return (
     <FolderBody className="min-h-0 flex-1">
+      {head}
       <div
         role="region"
         aria-labelledby={labelledBy}
@@ -65,28 +103,50 @@ export function FilesLedger({
         <UnfiledBand
           count={ledger.unfiled}
           rows={bands.find((b) => b.key === 'unfiled')?.rows ?? []}
-          onOpen={onOpen}
+          onOpen={(id) => {
+            const row = byId.get(id)
+            onOpen(id, row?.hit?.page ?? null)
+          }}
         />
-        {bands
-          .filter((b) => b.key !== 'unfiled')
-          .map((band) => (
-            <section
-              key={band.key}
-              aria-label={band.label}
-              data-files-band={band.key}
-            >
-              <Band label={band.label} />
-              <ol>
-                {band.rows.map((row) => (
-                  <FilesRow
-                    key={row.id}
-                    row={row}
-                    onOpen={() => onOpen(row.id)}
+        {group === 'record' && grouped !== null ? (
+          <RecordBands
+            bands={grouped.filter((b) => b.key !== 'unfiled')}
+            counts={ledger.groups}
+            onOpen={open}
+          />
+        ) : (
+          bands
+            .filter((b) => b.key !== 'unfiled')
+            .map((band) => (
+              <section
+                key={band.key}
+                aria-label={band.label === '' ? 'Filed' : band.label}
+                data-files-band={band.key}
+              >
+                {band.label === '' ? null : (
+                  <Band
+                    label={
+                      group === 'date' ? (
+                        band.label
+                      ) : (
+                        <>
+                          {band.label}
+                          <span className="tabular ml-1.5 text-foreground">
+                            {ledger.groups[band.key] ?? band.rows.length}
+                          </span>
+                        </>
+                      )
+                    }
                   />
-                ))}
-              </ol>
-            </section>
-          ))}
+                )}
+                <ol>
+                  {band.rows.map((row) => (
+                    <FilesRow key={row.id} row={row} onOpen={() => open(row)} />
+                  ))}
+                </ol>
+              </section>
+            ))
+        )}
       </div>
       <ListFoot
         folder
@@ -102,4 +162,63 @@ export function FilesLedger({
       />
     </FolderBody>
   )
+}
+
+/** One folding band per record or space, its count every file under it. */
+function RecordBands({
+  bands,
+  counts,
+  onOpen,
+}: {
+  bands: ReadonlyArray<FilesGroupBand<FilesLedgerRow>>
+  counts: Readonly<Record<string, number>>
+  onOpen: (row: FilesLedgerRow) => void
+}) {
+  const base = useId()
+  const [folded, setFolded] = useState<ReadonlySet<string>>(new Set())
+  return bands.map((band) => {
+    const open = !folded.has(band.key)
+    const rowsId = `${base}-${band.key}`
+    return (
+      <section
+        key={band.key}
+        aria-label={band.label}
+        data-files-band={band.key}
+        data-folded={!open}
+      >
+        <FoldBand
+          label={band.label}
+          count={counts[band.key] ?? band.rows.length}
+          mark={
+            band.kind === null ? null : (
+              <KindIcon
+                of={{ kind: band.kind, objectLabel: null, objectIcon: null }}
+                className="text-graphite"
+              />
+            )
+          }
+          open={open}
+          onOpenChange={(next) =>
+            setFolded((prev) => {
+              const out = new Set(prev)
+              if (next) out.delete(band.key)
+              else out.add(band.key)
+              return out
+            })
+          }
+          controls={rowsId}
+        />
+        <ol id={rowsId} hidden={!open}>
+          {band.rows.map((row) => (
+            <FilesRow
+              key={row.id}
+              row={row}
+              band={band.key}
+              onOpen={() => onOpen(row)}
+            />
+          ))}
+        </ol>
+      </section>
+    )
+  })
 }

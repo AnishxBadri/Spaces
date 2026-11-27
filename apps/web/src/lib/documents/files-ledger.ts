@@ -1,32 +1,47 @@
 import { Effect } from 'effect'
 import {
   and,
+  asc,
   count,
+  countDistinct,
   desc,
   eq,
   ilike,
   inArray,
   isNull,
+  not,
   or,
   sql,
 } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { db } from '@spaces/db'
 import {
   chunk,
   document,
   entity,
+  entitySpace,
   integration,
   interaction,
   link,
 } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
+import { detectFormat } from '@spaces/core/documents/extract'
 import { parseAddresses } from '#/lib/arrival/forwarded'
 import { documentFilingEdgesProgram } from '#/lib/server/shared'
 import { attachmentEmailsProgram } from './attachment-emails'
 import { inSyncedFolderSql, keptVersionsSql } from './deletable-sql'
 import { namedInFileProgram, spaceTreeProgram } from './file-under'
 import type { FileUnderOption } from './file-under'
+import type {
+  FilesFilters,
+  FilesFrom,
+  FilesGroup,
+  FilesSort,
+} from './files-filter'
+import { filterConditions, placesSql, sourceSql } from './files-filter-sql'
+import { searchHit } from './find-text'
+import type { SearchHit } from './find-text'
 import { firstLineOf } from './files-ledger-view'
 import type { FilesTab } from './files-ledger-view'
 import { documentsQuery } from './query'
@@ -57,6 +72,12 @@ export type FilesLedgerParams = {
   readonly limit: number
   /** Names and text; empty reads everything. */
   readonly q: string
+  /** The filters that are on; they narrow the tab counts too. */
+  readonly filters: FilesFilters
+  /** The bands: by date, record, source or adder, or none. */
+  readonly group: FilesGroup
+  /** The order inside each band; unfiled rows always lead. */
+  readonly sort: FilesSort
 }
 
 /** Where a file came from, as its source lane says it. */
@@ -116,6 +137,12 @@ export type FilesLedgerRow = {
   readonly records: ReadonlyArray<ShelfRecord>
   readonly spaces: ReadonlyArray<FilesSpace>
   readonly source: FilesSource
+  /** Its source as `From` and the source bands name it. */
+  readonly from: FilesFrom
+  /** The member who added it; null for a file a connection brought alone. */
+  readonly addedBy: { readonly id: string; readonly name: string } | null
+  /** Under a search, where its text matched; null when only its name did. */
+  readonly hit: SearchHit | null
   /** An unfiled file's best guess, named in its own text; null for none. */
   readonly guess: FileUnderOption | null
   /** A file of its kind is filed under one of its records: `Newer version of…`. */
@@ -134,8 +161,69 @@ export type FilesLedger = {
   readonly total: number
   /** How many of those are unfiled: the `Unfiled` band's count. */
   readonly unfiled: number
-  /** Each tab's count, whatever the search. */
+  /** Each tab's count under the filters, whatever the search. */
   readonly counts: Readonly<Record<FilesTab, number>>
+  /** Under a search, the places the matching files' text matched. */
+  readonly places: number
+  /**
+   * Each band's count when grouped by record, source or adder, keyed as
+   * the band is (`filesGroupBands`), over every filed file the params
+   * match, not only the rows read.
+   */
+  readonly groups: Readonly<Record<string, number>>
+  /** The names the filter chips print for the record and the member on. */
+  readonly named: {
+    readonly under: string | null
+    readonly by: string | null
+  }
+}
+
+/** The rows' order: unfiled first, then the sort, then the id for a stable page. */
+function orderOf(sort: FilesSort, unfiled: SQL): Array<SQL> {
+  switch (sort) {
+    case 'newest':
+      return [desc(unfiled), desc(document.createdAt), desc(document.entityId)]
+    case 'oldest':
+      return [desc(unfiled), asc(document.createdAt), asc(document.entityId)]
+    case 'name':
+      return [
+        desc(unfiled),
+        sql`lower(${document.filename}) asc nulls last`,
+        asc(document.entityId),
+      ]
+    case 'largest':
+      return [
+        desc(unfiled),
+        sql`${document.sizeBytes} desc nulls last`,
+        desc(document.createdAt),
+        desc(document.entityId),
+      ]
+  }
+}
+
+/**
+ * What every Files read narrows by before its own facet: readable, not
+ * merged away, the open tab and the search. The filters come on top.
+ */
+export function filesScope(params: {
+  readonly viewer: { readonly id: string }
+  readonly tab: FilesTab
+  readonly q: string
+}): Array<SQL | undefined> {
+  const q = params.q.trim()
+  return [
+    isNull(entity.mergedIntoId),
+    canReadDocumentSql(params.viewer.id),
+    ...(params.tab === 'all' ? [] : [eq(document.kind, params.tab)]),
+    ...(q === ''
+      ? []
+      : [
+          or(
+            ilike(document.filename, likePattern(q)),
+            ilike(document.extractedText, likePattern(q)),
+          ),
+        ]),
+  ]
 }
 
 /** `%` and `_` read literally in a search. */
@@ -147,21 +235,18 @@ const FIRST_TEXT_CHARS = 600
 export const filesLedgerProgram = Effect.fn('filesLedger')(function* (
   params: FilesLedgerParams,
 ) {
-  const { viewer, tab, limit } = params
+  const { viewer, tab, limit, filters, group, sort } = params
   const q = params.q.trim()
   const unfiled = sql<boolean>`(${unfiledPredicate()})`
-  const listed = [isNull(entity.mergedIntoId), canReadDocumentSql(viewer.id)]
+  // The tab counts follow the filters but not the search, so a search
+  // never empties the other tabs' counts.
+  const narrowed = [
+    ...filesScope({ viewer, tab: 'all', q: '' }),
+    ...filterConditions(filters),
+  ]
   const matched = [
-    ...listed,
-    ...(tab === 'all' ? [] : [eq(document.kind, tab)]),
-    ...(q === ''
-      ? []
-      : [
-          or(
-            ilike(document.filename, likePattern(q)),
-            ilike(document.extractedText, likePattern(q)),
-          ),
-        ]),
+    ...filesScope({ viewer, tab, q }),
+    ...filterConditions(filters),
   ]
 
   const byKind = yield* documentsQuery(() =>
@@ -175,7 +260,7 @@ export const filesLedgerProgram = Effect.fn('filesLedger')(function* (
       })
       .from(document)
       .innerJoin(entity, eq(entity.id, document.entityId))
-      .where(and(...listed))
+      .where(and(...narrowed))
       .groupBy(document.kind),
   )
   const sum = (t: FilesTab, of: (k: (typeof byKind)[number]) => number) =>
@@ -197,6 +282,7 @@ export const filesLedgerProgram = Effect.fn('filesLedger')(function* (
       ? {
           total: counts[tab],
           unfiled: sum(tab, (k) => k.unfiled),
+          places: 0,
         }
       : ((yield* documentsQuery(() =>
           db
@@ -205,11 +291,16 @@ export const filesLedgerProgram = Effect.fn('filesLedger')(function* (
               unfiled: sql<number>`count(*) filter (where ${unfiled})`.mapWith(
                 Number,
               ),
+              places: sql<number>`coalesce(sum(${placesSql(q)}), 0)`.mapWith(
+                Number,
+              ),
             })
             .from(document)
             .innerJoin(entity, eq(entity.id, document.entityId))
             .where(and(...matched)),
-        )).at(0) ?? { total: 0, unfiled: 0 })
+        )).at(0) ?? { total: 0, unfiled: 0, places: 0 })
+  const groups = yield* groupCountsProgram(group, [...matched, not(unfiled)])
+  const filterNames = yield* namedFiltersProgram(filters)
 
   // The per-row columns below are scalar subqueries over one row each; the
   // planner reads them after the sort and the limit, for the rows shown.
@@ -231,6 +322,7 @@ export const filesLedgerProgram = Effect.fn('filesLedger')(function* (
         uploadedByName: user.name,
         sourceCapability: integration.capabilityId,
         sourcePath: document.sourcePath,
+        from: sourceSql,
         unfiled,
         // The first chunk is the file's own text in reading order; a file
         // whose text is read but not yet cut falls back to its text.
@@ -260,11 +352,18 @@ export const filesLedgerProgram = Effect.fn('filesLedger')(function* (
       .leftJoin(user, eq(user.id, document.uploadedBy))
       .leftJoin(integration, eq(integration.id, document.sourceRef))
       .where(and(...matched))
-      .orderBy(desc(unfiled), desc(document.createdAt), desc(document.entityId))
+      .orderBy(...orderOf(sort, unfiled))
       .limit(limit),
   )
-  if (rows.length === 0)
-    return { rows: [], total: found.total, unfiled: found.unfiled, counts }
+  const totals = {
+    total: found.total,
+    unfiled: found.unfiled,
+    counts,
+    places: found.places,
+    groups,
+    named: filterNames,
+  }
+  if (rows.length === 0) return { rows: [], ...totals }
 
   const ids = rows.map((r) => r.id)
   const filings = yield* documentFilingEdgesProgram(ids)
@@ -274,6 +373,7 @@ export const filesLedgerProgram = Effect.fn('filesLedger')(function* (
     ? yield* spaceTreeProgram()
     : new Map<string, { readonly parents: ReadonlyArray<string> }>()
   const senders = yield* emailSendersProgram(viewer, ids)
+  const hits = yield* searchHitsProgram(ids, q)
   // One guess per unfiled row on screen, never for the whole workspace.
   const guesses = new Map(
     yield* Effect.forEach(
@@ -330,6 +430,12 @@ export const filesLedgerProgram = Effect.fn('filesLedger')(function* (
             : [],
         ),
         source: sourceOf(viewer, r, senders.get(r.id)),
+        from: r.from,
+        addedBy:
+          r.uploadedBy === null
+            ? null
+            : { id: r.uploadedBy, name: r.uploadedByName ?? 'A member' },
+        hit: hits.get(r.id) ?? null,
         guess: guesses.get(r.id) ?? null,
         hasOlder: r.hasOlder,
         sourceCapability: r.sourceCapability,
@@ -338,10 +444,132 @@ export const filesLedgerProgram = Effect.fn('filesLedger')(function* (
         versions: r.versions,
       }
     }),
-    total: found.total,
-    unfiled: found.unfiled,
-    counts,
+    ...totals,
   }
+})
+
+/**
+ * Each band's count for a grouping that has them, over `where` (the
+ * matched, filed files): a record's or a space's id, a source, an adder's
+ * id or `none`. A file under two records counts in both.
+ */
+const groupCountsProgram = Effect.fn('filesLedger.groups')(function* (
+  group: FilesGroup,
+  where: ReadonlyArray<SQL | undefined>,
+) {
+  const out: Record<string, number> = {}
+  if (group === 'record') {
+    const [records, spaces] = yield* documentsQuery(() =>
+      Promise.all([
+        db
+          .select({ key: link.toEntityId, n: countDistinct(document.entityId) })
+          .from(document)
+          .innerJoin(entity, eq(entity.id, document.entityId))
+          .innerJoin(
+            link,
+            and(
+              eq(link.fromEntityId, document.entityId),
+              eq(link.relation, 'tagged_in'),
+            ),
+          )
+          .where(and(...where))
+          .groupBy(link.toEntityId),
+        db
+          .select({
+            key: entitySpace.spaceId,
+            n: countDistinct(document.entityId),
+          })
+          .from(document)
+          .innerJoin(entity, eq(entity.id, document.entityId))
+          .innerJoin(entitySpace, eq(entitySpace.entityId, document.entityId))
+          .where(and(...where))
+          .groupBy(entitySpace.spaceId),
+      ]),
+    )
+    for (const r of [...records, ...spaces]) out[r.key] = r.n
+  }
+  if (group === 'source') {
+    // `group by 1`: the case expression carries parameters, and Postgres
+    // cannot match a repeated one to the select list's.
+    const rows = yield* documentsQuery(() =>
+      db
+        .select({ key: sourceSql, n: count() })
+        .from(document)
+        .innerJoin(entity, eq(entity.id, document.entityId))
+        .where(and(...where))
+        .groupBy(sql`1`),
+    )
+    for (const r of rows) out[r.key] = r.n
+  }
+  if (group === 'adder') {
+    const rows = yield* documentsQuery(() =>
+      db
+        .select({ key: document.uploadedBy, n: count() })
+        .from(document)
+        .innerJoin(entity, eq(entity.id, document.entityId))
+        .where(and(...where))
+        .groupBy(document.uploadedBy),
+    )
+    for (const r of rows) out[r.key ?? 'none'] = r.n
+  }
+  return out
+})
+
+/** The names of the record or space and the member a filter is on. */
+const namedFiltersProgram = Effect.fn('filesLedger.named')(function* (
+  filters: FilesFilters,
+) {
+  const { under, by } = filters
+  const record =
+    under === null
+      ? undefined
+      : (yield* documentsQuery(() =>
+          db
+            .select({ name: entity.canonicalName })
+            .from(entity)
+            .where(eq(entity.id, under)),
+        )).at(0)
+  const member =
+    by === null
+      ? undefined
+      : (yield* documentsQuery(() =>
+          db.select({ name: user.name }).from(user).where(eq(user.id, by)),
+        )).at(0)
+  return { under: record?.name ?? null, by: member?.name ?? null }
+})
+
+/**
+ * Where the search matched each row's text, for the rows on screen only:
+ * their stored text is read once, here, and cut into pages by the
+ * extractor's markers.
+ */
+const searchHitsProgram = Effect.fn('filesLedger.hits')(function* (
+  ids: ReadonlyArray<string>,
+  q: string,
+) {
+  const out = new Map<string, SearchHit>()
+  if (q === '') return out
+  const texts = yield* documentsQuery(() =>
+    db
+      .select({
+        id: document.entityId,
+        text: document.extractedText,
+        filename: document.filename,
+        mime: document.mime,
+      })
+      .from(document)
+      .where(
+        and(
+          inArray(document.entityId, [...ids]),
+          ilike(document.extractedText, likePattern(q)),
+        ),
+      ),
+  )
+  for (const t of texts) {
+    const hit = searchHit(t.text ?? '', detectFormat(t.filename, t.mime), q)
+    if (hit !== null) out.set(t.id, hit)
+  }
+  return out
 })
 
 /** The email a file came on: its sender and mailbox. */

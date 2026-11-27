@@ -8,6 +8,8 @@ import {
   weekdayOf,
 } from '@spaces/core/format'
 import { weekBand } from '#/lib/timeline/weeks'
+import { FROM_LABELS } from './files-filter'
+import type { FilesFrom, FilesGroup } from './files-filter'
 import { KIND_ORDER, fileType } from './files-tab'
 
 /**
@@ -65,7 +67,8 @@ const MONTHS = [
  * first whatever its rows' days, then `Today`, `This week`, `Last week` and
  * one band per month, newest first. A month outside `today`'s year carries
  * its year. A row dated after `today` (a clock ahead of the reader's) is
- * today's. Rows keep their order inside a band; empty bands are left out.
+ * today's. Rows keep their order inside a band, so a sort by name sorts
+ * within each; empty bands are left out.
  */
 export function filesBands<T extends Dated>(
   rows: ReadonlyArray<T>,
@@ -102,10 +105,78 @@ export function filesBands<T extends Dated>(
     const i = fixed.indexOf(b.key)
     return i < 0 ? fixed.length : i
   }
-  return bands
-    .map((b, i) => ({ b, i }))
-    .sort((x, y) => rank(x.b) - rank(y.b) || x.i - y.i)
-    .map(({ b }) => b)
+  // Months by their key, newest first, whatever the rows' sort.
+  return bands.sort(
+    (x, y) => rank(x) - rank(y) || (x.key < y.key ? 1 : x.key > y.key ? -1 : 0),
+  )
+}
+
+/** What a row's group band reads off it. */
+type Grouped = {
+  readonly id: string
+  readonly unfiled: boolean
+  readonly records: ReadonlyArray<{
+    readonly id: string
+    readonly name: string
+    readonly kind: string
+  }>
+  readonly spaces: ReadonlyArray<{ readonly id: string; readonly name: string }>
+  readonly from: FilesFrom
+  readonly addedBy: { readonly id: string; readonly name: string } | null
+}
+
+/** A band when the list is grouped by something other than the date. */
+export type FilesGroupBand<T> = FilesBand<T> & {
+  /** The record's or the space's kind, for its mark; null for the rest. */
+  readonly kind: string | null
+}
+
+/**
+ * The rows in the bands a grouping draws: `Unfiled` first, as in every
+ * grouping, then one band per record or space, source or adder, in the
+ * order their first row comes. A file under two records stands in both.
+ * Ungrouped, the filed rows are one band with no label.
+ */
+export function filesGroupBands<T extends Grouped>(
+  rows: ReadonlyArray<T>,
+  group: Exclude<FilesGroup, 'date'>,
+): Array<FilesGroupBand<T>> {
+  const bands: Array<FilesGroupBand<T>> = []
+  const at = (key: string, label: string, kind: string | null) => {
+    const found = bands.find((b) => b.key === key)
+    if (found !== undefined) return found.rows
+    const band: FilesGroupBand<T> = { key, label, kind, rows: [] }
+    bands.push(band)
+    return band.rows
+  }
+  for (const row of rows) {
+    if (row.unfiled) {
+      at('unfiled', 'Unfiled', null).push(row)
+      continue
+    }
+    switch (group) {
+      case 'record':
+        for (const r of row.records) at(r.id, r.name, r.kind).push(row)
+        for (const s of row.spaces) at(s.id, s.name, 'space').push(row)
+        break
+      case 'source':
+        at(row.from, FROM_LABELS[row.from], null).push(row)
+        break
+      case 'adder':
+        at(
+          row.addedBy?.id ?? 'none',
+          row.addedBy?.name ?? 'A connection',
+          null,
+        ).push(row)
+        break
+      case 'none':
+        at('all', '', null).push(row)
+        break
+    }
+  }
+  return bands.sort(
+    (x, y) => Number(y.key === 'unfiled') - Number(x.key === 'unfiled'),
+  )
 }
 
 /**

@@ -34,7 +34,8 @@ export type FileType =
   | 'google-sheet'
   | 'google-slides'
 
-const BY_EXTENSION: Readonly<Record<string, FileType>> = {
+/** A file's type by its lowercased extension; `formatSql` reads it too. */
+export const BY_EXTENSION: Readonly<Record<string, FileType>> = {
   pdf: 'pdf',
   doc: 'doc',
   docx: 'doc',
@@ -75,13 +76,13 @@ const BY_EXTENSION: Readonly<Record<string, FileType>> = {
   msg: 'eml',
 }
 
-const GOOGLE_MIMES: Readonly<Record<string, FileType>> = {
+export const GOOGLE_MIMES: Readonly<Record<string, FileType>> = {
   'application/vnd.google-apps.document': 'google-doc',
   'application/vnd.google-apps.spreadsheet': 'google-sheet',
   'application/vnd.google-apps.presentation': 'google-slides',
 }
 
-const GOOGLE_PATHS: ReadonlyArray<readonly [string, FileType]> = [
+export const GOOGLE_PATHS: ReadonlyArray<readonly [string, FileType]> = [
   ['/document/', 'google-doc'],
   ['/spreadsheets/', 'google-sheet'],
   ['/presentation/', 'google-slides'],

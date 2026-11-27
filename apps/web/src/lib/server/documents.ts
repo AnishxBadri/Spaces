@@ -7,6 +7,11 @@ import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES } from '@spaces/core/documents'
 import { storage } from '@spaces/core/writes/storage'
 import { requireUser } from './shared'
 import type { DocumentBirthInput } from '@spaces/core/writes/documents/birth'
+import {
+  FILES_GROUPS,
+  FILES_SORTS,
+  FilesFiltersSchema,
+} from '#/lib/documents/files-filter'
 import { input } from './input'
 import { serverQuery } from './query'
 
@@ -230,6 +235,9 @@ export const listFiles = createServerFn()
           Schema.isLessThanOrEqualTo(1000),
         ),
         q: Schema.String.check(Schema.isMaxLength(200)),
+        filters: FilesFiltersSchema,
+        group: Schema.Literals(FILES_GROUPS),
+        sort: Schema.Literals(FILES_SORTS),
       }),
     ),
   )
@@ -238,6 +246,43 @@ export const listFiles = createServerFn()
     const { filesLedgerProgram } = await import('../documents/files-ledger')
     const { effectFn } = await import('./effect')
     return effectFn(filesLedgerProgram)({ ...data, viewer: u })
+  })
+
+/**
+ * The Files page's Filter panel: each chip's count under the tab, the search
+ * and the other facets. Read when the panel opens; the work is
+ * `filesFacetsProgram`.
+ */
+export const listFilesFacets = createServerFn()
+  .validator(
+    input(
+      Schema.Struct({
+        tab: Schema.Literals(['all', ...DOCUMENT_KINDS]),
+        q: Schema.String.check(Schema.isMaxLength(200)),
+        filters: FilesFiltersSchema,
+      }),
+    ),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { filesFacetsProgram } = await import('../documents/files-facets')
+    const { effectFn } = await import('./effect')
+    return effectFn(filesFacetsProgram)({ ...data, viewer: u })
+  })
+
+/**
+ * The records and spaces the `Filed under` filter offers, searched as the
+ * `File under…` popover searches them. The work is `filingTargetsProgram`.
+ */
+export const getFilingTargets = createServerFn()
+  .validator(
+    input(Schema.Struct({ q: Schema.String.check(Schema.isMaxLength(120)) })),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { filingTargetsProgram } = await import('../documents/file-under')
+    const { effectFn } = await import('./effect')
+    return effectFn(filingTargetsProgram)(u, data.q)
   })
 
 /**

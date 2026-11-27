@@ -2,6 +2,7 @@ import { redirect } from '@tanstack/react-router'
 import { Schema } from 'effect'
 import { DOCUMENT_KINDS } from '@spaces/core/documents'
 import { caught, fallback, searchValidator } from '#/lib/search-validator'
+import { FILES_GROUPS, FILES_SORTS } from './files-filter'
 
 /**
  * The search of the Files page, shared with `/documents` so a redirect
@@ -13,6 +14,9 @@ import { caught, fallback, searchValidator } from '#/lib/search-validator'
  *   whose first band is `Unfiled`.
  * - `tab` is the kind tab, `q` the search and `n` how many rows are shown;
  *   each is absent at its default, so the plain address stays `/files`.
+ * - The filters are one comma list per facet (`from=email,drive`,
+ *   `under=<id>,unfiled`), read by `filtersOf`, which drops what it does
+ *   not know; `group` and `sort` are absent at `date` and `newest`.
  */
 const FilesSearch = Schema.Struct({
   filed: fallback(Schema.Literals(['all', 'unfiled']), 'all'),
@@ -20,6 +24,13 @@ const FilesSearch = Schema.Struct({
   tab: caught(Schema.Literals(DOCUMENT_KINDS)),
   q: caught(Schema.String.check(Schema.isMaxLength(200))),
   n: caught(Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))),
+  under: caught(Schema.String.check(Schema.isMaxLength(200))),
+  from: caught(Schema.String.check(Schema.isMaxLength(200))),
+  type: caught(Schema.String.check(Schema.isMaxLength(200))),
+  by: caught(Schema.String.check(Schema.isMaxLength(200))),
+  look: caught(Schema.String.check(Schema.isMaxLength(200))),
+  group: caught(Schema.Literals(FILES_GROUPS)),
+  sort: caught(Schema.Literals(FILES_SORTS)),
 })
 
 export const filesSearch = searchValidator(FilesSearch)
