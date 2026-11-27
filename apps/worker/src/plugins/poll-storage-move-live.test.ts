@@ -604,7 +604,7 @@ describe('storage.poll: renamed / moved inside the subtree (§8)', () => {
     )
     if (Exit.isSuccess(refused)) throw new Error('a stale re-file was accepted')
     expect(suggestionMessage(Cause.squash(refused.cause))).toBe(
-      'notes.txt is no longer filed on Ohmium',
+      'notes.txt is no longer filed under Ohmium',
     )
     expect(await taggedIn(notes.id)).toEqual([])
     const row = await db

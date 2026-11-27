@@ -485,7 +485,7 @@ describe('capture extraction (SPA-134)', () => {
     const unfiled = await Effect.runPromise(
       Effect.flip(acceptProgram(rows[0].id, actor)),
     )
-    expect(unfiled.message).toMatch(/File the page on a company first/)
+    expect(unfiled.message).toMatch(/File the page under a company first/)
 
     const company = await resolveEntity({
       kind: 'company',
