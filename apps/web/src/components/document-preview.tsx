@@ -585,15 +585,28 @@ function usePageSizes(pdf: PDFDocumentProxy | null): Array<Size> | null {
   return sizes
 }
 
-/** Draws one page to a canvas at a scale, at device resolution. */
+/**
+ * The last render on each canvas, settled. pdf.js draws garbage when two
+ * renders share a canvas, and a cancelled one takes a moment to stop.
+ */
+const lastRender = new WeakMap<HTMLCanvasElement, Promise<void>>()
+
+/**
+ * Draws one page to a canvas at a scale, at device resolution.
+ * - `live` is asked once the page is loaded and the canvas is free: a draw
+ *   whose effect was cleaned up while it waited never starts.
+ */
 async function drawPage(
   pdf: PDFDocumentProxy,
   n: number,
   canvas: HTMLCanvasElement,
   scaleFor: (baseWidth: number) => number,
   onTask: (task: { cancel: () => void }) => void,
+  live: () => boolean,
 ): Promise<void> {
   const p = await pdf.getPage(n)
+  await lastRender.get(canvas)
+  if (!live()) return
   const base = p.getViewport({ scale: 1 })
   const viewport = p.getViewport({ scale: scaleFor(base.width) })
   const dpr = Math.min(globalThis.devicePixelRatio || 1, 2)
@@ -606,6 +619,13 @@ async function drawPage(
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
   const task = p.render({ canvas: null, canvasContext: ctx, viewport })
   onTask(task)
+  lastRender.set(
+    canvas,
+    task.promise.then(
+      () => undefined,
+      () => undefined,
+    ),
+  )
   await task.promise
 }
 
@@ -848,6 +868,7 @@ function PageCanvas({
     const canvas = ref.current
     if (!canvas) return
     let task: { cancel: () => void } | null = null
+    let stopped = false
     void drawPage(
       pdf,
       n,
@@ -856,11 +877,13 @@ function PageCanvas({
       (t) => {
         task = t
       },
+      () => !stopped,
     ).catch((err: unknown) => {
       if (!cancelled(err))
         onError(err instanceof Error ? err.message : String(err))
     })
     return () => {
+      stopped = true
       task?.cancel()
     }
   }, [pdf, n, scale, onError])
@@ -977,6 +1000,7 @@ function Thumb({
     const canvas = ref.current
     if (!seen || !canvas) return
     let task: { cancel: () => void } | null = null
+    let stopped = false
     void drawPage(
       pdf,
       n,
@@ -985,8 +1009,10 @@ function Thumb({
       (t) => {
         task = t
       },
+      () => !stopped,
     ).catch(() => undefined)
     return () => {
+      stopped = true
       task?.cancel()
     }
   }, [seen, pdf, n])
