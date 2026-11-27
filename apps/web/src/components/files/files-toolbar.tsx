@@ -47,13 +47,34 @@ export function FilesToolbar({
     label: filesTabLabel(t),
     count: counts[t],
   }))
+  // One typed text for both fields, the phone's and the desktop's: with one
+  // each, the hidden field answered the other's search with its own empty one.
+  const [text, setText] = useState(q)
+  const latest = useRef(onSearch)
+  latest.current = onSearch
+  // A search from outside (Back, a link) replaces the text only while the
+  // text still holds the search it replaces; typing ahead of a read wins.
+  const before = useRef(q)
+  useEffect(() => {
+    const was = before.current
+    before.current = q
+    setText((typed) => (typed.trim() === was ? q : typed))
+  }, [q])
+  useEffect(() => {
+    if (text.trim() === q) return
+    const timer = setTimeout(() => latest.current(text.trim()), SEARCH_QUIET_MS)
+    return () => clearTimeout(timer)
+  }, [text, q])
+  // Only while the field holds what the list was read with.
+  const shown = text.trim() === q ? found : undefined
+
   return (
     <FolderGround>
       <div className="flex pb-2 md:hidden">
         <FilesSearch
-          q={q}
-          onSearch={onSearch}
-          found={found}
+          text={text}
+          onText={setText}
+          found={shown}
           className="w-full"
         />
       </div>
@@ -78,9 +99,9 @@ export function FilesToolbar({
             {filter}
             {arrange}
             <FilesSearch
-              q={q}
-              onSearch={onSearch}
-              found={found}
+              text={text}
+              onText={setText}
+              found={shown}
               slash
               className="w-65"
             />
@@ -95,37 +116,26 @@ export function FilesToolbar({
 const SEARCH_QUIET_MS = 250
 
 function FilesSearch({
-  q,
-  onSearch,
+  text,
+  onText,
   slash = false,
   found,
   className,
 }: {
-  q: string
-  onSearch: (q: string) => void
+  text: string
+  onText: (text: string) => void
   found: string | undefined
   slash?: boolean
   className: string
 }) {
-  const [text, setText] = useState(q)
-  const latest = useRef(onSearch)
-  latest.current = onSearch
-
-  useEffect(() => {
-    if (text.trim() === q) return
-    const timer = setTimeout(() => latest.current(text.trim()), SEARCH_QUIET_MS)
-    return () => clearTimeout(timer)
-  }, [text, q])
-
   return (
     <SearchField
       value={text}
-      onValueChange={setText}
+      onValueChange={onText}
       label="Search names and text"
       placeholder="Search names and text"
       slash={slash}
-      // Only while the field holds what the list was read with.
-      count={text.trim() === q ? found : undefined}
+      count={found}
       className={className}
     />
   )
