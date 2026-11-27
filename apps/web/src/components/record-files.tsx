@@ -6,7 +6,6 @@ import { Folder, icon } from './icons'
 import { Button } from './ui/button'
 import { MoreMenu } from './ui/more-menu'
 import { Band } from './ledger-section'
-import { DocumentPreview } from './document-preview'
 import { AddRow, LinkFetchRow, useLinkFetches } from './record-files-link'
 import {
   attachFromDriveItem,
@@ -16,13 +15,13 @@ import {
 import { useSummarizer } from './summarize'
 import { useKeyTermsExtractor } from './key-terms'
 import { useVisionReader } from './vision'
-import { FileRow, PendingRow, useRemoveFile } from './files/file-row'
+import { FileRow, PendingRow } from './files/file-row'
 import type { PendingUpload } from './files/file-row'
 import { FolderBand } from './files/folder-band'
 import type { BoundFolder } from './files/folder-band'
 import { LinkFolderDialog } from './files/link-folder-dialog'
 import { useFolderLink } from './files/use-folder-link'
-import { FileViewerFoot, FileViewerSidebar } from './files/viewer-sidebar'
+import { useOpenFile } from './files/file-window-nav'
 import {
   NewerVersionSelect,
   useLinkWhenFiled,
@@ -98,7 +97,7 @@ export function RecordFiles({
   const dragDepth = useRef(0)
   const [dragging, setDragging] = useState<number | null>(null)
   const [pending, setPending] = useState<Array<PendingUpload>>([])
-  const [viewingId, setViewingId] = useState<string | null>(null)
+  const openFile = useOpenFile()
   // Read by the upload loop and the fetch poll after an await, so a ref.
   const docsRef = useRef(documents)
   docsRef.current = documents
@@ -115,7 +114,6 @@ export function RecordFiles({
     onPicked: (files) => void links.attachPicked(files),
     onBlocked: setReadiness,
   })
-  const { remove, removeDialog } = useRemoveFile(entityId, recordName)
   const folderLink = useFolderLink(entityId)
   const folderPicker = usePickerSession({
     mode: 'folders',
@@ -340,7 +338,6 @@ export function RecordFiles({
   const versions = versionNumbers(documents)
   const attach = attachFromDriveItem(readiness, filePicker)
   // The live row, so the viewer follows a kind change or a re-read.
-  const viewing = documents.find((d) => d.id === viewingId) ?? null
 
   return (
     <div
@@ -493,7 +490,7 @@ export function RecordFiles({
                     ? null
                     : (versions.get(doc.replacedBy.id) ?? null)
                 }
-                onView={() => setViewingId(doc.id)}
+                onView={() => openFile(doc.id)}
               />
             ))}
           </ul>
@@ -506,7 +503,7 @@ export function RecordFiles({
           folder={f}
           recordId={entityId}
           recordName={recordName}
-          onView={(doc) => setViewingId(doc.id)}
+          onView={(doc) => openFile(doc.id)}
           onUnlink={() => folderLink.unlink(f.id)}
         />
       ))}
@@ -522,7 +519,7 @@ export function RecordFiles({
               recordName={recordName}
               actions={actionsFor(doc)}
               older={ours.filter((d) => d.kind === doc.kind)}
-              onView={() => setViewingId(doc.id)}
+              onView={() => openFile(doc.id)}
             />
           )}
         />
@@ -532,29 +529,6 @@ export function RecordFiles({
         <DropWash count={dragging} recordName={recordName} />
       )}
 
-      <DocumentPreview
-        doc={viewing}
-        onOpenChange={(open) => {
-          if (!open) setViewingId(null)
-        }}
-        sidebar={
-          viewing === null ? null : (
-            <FileViewerSidebar doc={viewing} recordId={entityId} />
-          )
-        }
-        foot={
-          viewing === null ? null : (
-            <FileViewerFoot
-              doc={viewing}
-              onDelete={() =>
-                void remove(viewing, 'server').then((gone) => {
-                  if (gone) setViewingId(null)
-                })
-              }
-            />
-          )
-        }
-      />
       <LinkFolderDialog
         key={folderLink.linking?.title ?? ''}
         path={folderLink.linking?.title ?? null}
@@ -570,7 +544,6 @@ export function RecordFiles({
           ? {}
           : { initial: folderLink.linking.initial })}
       />
-      {removeDialog}
     </div>
   )
 }

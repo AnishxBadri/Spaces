@@ -120,7 +120,9 @@ function EmailPage() {
   const go = Route.useNavigate()
   const tab: EmailTab = search.tab ?? 'threads'
   const filter: ThreadFilter = search.filter ?? 'all'
-  const open = search.id ?? null
+  // A file's window over the page takes the `id`; Back gives it back.
+  const fileOpen = search.modal === 'file'
+  const open = fileOpen ? null : (search.id ?? null)
   const split = useSplit()
   const composeHere = useComposeHere()
   // The window's own landing is ComposeModal's; the pane's is the open draft.
@@ -133,12 +135,15 @@ function EmailPage() {
     queryFn: (): Promise<Array<DraftRow>> => listEmailDrafts(),
   })
 
-  const select = (id: string | null) =>
+  const select = (id: string | null) => {
+    // The list's first-thread pick must not replace the file's `id`.
+    if (fileOpen) return
     void go({
       search: (prev) => ({ ...prev, id: id ?? undefined }),
       replace: true,
       resetScroll: false,
     })
+  }
 
   // Below the split a draft has no pane: an addressed one opens as a window.
   useEffect(() => {

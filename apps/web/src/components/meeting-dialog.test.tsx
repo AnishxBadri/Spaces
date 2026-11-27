@@ -63,7 +63,6 @@ const fns = vi.hoisted(() => ({
   pinMeetingRecord: vi.fn(),
   searchEntities: vi.fn(),
   writeUpInteraction: vi.fn(),
-  getDocumentPreview: vi.fn(),
   getDocumentDownloadUrl: vi.fn(),
   getDocumentText: vi.fn(),
 }))
@@ -74,7 +73,9 @@ vi.mock('@tanstack/react-router', () => ({
   useRouter: () => ({
     invalidate: () => Promise.resolve(),
     navigate,
+    state: { location: { state: { __TSR_index: 1 } } },
   }),
+  useNavigate: () => navigate,
   Link: ({
     to,
     children,
@@ -319,7 +320,7 @@ describe('the meeting window', () => {
     expect(navigate).not.toHaveBeenCalled()
   })
 
-  it('lists artifacts by role: a recording opens the provider, a transcript the Files preview', async () => {
+  it("lists artifacts by role: a recording opens the provider, a transcript the file's window", async () => {
     await open()
     const recording = [...document.querySelectorAll('a')].find(
       (a) => a.textContent === 'Recording',
@@ -328,10 +329,16 @@ describe('the meeting window', () => {
       'https://fathom.video/calls/42',
     )
     expect(recording?.getAttribute('target')).toBe('_blank')
-    fns.getDocumentPreview.mockResolvedValue(null)
+    navigate.mockResolvedValue(undefined)
     const transcript = buttons('intro transcript.txt')[0]
     await act(async () => transcript.click())
-    expect(fns.getDocumentPreview).toHaveBeenCalledWith({ data: { id: 'd1' } })
+    // The file's window takes the meeting's place in the address.
+    const search = navigate.mock.lastCall?.[0].search
+    expect(search({ modal: 'meeting', id: 'm1' })).toEqual({
+      modal: 'file',
+      id: 'd1',
+      page: undefined,
+    })
   })
 
   it("reads a recorder's write-up inline with Open in Granola, and its second note as a bordered row, each marked Via Granola", async () => {

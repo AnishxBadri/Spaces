@@ -38,6 +38,7 @@ import {
   Checkmark as CarbonCheckmark,
   CheckmarkOutline,
   ChevronDown as CarbonChevronDown,
+  ChevronLeft as CarbonChevronLeft,
   ChevronRight as CarbonChevronRight,
   ChevronSort as CarbonChevronSort,
   Close,
@@ -251,6 +252,7 @@ export const CheckboxChecked = carbon(
 )
 export const Checkmark = carbon(CarbonCheckmark, 'checkmark')
 export const ChevronDown = carbon(CarbonChevronDown, 'chevron--down')
+export const ChevronLeft = carbon(CarbonChevronLeft, 'chevron--left')
 export const ChevronRight = carbon(CarbonChevronRight, 'chevron--right')
 export const ChevronSort = carbon(CarbonChevronSort, 'chevron--sort')
 export const Column = carbon(CarbonColumn, 'column')

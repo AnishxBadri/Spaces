@@ -1,11 +1,7 @@
 import { useNavigate } from '@tanstack/react-router'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useMemo } from 'react'
 import { toast } from 'sonner'
 import type { DroppedDocument } from '#/components/editor/note-editor'
-import {
-  DOCUMENT_PREVIEW_EVENT,
-  documentPreviewRequest,
-} from '#/lib/editor/document-preview-event'
 import {
   fileAgainstForNote,
   noteDropFailure,
@@ -14,7 +10,6 @@ import {
 } from '#/lib/documents/note-drop'
 import { uploadDocument } from '#/lib/documents/upload'
 import type { UploadPhase } from '#/lib/documents/upload'
-import { getDocumentPreview } from '#/lib/server-fns'
 
 /** One toast, rewritten in place, for the three phases of a dropped file. */
 const DROP_PHASES: Record<UploadPhase, string> = {
@@ -86,67 +81,4 @@ export function useNoteFileDrop(
     },
     [fileAgainst, filedIn, navigate, unfiled],
   )
-}
-
-/**
- * The document preview a note opens on behalf of its mention chips, for the
- * caller to mount as `DocumentPreview`: the page beside its sheet, the
- * window inside its own, so the viewer steps down over it.
- * - Mounted by the note, not by the editor: a chip renders inside
- *   BlockNote's ProseMirror tree, where a Radix dialog has no context to open
- *   in and is remounted on every nearby keystroke. The chip dispatches; this
- *   listens.
- * - The chip carries only an entity id, so the row is fetched on the click
- *   rather than loaded with the note — a note may mention a dozen decks and
- *   open none of them.
- */
-export function useDocumentPreview() {
-  const [doc, setDoc] =
-    useState<Awaited<ReturnType<typeof getDocumentPreview>>>(null)
-
-  // A run token, not a boolean: a second chip clicked while the first fetch
-  // is in flight must win, and a fetch that resolves after a close must not
-  // reopen the dialog.
-  const runRef = useRef(0)
-
-  const open = useCallback((entityId: string) => {
-    const run = ++runRef.current
-    void (async () => {
-      try {
-        const row = await getDocumentPreview({ data: { id: entityId } })
-        if (runRef.current !== run) return
-        if (!row) {
-          toast.error('That document is no longer here')
-          return
-        }
-        setDoc(row)
-      } catch (err) {
-        if (runRef.current !== run) return
-        toast.error(
-          err instanceof Error ? err.message : 'Could not open that document',
-        )
-      }
-    })()
-  }, [])
-
-  const onOpenChange = useCallback((next: boolean) => {
-    if (next) return
-    runRef.current++
-    setDoc(null)
-  }, [])
-
-  useEffect(() => {
-    const onRequest = (event: Event) => {
-      const request = documentPreviewRequest(event)
-      if (request) open(request.entityId)
-    }
-    // The event bubbles out of the editor to the document, which is the one
-    // node guaranteed to be above every chip however BlockNote nests them.
-    globalThis.document.addEventListener(DOCUMENT_PREVIEW_EVENT, onRequest)
-    return () => {
-      globalThis.document.removeEventListener(DOCUMENT_PREVIEW_EVENT, onRequest)
-    }
-  }, [open])
-
-  return { doc, open, onOpenChange }
 }

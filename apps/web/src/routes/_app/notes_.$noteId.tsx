@@ -1,15 +1,12 @@
 import { ClientOnly, createFileRoute } from '@tanstack/react-router'
 import { useState } from 'react'
-import { DocumentPreview } from '#/components/document-preview'
+import { useOpenFile } from '#/components/files/file-window-nav'
 import { NoteEditor } from '#/components/editor/note-editor'
 import { NoteHead } from '#/components/notes/note-head'
 import { NoteSheet } from '#/components/notes/note-sheet'
 import { NoteMoreMenu } from '#/components/notes/note-menu'
 import { NoteRail } from '#/components/notes/note-rail'
-import {
-  useDocumentPreview,
-  useNoteFileDrop,
-} from '#/components/notes/use-note-files'
+import { useNoteFileDrop } from '#/components/notes/use-note-files'
 import {
   useNoteLeaveGuard,
   useNoteSave,
@@ -46,7 +43,7 @@ function NotePage() {
   const { note, allSpaces, terms } = Route.useLoaderData()
   const [title, setTitle] = useState(note.title)
   const save = useNoteSave({ noteId: note.id, initialTitle: note.title })
-  const preview = useDocumentPreview()
+  const openFile = useOpenFile()
   const onFileDrop = useNoteFileDrop(note.spaces)
   useNoteLeaveGuard(save.hasPending, save.flushNow)
 
@@ -104,16 +101,9 @@ function NotePage() {
           </ClientOnly>
         }
         rail={
-          <NoteRail
-            note={note}
-            allSpaces={allSpaces}
-            onPreview={preview.open}
-          />
+          <NoteRail note={note} allSpaces={allSpaces} onPreview={openFile} />
         }
       />
-
-      {/* Mounted by the page, not by the editor: see useDocumentPreview. */}
-      <DocumentPreview doc={preview.doc} onOpenChange={preview.onOpenChange} />
     </>
   )
 }

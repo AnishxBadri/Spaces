@@ -1,11 +1,9 @@
-import { useState } from 'react'
 import type { ReactElement, ReactNode } from 'react'
-import { DocumentPreview } from '#/components/document-preview'
 import { EmailModal } from '#/components/email-dialog'
 import { FileGlyph } from '#/components/files/file-glyph'
 import { openFile } from '#/components/files/file-row'
+import { FileNameLink, useOpenFile } from '#/components/files/file-window-nav'
 import type { RecordDocument } from '#/components/files/types'
-import { FileViewerSidebar } from '#/components/files/viewer-sidebar'
 import { Band, Day, EmptyRow } from '#/components/ledger-section'
 import { ThreadRow, useThreadHighlight } from '#/components/record/thread-row'
 import type { ThreadItem } from '#/components/record/thread-row'
@@ -144,11 +142,7 @@ export function RecordOverview({
       {files.length === 0 ? (
         <EmptyRow name="Files" onAdd={() => onTab('files')} />
       ) : (
-        <OverviewFiles
-          recordId={record.id}
-          files={files}
-          onAll={() => onTab('files')}
-        />
+        <OverviewFiles files={files} onAll={() => onTab('files')} />
       )}
     </div>
   )
@@ -178,16 +172,13 @@ function TabLink({
  * viewer, or Google for a Google file), who filed it and the day.
  */
 function OverviewFiles({
-  recordId,
   files,
   onAll,
 }: {
-  recordId: string
   files: ReadonlyArray<RecordDocument>
   onAll: () => void
 }) {
-  const [viewingId, setViewingId] = useState<string | null>(null)
-  const viewing = files.find((d) => d.id === viewingId) ?? null
+  const openWindow = useOpenFile()
   return (
     <section aria-label="Files" className="flex flex-col">
       <Band
@@ -202,13 +193,13 @@ function OverviewFiles({
             className="flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)"
           >
             <FileGlyph type={fileType(doc)} />
-            <button
-              type="button"
-              onClick={() => openFile(doc, () => setViewingId(doc.id))}
+            <FileNameLink
+              id={doc.id}
+              onOpen={() => openFile(doc, () => openWindow(doc.id))}
               className="focus-ring min-w-0 flex-1 truncate text-left text-ui text-foreground hover:underline"
             >
               {doc.filename}
-            </button>
+            </FileNameLink>
             <span
               data-filed-by
               className="w-63 shrink-0 truncate text-label text-graphite"
@@ -219,17 +210,6 @@ function OverviewFiles({
           </li>
         ))}
       </ul>
-      <DocumentPreview
-        doc={viewing}
-        onOpenChange={(open) => {
-          if (!open) setViewingId(null)
-        }}
-        sidebar={
-          viewing === null ? null : (
-            <FileViewerSidebar doc={viewing} recordId={recordId} />
-          )
-        }
-      />
     </section>
   )
 }

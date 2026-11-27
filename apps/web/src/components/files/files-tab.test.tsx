@@ -109,6 +109,7 @@ const fns = vi.hoisted(() => {
 vi.mock('#/lib/server-fns', () => fns)
 vi.mock('@tanstack/react-router', () => ({
   useRouter: () => ({ invalidate: () => Promise.resolve() }),
+  useNavigate: () => () => Promise.resolve(),
   Link: ({ children }: { children: unknown }) => children,
 }))
 

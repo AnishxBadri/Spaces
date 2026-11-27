@@ -1,19 +1,11 @@
-import { excerpt } from '@spaces/core/context/excerpt'
 import { createServerFn } from '@tanstack/react-start'
 import { Effect, Schema } from 'effect'
-import { and, desc, eq, inArray, isNull } from 'drizzle-orm'
+import { and, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { user } from '@spaces/db/schema/auth'
-import { document, entity, jobRun, link } from '@spaces/db/schema'
+import { document } from '@spaces/db/schema'
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES } from '@spaces/core/documents'
-import { QUEUES } from '@spaces/core/queue/names'
 import { storage } from '@spaces/core/writes/storage'
-import {
-  deleteDocumentWithBlobGcProgram,
-  documentFilingEdgesProgram,
-  documentProvenanceProgram,
-  requireUser,
-} from './shared'
+import { deleteDocumentWithBlobGcProgram, requireUser } from './shared'
 import type { DocumentBirthInput } from '@spaces/core/writes/documents/birth'
 import { input } from './input'
 import { serverQuery } from './query'
@@ -195,118 +187,14 @@ export const clipUrl = createServerFn({ method: 'POST' })
     }
   })
 
-/** A listed document with no provenance row: a bug, and it says so. */
-class DocumentProvenanceMissing extends Schema.TaggedError<DocumentProvenanceMissing>()(
-  'DocumentProvenanceMissing',
-  { message: Schema.String },
-) {}
-
 const listRecordDocumentsProgram = Effect.fn('listRecordDocumentsProgram')(
   function* (userId: string, entityId: string) {
-    const { recordDocumentRows } = yield* Effect.promise(
-      () => import('../documents/record-files'),
-    )
+    const { recordDocumentRows, describeDocumentRowsProgram } =
+      yield* Effect.promise(() => import('../documents/record-files'))
     const rows = yield* Effect.promise(() =>
       recordDocumentRows(userId, entityId),
     )
-
     if (rows.length === 0) return []
-    // A readable attaching email names the file: `via <subject>`.
-    const { attachmentEmailsProgram } = yield* Effect.promise(
-      () => import('../documents/attachment-emails'),
-    )
-    const attached = yield* attachmentEmailsProgram(
-      { id: userId },
-      rows.map((r) => r.id),
-    )
-    const users = yield* serverQuery(() =>
-      db.select({ id: user.id, name: user.name }).from(user),
-    )
-    const names = new Map(users.map((x) => [x.id, x.name]))
-
-    // Who filed it. "integration" names no integration, so the ref is
-    // resolved to the capability id here, server side, once.
-    const provenance = yield* documentProvenanceProgram(rows.map((r) => r.id))
-
-    // Every edge each document is filed by, not just this record's. The
-    // filing control renders both kinds as chips, and a per-row fetch would
-    // open one request per file to draw a popover nobody has clicked.
-    const filings = yield* documentFilingEdgesProgram(rows.map((r) => r.id))
-
-    // The last extraction attempt per document: `job_run` says what the
-    // worker did (attempt, duration, how long ago). `distinct on` sorted by
-    // started_at desc is the last row per entity, the shape the
-    // (entity_id, started_at) index serves.
-    const lastRuns = yield* serverQuery(() =>
-      db
-        .selectDistinctOn([jobRun.entityId], {
-          entityId: jobRun.entityId,
-          status: jobRun.status,
-          attempt: jobRun.attempt,
-          durationMs: jobRun.durationMs,
-          startedAt: jobRun.startedAt,
-          finishedAt: jobRun.finishedAt,
-        })
-        .from(jobRun)
-        .where(
-          and(
-            eq(jobRun.queue, QUEUES.extractDocument),
-            inArray(
-              jobRun.entityId,
-              rows.map((r) => r.id),
-            ),
-          ),
-        )
-        .orderBy(jobRun.entityId, desc(jobRun.startedAt)),
-    )
-
-    // `sinceMs` is computed here rather than in the component on purpose: a
-    // relative time read off the browser's clock renders one string on the
-    // server and another during hydration, which is a mismatch.
-    const now = Date.now()
-    const runs = new Map(
-      lastRuns.map((r) => [
-        r.entityId,
-        {
-          status: r.status,
-          attempt: r.attempt,
-          durationMs: r.durationMs,
-          sinceMs: now - (r.finishedAt ?? r.startedAt).getTime(),
-        },
-      ]),
-    )
-
-    // The newest document that supersedes each row: the older row reads
-    // "Replaced by → <name>", dimmed. Nothing else changes about it.
-    const replacements = yield* serverQuery(() =>
-      db
-        .selectDistinctOn([link.toEntityId], {
-          olderId: link.toEntityId,
-          id: document.entityId,
-          name: document.filename,
-        })
-        .from(link)
-        .innerJoin(document, eq(document.entityId, link.fromEntityId))
-        .innerJoin(entity, eq(entity.id, document.entityId))
-        .where(
-          and(
-            eq(link.relation, 'supersedes'),
-            inArray(
-              link.toEntityId,
-              rows.map((r) => r.id),
-            ),
-            isNull(entity.mergedIntoId),
-          ),
-        )
-        .orderBy(link.toEntityId, desc(link.createdAt)),
-    )
-    const replacedBy = new Map(
-      replacements.map((r) => [
-        r.olderId,
-        { id: r.id, name: r.name ?? 'Untitled file' },
-      ]),
-    )
-
     // Follow takes a record that holds a binding: a person's tab offers none.
     const { followableRecord } = yield* Effect.promise(
       () => import('../documents/follow'),
@@ -314,61 +202,7 @@ const listRecordDocumentsProgram = Effect.fn('listRecordDocumentsProgram')(
     const recordFollows = yield* Effect.promise(() =>
       followableRecord(entityId),
     )
-
-    const out = []
-    for (const row of rows) {
-      // Never default to `'manual'`: that would invent a provenance. The id
-      // came out of `document` above, so a miss is a bug, and it says so.
-      const source = provenance.get(row.id)
-      if (!source)
-        return yield* new DocumentProvenanceMissing({
-          message: `No provenance row for document ${row.id}`,
-        })
-      const {
-        followable,
-        followStatus,
-        followSyncedAt,
-        priorRevisions,
-        revisedAt,
-        ...r
-      } = row
-      out.push({
-        ...r,
-        /** A followed file's binding; null for a file never followed. */
-        follow:
-          followStatus === null
-            ? null
-            : {
-                status: followStatus,
-                lastSyncedAt:
-                  followSyncedAt === null ? null : followSyncedAt.toISOString(),
-                revisions: priorRevisions + 1,
-                revisedAt:
-                  revisedAt === null ? null : new Date(revisedAt).toISOString(),
-              },
-        /**
-         * Whether the row's `···` offers Follow: a file a connection brought
-         * and no folder binding holds, not gone, not followed right now.
-         */
-        canFollow:
-          recordFollows &&
-          followable &&
-          r.externalStatus !== 'gone' &&
-          (r.bindingId === null || followStatus === 'paused'),
-        filename: r.filename ?? 'Untitled file',
-        createdAt: r.createdAt.toISOString(),
-        uploadedByName: r.uploadedBy ? (names.get(r.uploadedBy) ?? null) : null,
-        snippet: excerpt(r.snippet ?? '') || null,
-        lastRun: runs.get(r.id) ?? null,
-        sourceClass: source.sourceClass,
-        sourceCapability: source.sourceCapability,
-        filedIn: filings.get(r.id) ?? [],
-        replacedBy: replacedBy.get(r.id) ?? null,
-        /** The readable email it came attached to: `via <subject>`. */
-        email: attached.get(r.id) ?? null,
-      })
-    }
-    return out
+    return yield* describeDocumentRowsProgram(userId, rows, recordFollows)
   },
 )
 

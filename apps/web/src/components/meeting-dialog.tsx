@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { dayKey, formatDay, formatTime } from '@spaces/core/format'
-import { DocumentPreview } from '#/components/document-preview'
+import { useOpenFile } from '#/components/files/file-window-nav'
 import { Meeting } from '#/components/icons'
 import { ProviderMark } from '#/components/provider-mark'
 import { KindIcon } from '#/components/kind-icon'
@@ -29,7 +29,6 @@ import {
 } from '#/components/ui/dialog'
 import {
   acceptSuggestion,
-  getDocumentPreview,
   getMeeting,
   pinMeetingRecord,
   prepMeeting,
@@ -444,9 +443,7 @@ function MeetingWindow({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [writing, setWriting] = useState(false)
-  const [viewer, setViewer] = useState<Awaited<
-    ReturnType<typeof getDocumentPreview>
-  > | null>(null)
+  const openFile = useOpenFile()
   const reader = useRef<ReadableStreamDefaultReader<PrepEvent> | null>(null)
   const started = useRef(false)
 
@@ -568,9 +565,8 @@ function MeetingWindow({
     [meeting],
   )
 
-  async function openArtifact(a: MeetingArtifact) {
-    const doc = await getDocumentPreview({ data: { id: a.documentId } })
-    if (doc) setViewer(doc)
+  function openArtifact(a: MeetingArtifact) {
+    openFile(a.documentId)
   }
 
   if (meeting === null)
@@ -615,11 +611,7 @@ function MeetingWindow({
         <NoteRow key={n.id} n={n} onOpenNote={onOpenNote} />
       ))}
       {sharedArtifacts.map((a) => (
-        <ArtifactRow
-          key={a.documentId}
-          a={a}
-          onOpen={(x) => void openArtifact(x)}
-        />
+        <ArtifactRow key={a.documentId} a={a} onOpen={openArtifact} />
       ))}
     </ul>
   ) : null
@@ -767,7 +759,7 @@ function MeetingWindow({
                     <ArtifactRow
                       key={a.documentId}
                       a={a}
-                      onOpen={(x) => void openArtifact(x)}
+                      onOpen={openArtifact}
                     />
                   ))}
                   {privateNotes.map((n) => (
@@ -906,13 +898,6 @@ function MeetingWindow({
           </Button>
         )}
       </DialogFooter>
-
-      <DocumentPreview
-        doc={viewer}
-        onOpenChange={(open) => {
-          if (!open) setViewer(null)
-        }}
-      />
     </>
   )
 }

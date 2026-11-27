@@ -11,6 +11,7 @@ import { icon } from '#/components/icons'
 import { brandOf, ProviderMark } from '#/components/provider-mark'
 import { NewerVersionDialog } from './newer-version-dialog'
 import { FileOnDialog } from './file-on-dialog'
+import { FileNameLink } from './file-window-nav'
 import { keepCopyItems, useKeepCopy } from './keep-copy'
 import { bytesUrl } from '../document-preview'
 import type { FileAction, FilingEdge, RecordDocument } from './types'
@@ -226,13 +227,13 @@ export function FileRow({
       )}
     >
       <FileGlyph type={fileType(doc)} />
-      <button
-        type="button"
-        onClick={() => openFile(doc, onView)}
+      <FileNameLink
+        id={doc.id}
+        onOpen={() => openFile(doc, onView)}
         className="focus-ring min-w-0 flex-1 truncate text-left text-body hover:underline"
       >
         {doc.filename}
-      </button>
+      </FileNameLink>
       <span
         data-file-end
         className="min-w-0 shrink truncate mono text-micro text-graphite"

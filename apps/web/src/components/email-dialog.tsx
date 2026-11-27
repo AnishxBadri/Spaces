@@ -2,11 +2,10 @@ import { useNavigate, useRouter, useSearch } from '@tanstack/react-router'
 import { Email, icon } from '#/components/icons'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { DocumentPreview } from '#/components/document-preview'
+import { useOpenFile } from '#/components/files/file-window-nav'
 import { DraftComposer } from '#/components/email/draft-composer'
 import type { FileActions, ReplyMode } from '#/components/email/message-card'
 import { EmailThread } from '#/components/email/thread'
-import { AttachmentSidebar } from '#/components/email/attachment-sidebar'
 import { PaneHead } from '#/components/email/pane-head'
 import { WidenDialog } from '#/components/email/who-can-read'
 import { useKeepCopy } from '#/components/files/keep-copy'
@@ -32,7 +31,6 @@ import type { MoreMenuEntry } from '#/components/ui/more-menu'
 import {
   fileDocument,
   fileInteractionOnEntity,
-  getDocumentPreview,
   getEmail,
   listRecordDocuments,
   openEmailReply,
@@ -62,8 +60,8 @@ import { cn } from '#/lib/utils'
  * - Reply grows the draft as the last card, in ink, every message folded
  *   above it; the foot turns to the composer's Cancel and Send. Each open
  *   message's own `···` replies to, or forwards, that message.
- * - A file opens the viewer as a second window, stepping through the files
- *   of its message.
+ * - A file opens its own window in this one's place (`?modal=file&id=`);
+ *   Back brings the email back.
  */
 export function EmailDialog({
   id,
@@ -226,13 +224,6 @@ const EDGE = 'mx-0 mt-0 mb-0 shrink-0'
 /** The bone ground the message cards stand on, 8px apart. */
 const GROUND = 'flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto bg-bone p-3'
 
-/** The viewer over the thread: the files of one message, and which is open. */
-type Viewing = {
-  files: ReadonlyArray<EmailAttachment>
-  at: number
-  doc: NonNullable<Awaited<ReturnType<typeof getDocumentPreview>>>
-}
-
 function EmailWindow({
   id,
   recordId,
@@ -251,7 +242,7 @@ function EmailWindow({
   const { confirm, confirmDialog } = useConfirm()
   const [email, setEmail] = useState<EmailDetail | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [viewer, setViewer] = useState<Viewing | null>(null)
+  const openFile = useOpenFile()
   const [widening, setWidening] = useState(false)
   const [filing, setFiling] = useState<EmailAttachment | null>(null)
   const [filingDeal, setFilingDeal] = useState(false)
@@ -293,13 +284,6 @@ function EmailWindow({
     [recordId],
   )
 
-  async function view(files: ReadonlyArray<EmailAttachment>, at: number) {
-    const a = files.at(at)
-    if (a === undefined) return
-    const doc = await getDocumentPreview({ data: { id: a.documentId } })
-    if (doc) setViewer({ files, at, doc })
-  }
-
   /** The record's other files of this kind, for `Newer version of…`. */
   async function newerVersion(a: EmailAttachment) {
     if (recordId === null) return
@@ -324,23 +308,20 @@ function EmailWindow({
   }
 
   const keepCopy = useKeepCopy()
-  // The window holds the thread and the open file in state, so a kept copy
-  // re-reads both: the card's `···` and the Source line stop offering it.
+  // The window holds the thread in state, so a kept copy re-reads it: the
+  // card's `···` stops offering it.
   const keeper: KeepCopy = {
     busy: keepCopy.busy,
     keep: async (documentId) => {
       const kept = await keepCopy.keep(documentId)
-      if (kept) {
-        setReads((n) => n + 1)
-        if (viewer?.doc.id === documentId) await view(viewer.files, viewer.at)
-      }
+      if (kept) setReads((n) => n + 1)
       return kept
     },
   }
 
   const actions: FileActions = {
     recordId,
-    onOpen: (a, files) => void view(files, files.indexOf(a)),
+    onOpen: (a) => openFile(a.documentId),
     onFileOn: setFiling,
     onNewer: (a) => void newerVersion(a),
     keeper,
@@ -545,34 +526,8 @@ function EmailWindow({
       onDraft={(messageId, mode) => void startDraft(messageId, mode)}
     />
   )
-  const viewing = viewer?.files.at(viewer.at)
   const extras = (
     <>
-      <DocumentPreview
-        doc={viewer?.doc ?? null}
-        sidebar={
-          viewer === null || viewing === undefined ? null : (
-            <AttachmentSidebar
-              attachment={viewing}
-              doc={viewer.doc}
-              subject={email.subject ?? ''}
-              keeper={keeper}
-            />
-          )
-        }
-        onOpenChange={(open) => {
-          if (!open) setViewer(null)
-        }}
-        steps={
-          viewer === null
-            ? null
-            : {
-                at: viewer.at,
-                of: viewer.files.length,
-                onStep: (to) => void view(viewer.files, to),
-              }
-        }
-      />
       <FileOnDialog
         attachment={filing}
         onOpenChange={(open) => {

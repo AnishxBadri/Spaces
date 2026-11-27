@@ -64,12 +64,13 @@ export const meetingsSearch = searchValidator(
 
 /**
  * `/email`: the tab, the thread or draft open in the pane (by the newest
- * message's id, or the draft's), Threads' filter and its search, and a new
- * email's window over the page (`modal=email&new=1&draft=`).
+ * message's id, or the draft's), Threads' filter and its search, a new
+ * email's window over the page (`modal=email&new=1&draft=`), and a file's
+ * (`modal=file&id=`), whose `id` is the file's while it is open.
  */
 export const emailSearch = searchValidator(
   Schema.Struct({
-    modal: caught(Schema.Literals(['email'])),
+    modal: caught(Schema.Literals(['email', 'file'])),
     ...composeSearchShape,
     tab: caught(Schema.Literals(EMAIL_TABS)),
     id: caught(uuidString),

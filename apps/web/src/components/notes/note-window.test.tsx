@@ -4,7 +4,6 @@ import type { Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { ClockProvider } from '#/components/clock'
-import { documentPreviewEvent } from '#/lib/editor/document-preview-event'
 import type { NoteData } from './note-head'
 import {
   NoteWindow,
@@ -58,9 +57,6 @@ const fns = vi.hoisted(() => ({
   listTermsForNote: vi.fn(() => Promise.resolve([])),
   saveNote: vi.fn((_: unknown) => Promise.resolve()),
   setNoteKind: vi.fn(() => Promise.resolve()),
-  getDocumentPreview: vi.fn((_: { data: { id: string } }) =>
-    Promise.resolve({ id: 'd1', filename: 'Flent deck.pdf' }),
-  ),
 }))
 
 const upload = vi.hoisted(() => ({
@@ -111,20 +107,6 @@ vi.mock('@tanstack/react-router', () => ({
     blocker.shouldBlockFn = opts.shouldBlockFn
   },
 }))
-// The viewer as a bare window: which file, and how deep it stacks.
-vi.mock('#/components/document-preview', async () => {
-  const { Dialog, DialogContent, DialogTitle } =
-    await import('#/components/ui/dialog')
-  return {
-    DocumentPreview: ({ doc }: { doc: { filename: string } | null }) => (
-      <Dialog open={doc !== null}>
-        <DialogContent size="viewer" aria-describedby={undefined}>
-          <DialogTitle data-viewer-stub>{doc?.filename}</DialogTitle>
-        </DialogContent>
-      </Dialog>
-    ),
-  }
-})
 vi.mock('#/components/editor/note-editor', () => ({
   NoteEditor: (props: {
     onChange: (snap: unknown) => void
@@ -187,7 +169,6 @@ afterEach(async () => {
   fns.getNoteWindow.mockReset()
   fns.saveNote.mockReset()
   fns.saveNote.mockImplementation(() => Promise.resolve())
-  fns.getDocumentPreview.mockClear()
   upload.uploadDocument.mockClear()
   Reflect.deleteProperty(window, 'confirm')
 })
@@ -445,26 +426,6 @@ describe('leaving the record', () => {
 })
 
 describe('files', () => {
-  it('opens a file mention’s viewer stepped down over the window', async () => {
-    await open(data())
-    act(() => {
-      part('body')
-        ?.querySelector('[data-editor-stub]')
-        ?.dispatchEvent(
-          documentPreviewEvent({ entityId: 'd1', label: 'Flent deck.pdf' }),
-        )
-    })
-    await flush()
-    expect(fns.getDocumentPreview).toHaveBeenCalledWith({ data: { id: 'd1' } })
-    const viewer = document.querySelector('[data-viewer-stub]')
-    expect(viewer?.textContent).toBe('Flent deck.pdf')
-    expect(
-      viewer?.closest('[data-window-depth]')?.getAttribute('data-window-depth'),
-    ).toBe('2')
-    // The note stays open beneath it.
-    expect(sheet()).not.toBeNull()
-  })
-
   it('files a dropped file where the note is filed and hands the editor its chip', async () => {
     await open(
       data({

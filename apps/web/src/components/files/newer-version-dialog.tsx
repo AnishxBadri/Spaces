@@ -19,6 +19,12 @@ import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
+/** A file the dialog may mark this one newer than. */
+export type OlderFile = Pick<
+  RecordDocument,
+  'id' | 'filename' | 'mime' | 'externalUrl' | 'createdAt'
+>
+
 /**
  * "Newer version of…": the record's other files of the same kind, one
  * pick, then Mark as newer. Writes one `supersedes` link; nothing is deleted
@@ -30,9 +36,9 @@ export function NewerVersionDialog({
   open,
   onOpenChange,
 }: {
-  doc: RecordDocument
+  doc: Pick<RecordDocument, 'id' | 'filename'>
   /** The files `doc` may replace: same record, same kind, not itself. */
-  older: ReadonlyArray<RecordDocument>
+  older: ReadonlyArray<OlderFile>
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {

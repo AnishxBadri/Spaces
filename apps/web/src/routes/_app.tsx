@@ -18,6 +18,7 @@ import { AskDock } from '#/components/ask/ask-dock'
 import { toggleAsk } from '#/lib/ask/dock-store'
 import { UploadDialog } from '#/components/upload-dialog'
 import { ComposeWindows } from '#/components/email/compose-windows'
+import { FileWindow } from '#/components/files/file-window'
 import { Wordmark } from '#/components/wordmark'
 import { Toaster } from '#/components/ui/sonner'
 import { useHeldDecisionsHost } from '#/lib/held-decisions'
@@ -196,6 +197,7 @@ function AppShell() {
           running. */}
         <UploadDialog />
         <ComposeWindows />
+        <FileWindow />
         <KeyboardHelp open={keyboardOpen} onOpenChange={setKeyboardOpen} />
         <Toaster position="bottom-right" />
       </div>

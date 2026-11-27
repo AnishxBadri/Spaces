@@ -36,8 +36,8 @@ export const recordSearch = searchValidator(
 )
 
 /**
- * The tab a link asks for: its own, else Notes under a note's window and
- * Interactions under any other.
+ * The tab a link asks for: its own, else Notes under a note's window, Files
+ * under a file's and Interactions under any other.
  */
 export function linkedRecordTab(search: {
   tab?: RecordTab | undefined
@@ -45,7 +45,8 @@ export function linkedRecordTab(search: {
 }): RecordTab | undefined {
   if (search.tab !== undefined) return search.tab
   if (search.modal === undefined) return undefined
-  return search.modal === 'note' ? 'notes' : 'interactions'
+  if (search.modal === 'note') return 'notes'
+  return search.modal === 'file' ? 'files' : 'interactions'
 }
 
 /** The tab to show: the link's, else Overview. */

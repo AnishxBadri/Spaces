@@ -1,14 +1,15 @@
-import { Schema } from 'effect'
+import { Option, Schema } from 'effect'
 import { uuidString } from '@spaces/core/attributes/registry'
 import { caught, searchValidator } from './search-validator'
 
 /**
  * The window a page opens over itself from its URL: `?modal=meeting&id=`,
- * `?modal=email&id=` and `?modal=note&id=` (the id is the note's). Anything
+ * `?modal=email&id=`, `?modal=note&id=` (the id is the note's) and
+ * `?modal=file&id=`, with `&page=` for the page a PDF opens at. Anything
  * else reads as no window. Spread `modalSearchShape` into a route's own
  * search schema.
  */
-export const MODALS = ['meeting', 'email', 'note'] as const
+export const MODALS = ['meeting', 'email', 'note', 'file'] as const
 export type Modal = (typeof MODALS)[number]
 
 /**
@@ -24,9 +25,13 @@ export const composeSearchShape = {
   reconnected: caught(Schema.Literal('gmail')),
 }
 
+/** A file window's page: 1-based. */
+const filePage = Schema.Int.check(Schema.isGreaterThanOrEqualTo(1))
+
 export const modalSearchShape = {
   modal: caught(Schema.Literals(MODALS)),
   id: caught(uuidString),
+  page: caught(filePage),
   ...composeSearchShape,
 }
 
@@ -38,6 +43,36 @@ export function openModalId(
   modal: Modal,
 ): string | null {
   return search.modal === modal && search.id !== undefined ? search.id : null
+}
+
+const FileWindowSearch = Schema.Struct({
+  modal: Schema.Literal('file'),
+  id: uuidString,
+  page: caught(filePage),
+})
+const decodeFileWindow = Schema.decodeUnknownOption(FileWindowSearch)
+
+/**
+ * The file window a location's raw search opens, else null. The file window
+ * opens over every page, so it reads the URL itself rather than trusting a
+ * route's schema, which may not know `modal=file` (Email's does not).
+ */
+export function openFileWindowOf(
+  search: unknown,
+): { id: string; page: number | null } | null {
+  return Option.match(decodeFileWindow(search), {
+    onNone: () => null,
+    onSome: ({ id, page }) => ({ id, page: page ?? null }),
+  })
+}
+
+/** The keys that open a file's window over the page it is opened from. */
+export function fileWindowSearch(id: string, page: number | null = null) {
+  return {
+    modal: 'file' as const,
+    id,
+    ...(page === null ? {} : { page }),
+  }
 }
 
 /** The new email the search opens, else null; `draftId` null until minted. */

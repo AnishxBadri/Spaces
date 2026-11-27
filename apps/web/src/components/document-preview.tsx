@@ -2,38 +2,16 @@ import { WarningAlt } from '#/components/icons'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { PDFDocumentProxy } from 'unpdf/pdfjs'
-import { AskButton } from './ui/ask-control'
-import { Button } from './ui/button'
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from './ui/dialog'
-import { WindowControls } from './ui/window-controls'
-import { FileGlyph } from './files/file-glyph'
-import { followWord } from './files/revision-ledger'
-import type { RecordDocument } from './files/types'
 import { Twinkle } from './twinkle'
 import { detectFormat } from '@spaces/core/documents/extract'
-import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
-import type { DocumentKind } from '@spaces/core/documents'
 import { getDocumentBytes, getDocumentText } from '#/lib/server-fns'
-import { addMention, openAsk } from '#/lib/ask/dock-store'
-import { useAskSubject } from '#/lib/ask/page-scope'
-import type { AskScopeChip } from '#/lib/ask/types'
-import { fileType } from '#/lib/documents/files-tab'
-import type { FileType, RemoteBytes } from '#/lib/documents/files-tab'
-import { storageLinkProvider } from '#/lib/documents/storage-link'
+import type { RemoteBytes } from '#/lib/documents/files-tab'
 import { cn } from '#/lib/utils'
 
 /**
- * The file viewer: a window over the page rather than a route, so Back
- * undoes reading position and not the look. Closes from the ink close at the
- * end of its head.
+ * The file viewer's body: its tool bar (a PDF's pages and zoom) and the
+ * file itself, the same in the file's window and on its page; `FileView`
+ * puts the head and the rail round it.
  *
  * **Nothing here relaxes the download hardening.** Blobs are served as
  * `application/octet-stream; attachment` (an uploaded `.html` served inline
@@ -50,25 +28,20 @@ import { cn } from '#/lib/utils'
  *   Gmail; one whose mailbox was disconnected opens its text.
  */
 
-type Doc = {
+/** What the body reads of a file. */
+export type ViewerDoc = {
   id: string
   filename: string
   mime: string | null
   sizeBytes: number | null
-  /** The genre, printed first in the title bar's mono line when known. */
-  kind?: DocumentKind | undefined
   extractionStatus: string
   extractionError: string | null
   /** Null when there are no bytes to fetch — a clipped article. */
   blobSha: string | null
   /** The page a clip was read from, and null on every row that had bytes. */
   url: string | null
-  /** The newer version that supersedes this file; the head says so. */
+  /** The newer version that supersedes this file; the tool bar says so. */
   replacedBy?: { id: string; name: string } | null
-  /** A followed file's binding: the head reads its provider and revision. */
-  follow?: RecordDocument['follow'] | undefined
-  externalUrl?: string | null | undefined
-  externalStatus?: RecordDocument['externalStatus'] | undefined
   /** An email attachment whose file stays in its mailbox. */
   remoteBytes?: RemoteBytes | undefined
 }
@@ -77,67 +50,8 @@ type Doc = {
  * No file to fetch: a clip, or an attachment whose mailbox was
  * disconnected. One still in the mailbox opens through it.
  */
-const blobless = (doc: Doc) =>
+export const blobless = (doc: ViewerDoc) =>
   doc.blobSha === null && doc.remoteBytes !== 'linked'
-
-const FOLLOWED_TYPE_WORD: Partial<Record<FileType, string>> = {
-  'google-sheet': 'Sheet',
-  xls: 'Sheet',
-  'google-doc': 'Doc',
-  doc: 'Doc',
-  'google-slides': 'Slides',
-  ppt: 'Slides',
-  pdf: 'PDF',
-}
-
-/**
- * The head's mono line: `Deck · 4.2 MB · 14 pages`, or for a followed file
- * `Sheet · Drive · rev 4 · following`.
- */
-export function viewerHeadLine(
-  doc: Doc,
-  format: string | null,
-  pages: number,
-): string {
-  const kind =
-    doc.kind === undefined
-      ? format
-        ? format.toUpperCase()
-        : (doc.mime ?? 'Unknown type')
-      : DOCUMENT_KIND_LABELS[doc.kind]
-  const follow = doc.follow ?? null
-  if (follow !== null) {
-    const where =
-      doc.externalUrl == null
-        ? null
-        : (storageLinkProvider(doc.externalUrl)?.label ?? null)
-    // A followed file is the provider's live file: it is named by what it is.
-    const type = fileType({ ...doc, externalUrl: doc.externalUrl ?? null })
-    return [
-      FOLLOWED_TYPE_WORD[type] ?? kind,
-      where,
-      `rev ${String(follow.revisions)}`,
-      followWord({ follow, externalStatus: doc.externalStatus ?? null }),
-    ]
-      .filter((part) => part !== null)
-      .join(' · ')
-  }
-  return [
-    kind,
-    doc.sizeBytes ? formatBytes(doc.sizeBytes) : null,
-    pages > 0 ? `${String(pages)} page${pages === 1 ? '' : 's'}` : null,
-  ]
-    .filter((part) => part !== null)
-    .join(' · ')
-}
-
-/** A file as Ask's scope chip: its chunks seed the turn. */
-const fileChip = (doc: Doc): AskScopeChip => ({
-  kind: 'file',
-  id: doc.id,
-  name: doc.filename,
-  href: null,
-})
 
 /** Raster types only — SVG can carry script and is deliberately absent. */
 const PREVIEWABLE_IMAGES = new Set([
@@ -149,7 +63,7 @@ const PREVIEWABLE_IMAGES = new Set([
   'image/bmp',
 ])
 
-function imageType(doc: Doc): string | null {
+function imageType(doc: ViewerDoc): string | null {
   const mime = doc.mime?.toLowerCase().split(';')[0].trim()
   if (mime && PREVIEWABLE_IMAGES.has(mime)) return mime
   // Attachments are labelled `application/octet-stream` constantly, so fall
@@ -167,104 +81,20 @@ function imageType(doc: Doc): string | null {
   return ext ? (byExt[ext] ?? null) : null
 }
 
-export function DocumentPreview({
-  doc,
-  page,
-  onOpenChange,
-  sidebar = null,
-  foot = null,
-  steps = null,
-}: {
-  doc: Doc | null
-  /** The 1-based page a PDF opens at; the first when omitted. */
-  page?: number
-  onOpenChange: (open: boolean) => void
-  /** The column right of the page. */
-  sidebar?: ReactNode
-  /** Foot actions, right of Ask. */
-  foot?: ReactNode
-  /**
-   * The files of one message, stepped from the foot (`‹ File 1 of 2 ›`),
-   * which then ends on Done.
-   */
-  steps?: ViewerSteps | null
-}) {
-  // An open file is Ask's default chip while it is on screen.
-  useAskSubject(doc === null ? null : fileChip(doc))
-  return (
-    <Dialog open={Boolean(doc)} onOpenChange={onOpenChange}>
-      <DialogContent size="viewer" className="gap-0 overflow-hidden">
-        {doc ? (
-          <PreviewBody
-            key={doc.id}
-            doc={doc}
-            startPage={page ?? 1}
-            sidebar={sidebar}
-            foot={foot}
-            steps={steps}
-          />
-        ) : null}
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-/** Where the viewer stands among the files it steps through. */
-type ViewerSteps = {
-  /** 0-based. */
-  at: number
-  of: number
-  onStep: (to: number) => void
-}
-
-/** `‹ File 1 of 2 ›` in the foot; nothing for a single file. */
-function FileStepper({ at, of, onStep }: ViewerSteps) {
-  if (of < 2) return null
-  return (
-    <div
-      data-file-stepper
-      className="mr-2 flex h-[1.625rem] shrink-0 items-stretch border border-rule bg-paper mono text-micro"
-    >
-      <button
-        type="button"
-        aria-label="Previous file"
-        disabled={at <= 0}
-        onClick={() => onStep(at - 1)}
-        className="focus-ring w-6 border-r border-rule hover:bg-bone disabled:text-graphite"
-      >
-        ‹
-      </button>
-      <span className="tabular flex items-center px-2">
-        File {at + 1} of {of}
-      </span>
-      <button
-        type="button"
-        aria-label="Next file"
-        disabled={at >= of - 1}
-        onClick={() => onStep(at + 1)}
-        className="focus-ring w-6 border-l border-rule hover:bg-bone disabled:text-graphite"
-      >
-        ›
-      </button>
-    </div>
-  )
-}
-
 /** A PDF's zoom: fitted to the page column, or a scale the reader chose. */
 type Zoom = 'fit' | number
 
-function PreviewBody({
+/**
+ * The tool bar and the file under it. `startPage` is the 1-based page a PDF
+ * opens at. Keyed by the file's id where it mounts, so another file starts
+ * on its own first page.
+ */
+export function FileBody({
   doc,
   startPage,
-  sidebar,
-  foot,
-  steps,
 }: {
-  doc: Doc
+  doc: ViewerDoc
   startPage: number
-  sidebar: ReactNode
-  foot: ReactNode
-  steps: ViewerSteps | null
 }) {
   const format = detectFormat(doc.filename, doc.mime)
   const asImage = imageType(doc)
@@ -280,199 +110,96 @@ function PreviewBody({
     // A page past the end (the file was replaced) opens on the last.
     setPage((p) => Math.min(p, n))
   }, [])
-
-  const [downloading, setDownloading] = useState(false)
-  const [downloadError, setDownloadError] = useState<string | null>(null)
-
-  async function download() {
-    setDownloading(true)
-    setDownloadError(null)
-    try {
-      const answer = await bytesUrl(
-        doc.id,
-        () => true,
-        () => undefined,
-      )
-      if ('url' in answer) window.location.href = answer.url
-      else setDownloadError(answer.unavailable)
-    } catch (err) {
-      setDownloadError(
-        err instanceof Error ? err.message : 'Could not load file',
-      )
-    } finally {
-      setDownloading(false)
-    }
-  }
+  const replaced = doc.replacedBy ?? null
 
   return (
-    <>
-      {/* The title bar at the sheet's edge: the content is `p-0`, so the
-          header's own breakout is cancelled here. */}
-      <DialogHeader className="mx-0 mt-0 mb-0 h-12 shrink-0 flex-nowrap items-center gap-3 py-0">
-        <FileGlyph
-          type={fileType({ ...doc, externalUrl: null })}
-          className="-ml-1"
-        />
-        <DialogTitle
-          className={cn(
-            'min-w-0 truncate text-title leading-5',
-            doc.replacedBy != null && 'text-graphite',
-          )}
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      {isPdf || replaced !== null ? (
+        <div
+          data-viewer-tools
+          className="flex h-11 shrink-0 items-center gap-3 border-b border-rule bg-paper px-6"
         >
-          {doc.filename}
-        </DialogTitle>
-        <DialogDescription data-viewer-head className="shrink-0">
-          {viewerHeadLine(doc, format, isPdf ? pages : 0)}
-        </DialogDescription>
-        {doc.replacedBy == null ? null : (
-          <span className="min-w-0 truncate mono text-micro text-graphite">
-            Replaced by → {doc.replacedBy.name}
-          </span>
-        )}
-        {downloadError === null ? null : (
-          <span
-            role="alert"
-            title={downloadError}
-            className="min-w-0 truncate mono text-micro text-graphite"
-          >
-            {downloadError}
-          </span>
-        )}
-        <span className="flex-1" />
-        {isPdf && pages > 1 ? (
-          <div className="flex h-[1.625rem] shrink-0 items-stretch border border-rule bg-paper mono text-micro">
-            <button
-              type="button"
-              aria-label="Previous page"
-              disabled={page <= 1}
-              onClick={() => setPage((n) => Math.max(1, n - 1))}
-              className="focus-ring w-6 border-r border-rule hover:bg-bone disabled:text-graphite"
-            >
-              ‹
-            </button>
-            <span className="tabular flex items-center px-2">
-              {page} / {pages}
+          {replaced === null ? null : (
+            <span className="min-w-0 truncate mono text-micro text-graphite">
+              Replaced by → {replaced.name}
             </span>
-            <button
-              type="button"
-              aria-label="Next page"
-              disabled={page >= pages}
-              onClick={() => setPage((n) => Math.min(pages, n + 1))}
-              className="focus-ring w-6 border-l border-rule hover:bg-bone disabled:text-graphite"
-            >
-              ›
-            </button>
-          </div>
-        ) : null}
-        {isPdf ? (
-          <div className="flex h-[1.625rem] shrink-0 items-stretch border border-rule bg-paper mono text-micro">
-            <button
-              type="button"
-              aria-label="Zoom out"
-              onClick={() => setZoom(Math.max(0.25, scale / 1.25))}
-              className="focus-ring w-6 border-r border-rule hover:bg-bone"
-            >
-              -
-            </button>
-            <button
-              type="button"
-              aria-label="Fit to width"
-              aria-pressed={zoom === 'fit'}
-              onClick={() => setZoom('fit')}
-              className="focus-ring px-2 hover:bg-bone"
-            >
-              fit
-            </button>
-            <button
-              type="button"
-              aria-label="Zoom in"
-              onClick={() => setZoom(Math.min(4, scale * 1.25))}
-              className="focus-ring w-6 border-l border-rule hover:bg-bone"
-            >
-              +
-            </button>
-          </div>
-        ) : null}
-        <div className="flex shrink-0 items-center">
-          {noFile ? (
-            doc.url === null ? null : (
-              <Button size="sm" variant="outline" asChild>
-                <a
-                  href={doc.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={doc.url}
-                >
-                  Open source
-                </a>
-              </Button>
-            )
-          ) : (
-            <Button
-              size="sm"
-              variant="outline"
-              pending={downloading}
-              disabled={downloading}
-              onClick={() => void download()}
-            >
-              Download
-            </Button>
           )}
+          <span className="flex-1" />
+          {isPdf && pages > 1 ? (
+            <div className="flex h-[1.625rem] shrink-0 items-stretch border border-rule bg-paper mono text-micro">
+              <button
+                type="button"
+                aria-label="Previous page"
+                disabled={page <= 1}
+                onClick={() => setPage((n) => Math.max(1, n - 1))}
+                className="focus-ring w-6 border-r border-rule hover:bg-bone disabled:text-graphite"
+              >
+                ‹
+              </button>
+              <span className="tabular flex items-center px-2">
+                {page} / {pages}
+              </span>
+              <button
+                type="button"
+                aria-label="Next page"
+                disabled={page >= pages}
+                onClick={() => setPage((n) => Math.min(pages, n + 1))}
+                className="focus-ring w-6 border-l border-rule hover:bg-bone disabled:text-graphite"
+              >
+                ›
+              </button>
+            </div>
+          ) : null}
+          {isPdf ? (
+            <div className="flex h-[1.625rem] shrink-0 items-stretch border border-rule bg-paper mono text-micro">
+              <button
+                type="button"
+                aria-label="Zoom out"
+                onClick={() => setZoom(Math.max(0.25, scale / 1.25))}
+                className="focus-ring w-6 border-r border-rule hover:bg-bone"
+              >
+                -
+              </button>
+              <button
+                type="button"
+                aria-label="Fit to width"
+                aria-pressed={zoom === 'fit'}
+                onClick={() => setZoom('fit')}
+                className="focus-ring px-2 hover:bg-bone"
+              >
+                fit
+              </button>
+              <button
+                type="button"
+                aria-label="Zoom in"
+                onClick={() => setZoom(Math.min(4, scale * 1.25))}
+                className="focus-ring w-6 border-l border-rule hover:bg-bone"
+              >
+                +
+              </button>
+            </div>
+          ) : null}
         </div>
-        <WindowControls />
-      </DialogHeader>
-
-      <div className="flex min-h-0 flex-1">
-        <div className="min-h-0 min-w-0 flex-1 overflow-auto bg-bone">
-          {noFile ? (
-            <TextPreview doc={doc} format={format} />
-          ) : isPdf ? (
-            <PdfPreview
-              doc={doc}
-              page={page}
-              scale={scale}
-              onPages={onPages}
-              onPage={setPage}
-              onFitScale={setFitScale}
-            />
-          ) : asImage ? (
-            <ImagePreview doc={doc} type={asImage} />
-          ) : (
-            <TextPreview doc={doc} format={format} />
-          )}
-        </div>
-        {sidebar === null ? null : (
-          <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-hairline bg-paper">
-            {sidebar}
-          </aside>
+      ) : null}
+      <div className="min-h-0 min-w-0 flex-1 overflow-auto bg-bone">
+        {noFile ? (
+          <TextPreview doc={doc} format={format} />
+        ) : isPdf ? (
+          <PdfPreview
+            doc={doc}
+            page={page}
+            scale={scale}
+            onPages={onPages}
+            onPage={setPage}
+            onFitScale={setFitScale}
+          />
+        ) : asImage ? (
+          <ImagePreview doc={doc} type={asImage} />
+        ) : (
+          <TextPreview doc={doc} format={format} />
         )}
       </div>
-
-      {/* The foot, breakout cancelled like the head's. */}
-      <DialogFooter className="mx-0 mt-0 mb-0 shrink-0">
-        <DialogClose asChild>
-          <AskButton
-            className="mr-auto"
-            title="Ask with this file as the scope"
-            onClick={() => {
-              addMention(fileChip(doc))
-              openAsk()
-            }}
-          >
-            Ask about this
-          </AskButton>
-        </DialogClose>
-        {foot}
-        {steps === null ? null : (
-          <>
-            <FileStepper {...steps} />
-            <DialogClose asChild>
-              <Button variant="outline">Done</Button>
-            </DialogClose>
-          </>
-        )}
-      </DialogFooter>
-    </>
+    </div>
   )
 }
 
@@ -670,7 +397,7 @@ function PdfPreview({
   onPage,
   onFitScale,
 }: {
-  doc: Doc
+  doc: ViewerDoc
   page: number
   scale: number
   onPages: (pages: number) => void
@@ -843,7 +570,7 @@ function Thumb({
   )
 }
 
-function ImagePreview({ doc, type }: { doc: Doc; type: string }) {
+function ImagePreview({ doc, type }: { doc: ViewerDoc; type: string }) {
   const blob = useBlobBytes(doc.id)
   const { bytes } = blob
   const [url, setUrl] = useState<string | null>(null)
@@ -881,7 +608,7 @@ function TextPreview({
   doc,
   format,
 }: {
-  doc: Doc
+  doc: ViewerDoc
   format: ReturnType<typeof detectFormat>
 }) {
   const [text, setText] = useState<string | null>(null)

@@ -11,7 +11,7 @@ import { icon, KIND_ICONS, Layers } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
 import { useId, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { DocumentPreview } from '#/components/document-preview'
+import { FileNameLink, useOpenFile } from '#/components/files/file-window-nav'
 import {
   GoneMarker,
   OpenInSourceButton,
@@ -47,11 +47,11 @@ import { filesSearch } from '#/lib/documents/to-files'
  * filter is `All · Unfiled`, as tabs on the bar with both counts, plus the
  * text box.
  *
- * A row opens the preview rather than navigating: a document has no page, by
- * decision — inspection, not a destination. The filename is a real button
- * inside the sticky cell so the
- * keyboard reaches it, exactly where `/portfolio` puts its link. A row ends
- * on its exception lane: still extracting, or failed with Re-read.
+ * A row opens the file's window over the list (`?modal=file&id=`); its page
+ * is `/files/<id>`, where a Cmd-click on the name goes. The filename is a
+ * real link inside the sticky cell so the keyboard reaches it, exactly
+ * where `/portfolio` puts its link. A row ends on its exception lane: still
+ * extracting, or failed with Re-read.
  *
  * `?filed=unfiled` is the unfiled inbox: a filter on the shelf, not a route —
  * a search param, so reload, back/forward and Today's badge land on the same
@@ -104,7 +104,7 @@ function DocumentsPage() {
   const navigate = Route.useNavigate()
   const [globalFilter, setGlobalFilter] = useState('')
   const [sorting, setSorting] = useState<SortingState>([])
-  const [previewing, setPreviewing] = useState<DocumentRow | null>(null)
+  const openFile = useOpenFile()
   const prefs = useTablePrefs(PREFS_KEY)
   const { today } = useClock()
 
@@ -119,20 +119,15 @@ function DocumentsPage() {
           const r = info.row.original
           return (
             <div className="flex h-full min-w-0 items-center gap-1.5">
-              <button
-                type="button"
-                // The row click does the same thing; without this, clicking
-                // the button fires both handlers for one intent.
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setPreviewing(r)
-                }}
-                title={`Preview ${r.filename}`}
+              <FileNameLink
+                id={r.id}
+                onOpen={() => openFile(r.id)}
+                title={`Open ${r.filename}`}
                 className="focus-ring-inset flex h-full min-w-0 flex-1 items-center gap-2 px-1 text-left font-medium group-hover:underline hover:underline"
               >
                 <DocumentTile kind={r.kind} filename={r.filename} />
                 <span className="truncate">{r.filename}</span>
-              </button>
+              </FileNameLink>
               {r.externalStatus === 'gone' ? <GoneMarker /> : null}
               {/* Only a row a source linked has somewhere to open: an
                   upload has no external URL, so it gets no action rather
@@ -231,7 +226,7 @@ function DocumentsPage() {
       }),
     ]
     return defs
-  }, [today])
+  }, [today, openFile])
 
   const table = useReactTable({
     data: documents,
@@ -319,7 +314,7 @@ function DocumentsPage() {
                 label="Files"
                 labelledBy={[titleId, viewId]}
                 stickyColumnId="filename"
-                onRowClick={setPreviewing}
+                onRowClick={(r) => openFile(r.id)}
                 rowEnd={(r) => <ExceptionLane doc={r} />}
                 rowEndWidth={EXCEPTION_WIDTH}
               />
@@ -327,10 +322,6 @@ function DocumentsPage() {
           </PageBody>
         </>
       )}
-      <DocumentPreview
-        doc={previewing}
-        onOpenChange={(open) => !open && setPreviewing(null)}
-      />
     </ListPage>
   )
 }
@@ -435,7 +426,7 @@ function ChipLane({ chips }: { chips: Array<Chip> }) {
             {chip.href ? (
               <Link
                 to={chip.href}
-                // The row opens the preview; a chip is a different intent and
+                // The row opens the file; a chip is a different intent and
                 // must not do both.
                 onClick={(e) => e.stopPropagation()}
                 className="focus-ring flex min-w-0 items-center gap-1 hover:underline"

@@ -3,7 +3,6 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { RefObject } from 'react'
 import { formatDay } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
-import { DocumentPreview } from '#/components/document-preview'
 import { NoteEditor } from '#/components/editor/note-editor'
 import { NOTE_INSET } from '#/components/editor/note-column'
 import type { GlossaryTerm } from '#/components/editor/glossary-decoration'
@@ -29,7 +28,7 @@ import { SaveWord } from './note-head'
 import type { SaveState } from './note-head'
 import { noteKindEntries, useNoteKind } from './note-menu'
 import { NoteMark } from './note-mark'
-import { useDocumentPreview, useNoteFileDrop } from './use-note-files'
+import { useNoteFileDrop } from './use-note-files'
 import { useNoteLeaveGuard, useNoteSave } from './use-note-save'
 
 /**
@@ -40,9 +39,9 @@ import { useNoteLeaveGuard, useNoteSave } from './use-note-save'
  * - Body: the note's editor at its 72ch measure, scrolling inside the
  *   window. Its floating menus mount in the sheet, outside the scroller, so
  *   the window's focus trap and pointer guard let them be used and the
- *   scroller never clips them. A file mention opens the file viewer stepped
- *   down over the window, and a dropped file is filed on the note, as on
- *   the note's page.
+ *   scroller never clips them. A file mention opens the file's window in
+ *   its place (Back brings the note back), and a dropped file is filed on
+ *   the note, as on the note's page.
  * - Foot: the save word, `Only you` for a private note, `Open as page ↗`
  *   and `Done`. It autosaves, so there is no Cancel.
  * - Done, Esc and the scrim land the last edit before the window closes; a
@@ -301,7 +300,6 @@ function OpenNote({
   const kind = useNoteKind(note.id, note.kind)
   const [portal, setPortal] = useState<HTMLDivElement | null>(null)
   const titleField = useRef<HTMLInputElement>(null)
-  const preview = useDocumentPreview()
   const onFileDrop = useNoteFileDrop(note.spaces)
   useNoteLeaveGuard(save.hasPending, save.flushNow)
 
@@ -422,10 +420,6 @@ function OpenNote({
       {/* The editor's floating menus: in the sheet, outside the scroller,
           and under `.prose-note`, which is what styles them. */}
       <div ref={setPortal} data-note-window-portal className="prose-note" />
-
-      {/* Inside the sheet, so the viewer is this window's child and steps
-          down under its head. */}
-      <DocumentPreview doc={preview.doc} onOpenChange={preview.onOpenChange} />
     </>
   )
 }

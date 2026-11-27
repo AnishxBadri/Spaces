@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { LedgerFigure, LedgerRow, LedgerSection } from './ledger-section'
 import { Button } from './ui/button'
 import { useConfirm } from './ui/confirm-dialog'
-import { DocumentPreview } from './document-preview'
+import { FileNameLink, useOpenFile } from './files/file-window-nav'
 import { OpenSourceButton } from './document-source'
 import { Twinkle } from './twinkle'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
@@ -67,7 +67,7 @@ export function SpaceSources({
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [pending, setPending] = useState<Array<Pending>>([])
-  const [previewing, setPreviewing] = useState<SpaceSource | null>(null)
+  const openFile = useOpenFile()
 
   useExtractionPolling(sources, router)
 
@@ -190,7 +190,7 @@ export function SpaceSources({
             key={s.id}
             source={s}
             spaceName={spaceName}
-            onPreview={() => setPreviewing(s)}
+            onPreview={() => openFile(s.id)}
           />
         ))}
 
@@ -234,7 +234,7 @@ export function SpaceSources({
                   <InheritedRow
                     key={`${s.companyId}:${s.id}`}
                     source={s}
-                    onPreview={() => setPreviewing(s)}
+                    onPreview={() => openFile(s.id)}
                   />
                 ))}
               </ol>
@@ -253,11 +253,6 @@ export function SpaceSources({
           void handleFiles(e.target.files)
           e.target.value = ''
         }}
-      />
-
-      <DocumentPreview
-        doc={previewing}
-        onOpenChange={(open) => !open && setPreviewing(null)}
       />
     </div>
   )
@@ -312,14 +307,14 @@ function SourceRow({
     <li className="group flex items-center gap-3 border-b border-rule px-(--inset) py-2.5">
       <Page className="size-4 shrink-0 text-graphite" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <button
-          type="button"
-          onClick={onPreview}
-          title={`Preview ${source.filename}`}
+        <FileNameLink
+          id={source.id}
+          onOpen={onPreview}
+          title={`Open ${source.filename}`}
           className="focus-ring min-w-0 truncate text-left text-body font-medium hover:underline"
         >
           {source.filename}
-        </button>
+        </FileNameLink>
         <SourceNote source={source} />
         <span className="truncate mono text-field text-graphite">
           {[source.uploadedByName, `${formatSince(source.sinceMs)} ago`]
@@ -409,14 +404,14 @@ function InheritedRow({
     <li className="group flex items-center gap-3 border-b border-rule px-(--inset) py-2.5">
       <Page className="size-4 shrink-0 text-graphite" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <button
-          type="button"
-          onClick={onPreview}
-          title={`Preview ${source.filename}`}
+        <FileNameLink
+          id={source.id}
+          onOpen={onPreview}
+          title={`Open ${source.filename}`}
           className="focus-ring min-w-0 truncate text-left text-body font-medium hover:underline"
         >
           {source.filename}
-        </button>
+        </FileNameLink>
         <SourceNote source={source} />
         <span className="flex min-w-0 items-center gap-1 mono text-field text-graphite">
           {href ? (

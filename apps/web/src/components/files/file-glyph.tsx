@@ -1,3 +1,4 @@
+import { useId } from 'react'
 import type { FileType } from '#/lib/documents/files-tab'
 import { cn } from '#/lib/utils'
 
@@ -108,6 +109,66 @@ export function FileGlyph({
         </text>
       ) : type === 'file' ? null : (
         <GoogleMark type={type} />
+      )}
+    </svg>
+  )
+}
+
+/**
+ * The glyph a file's head leads with: the cut-corner sheet at 40 by 48 with
+ * its type set on it, casting the pine dither 4px down and right.
+ */
+export function FileGlyphLarge({
+  type,
+  className,
+}: {
+  type: FileType
+  className?: string
+}) {
+  const dither = useId()
+  const label = LABELS[type]
+  return (
+    <svg
+      viewBox="0 0 44 52"
+      aria-hidden
+      data-glyph={type}
+      data-glyph-size="large"
+      shapeRendering="crispEdges"
+      className={cn('h-13 w-11 shrink-0 text-foreground', className)}
+    >
+      <defs>
+        <pattern id={dither} width="4" height="4" patternUnits="userSpaceOnUse">
+          <rect x="0" y="0" width="2" height="2" fill="var(--primary)" />
+          <rect x="2" y="2" width="2" height="2" fill="var(--primary)" />
+        </pattern>
+      </defs>
+      {/* The shadow follows the sheet's cut: the corner casts none. */}
+      <rect x="4" y="16" width="40" height="36" fill={`url(#${dither})`} />
+      <rect x="4" y="4" width="29" height="12" fill={`url(#${dither})`} />
+      <g shapeRendering="auto">
+        <path
+          d="M0.5 0.5H28.5L39.5 11.5V47.5H0.5Z"
+          fill="var(--paper)"
+          stroke="currentColor"
+        />
+        <path d="M28.5 0.5V11.5H39.5" fill="none" stroke="currentColor" />
+      </g>
+      {label !== null ? (
+        <text
+          x="20"
+          y="35"
+          textAnchor="middle"
+          fontSize="11"
+          fontWeight="600"
+          fontFamily="var(--font-mono)"
+          fill="currentColor"
+        >
+          {label}
+        </text>
+      ) : type === 'file' ? null : (
+        <g transform="translate(-1 1) scale(1.5)">
+          <GoogleMark type={type} />
+        </g>
       )}
     </svg>
   )

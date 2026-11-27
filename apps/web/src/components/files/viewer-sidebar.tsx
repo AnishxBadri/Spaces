@@ -2,7 +2,6 @@ import { Link, useRouter } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
-import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { Select } from '../ui/select'
@@ -13,24 +12,20 @@ import { useKeepCopy } from './keep-copy'
 import type { KeepCopy } from './keep-copy'
 import type { RemoteBytes } from '#/lib/documents/files-tab'
 import type { FilingEdge, RecordDocument } from './types'
-import { DOCUMENT_KIND_LABELS } from '@spaces/core/documents'
 import {
   fileDocument,
   getDocumentDetails,
   listSpaces,
-  reExtractDocument,
   searchEntities,
-  setDocumentKind,
   unfileDocument,
 } from '#/lib/server-fns'
-import { KIND_ORDER } from '#/lib/documents/files-tab'
 import { recordPath } from '#/lib/record-path'
 import { formatDay, formatWhen } from '@spaces/core/format'
 import { cn } from '#/lib/utils'
 import { useClock } from '#/components/clock'
 
 /**
- * The viewer's sidebar on a Files tab: KIND, FILED ON with File on…,
+ * The viewer's rail: FILED ON with File on…,
  * VERSIONS (REVISIONS for a followed file), TEXT, MENTIONED IN and SOURCE. Filing is a re-file: every
  * edge, not just this record's, because one file sits in several places.
  */
@@ -121,24 +116,6 @@ export function FileViewerSidebar({
 
   return (
     <>
-      <Section label="Kind">
-        <Select
-          aria-label={`Kind of ${doc.filename}`}
-          value={doc.kind}
-          disabled={busy}
-          onChange={(kind) =>
-            void run(() =>
-              setDocumentKind({ data: { documentId: doc.id, kind } }),
-            )
-          }
-          items={KIND_ORDER.map((k) => ({
-            value: k,
-            label: DOCUMENT_KIND_LABELS[k],
-          }))}
-          width="trigger"
-        />
-      </Section>
-
       <Section label="Filed under" count={doc.filedIn.length}>
         {doc.filedIn.map((edge) => (
           <FiledOnLine
@@ -625,48 +602,5 @@ function SpacePicker({
         className="h-7 w-full rounded-none border-dashed bg-transparent px-2 text-label text-graphite hover:text-foreground"
       />
     </div>
-  )
-}
-
-/** The viewer's foot on a Files tab: Delete file… and Re-read text. */
-export function FileViewerFoot({
-  doc,
-  onDelete,
-}: {
-  doc: RecordDocument
-  onDelete: () => void
-}) {
-  const router = useRouter()
-  const [busy, setBusy] = useState(false)
-
-  async function reRead() {
-    setBusy(true)
-    try {
-      const { queued } = await reExtractDocument({
-        data: { documentId: doc.id },
-      })
-      // Pending either way and re-queueable; a down worker is said, not hidden.
-      if (!queued) toast.message('Queued when the worker is back')
-      await router.invalidate()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not re-read')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <>
-      <button
-        type="button"
-        onClick={onDelete}
-        className="focus-ring mr-auto text-ui text-destructive hover:underline"
-      >
-        Delete file…
-      </button>
-      <Button variant="ghost" disabled={busy} onClick={() => void reRead()}>
-        Re-read text
-      </Button>
-    </>
   )
 }

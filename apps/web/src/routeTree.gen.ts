@@ -41,6 +41,7 @@ import { Route as ApiHeldDecisionsRouteImport } from './routes/api/held-decision
 import { Route as ApiMcpRouteImport } from './routes/api/mcp'
 import { Route as AppCompaniesCompanyIdRouteImport } from './routes/_app/companies_.$companyId'
 import { Route as AppDealsDealIdRouteImport } from './routes/_app/deals_.$dealId'
+import { Route as AppFilesFileIdRouteImport } from './routes/_app/files_.$fileId'
 import { Route as AppImportBatchIdRouteImport } from './routes/_app/import_.$batchId'
 import { Route as AppNotesNoteIdRouteImport } from './routes/_app/notes_.$noteId'
 import { Route as AppOObjectSlugRouteImport } from './routes/_app/o.$objectSlug'
@@ -244,6 +245,11 @@ const AppCompaniesCompanyIdRoute = AppCompaniesCompanyIdRouteImport.update({
 const AppDealsDealIdRoute = AppDealsDealIdRouteImport.update({
   id: '/deals_/$dealId',
   path: '/deals/$dealId',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppFilesFileIdRoute = AppFilesFileIdRouteImport.update({
+  id: '/files_/$fileId',
+  path: '/files/$fileId',
   getParentRoute: () => AppRoute,
 } as any)
 const AppImportBatchIdRoute = AppImportBatchIdRouteImport.update({
@@ -515,6 +521,7 @@ export interface FileRoutesByFullPath {
   '/api/mcp': typeof ApiMcpRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
+  '/files/$fileId': typeof AppFilesFileIdRoute
   '/import/$batchId': typeof AppImportBatchIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/o/$objectSlug': typeof AppOObjectSlugRoute
@@ -592,6 +599,7 @@ export interface FileRoutesByTo {
   '/api/mcp': typeof ApiMcpRoute
   '/companies/$companyId': typeof AppCompaniesCompanyIdRoute
   '/deals/$dealId': typeof AppDealsDealIdRoute
+  '/files/$fileId': typeof AppFilesFileIdRoute
   '/import/$batchId': typeof AppImportBatchIdRoute
   '/notes/$noteId': typeof AppNotesNoteIdRoute
   '/o/$objectSlug': typeof AppOObjectSlugRoute
@@ -672,6 +680,7 @@ export interface FileRoutesById {
   '/api/mcp': typeof ApiMcpRoute
   '/_app/companies_/$companyId': typeof AppCompaniesCompanyIdRoute
   '/_app/deals_/$dealId': typeof AppDealsDealIdRoute
+  '/_app/files_/$fileId': typeof AppFilesFileIdRoute
   '/_app/import_/$batchId': typeof AppImportBatchIdRoute
   '/_app/notes_/$noteId': typeof AppNotesNoteIdRoute
   '/_app/o/$objectSlug': typeof AppOObjectSlugRoute
@@ -752,6 +761,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/companies/$companyId'
     | '/deals/$dealId'
+    | '/files/$fileId'
     | '/import/$batchId'
     | '/notes/$noteId'
     | '/o/$objectSlug'
@@ -829,6 +839,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/companies/$companyId'
     | '/deals/$dealId'
+    | '/files/$fileId'
     | '/import/$batchId'
     | '/notes/$noteId'
     | '/o/$objectSlug'
@@ -908,6 +919,7 @@ export interface FileRouteTypes {
     | '/api/mcp'
     | '/_app/companies_/$companyId'
     | '/_app/deals_/$dealId'
+    | '/_app/files_/$fileId'
     | '/_app/import_/$batchId'
     | '/_app/notes_/$noteId'
     | '/_app/o/$objectSlug'
@@ -1199,6 +1211,13 @@ declare module '@tanstack/react-router' {
       path: '/deals/$dealId'
       fullPath: '/deals/$dealId'
       preLoaderRoute: typeof AppDealsDealIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/files_/$fileId': {
+      id: '/_app/files_/$fileId'
+      path: '/files/$fileId'
+      fullPath: '/files/$fileId'
+      preLoaderRoute: typeof AppFilesFileIdRouteImport
       parentRoute: typeof AppRoute
     }
     '/_app/import_/$batchId': {
@@ -1613,6 +1632,7 @@ interface AppRouteChildren {
   AppTodayRoute: typeof AppTodayRoute
   AppCompaniesCompanyIdRoute: typeof AppCompaniesCompanyIdRoute
   AppDealsDealIdRoute: typeof AppDealsDealIdRoute
+  AppFilesFileIdRoute: typeof AppFilesFileIdRoute
   AppImportBatchIdRoute: typeof AppImportBatchIdRoute
   AppNotesNoteIdRoute: typeof AppNotesNoteIdRoute
   AppOObjectSlugRoute: typeof AppOObjectSlugRoute
@@ -1647,6 +1667,7 @@ const AppRouteChildren: AppRouteChildren = {
   AppTodayRoute: AppTodayRoute,
   AppCompaniesCompanyIdRoute: AppCompaniesCompanyIdRoute,
   AppDealsDealIdRoute: AppDealsDealIdRoute,
+  AppFilesFileIdRoute: AppFilesFileIdRoute,
   AppImportBatchIdRoute: AppImportBatchIdRoute,
   AppNotesNoteIdRoute: AppNotesNoteIdRoute,
   AppOObjectSlugRoute: AppOObjectSlugRoute,
@@ -1681,6 +1702,7 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
 
 import type { getRouter } from './router.tsx'
 import type { createStart } from '@tanstack/react-start'

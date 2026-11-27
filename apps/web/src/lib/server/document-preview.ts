@@ -25,6 +25,21 @@ export const getDocumentPreview = createServerFn()
   })
 
 /**
+ * One file as its window (`?modal=file&id=`) and its page (`/files/<id>`)
+ * read it, by id, or null when the reader may not have it. The query is
+ * `fileViewProgram`, reached by a dynamic import so drizzle and Effect stay
+ * out of the client bundle.
+ */
+export const getFileView = createServerFn()
+  .validator(input(Schema.Struct({ id: uuid })))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { fileViewProgram } = await import('../documents/file-view')
+    const { effectFn } = await import('./effect')
+    return effectFn(fileViewProgram)(u, data.id)
+  })
+
+/**
  * The viewer sidebar's facts and the Remove confirm's ledger for one
  * document: chunk count, words and pages read, the notes that mention it.
  * The query is `documentDetailsProgram`, reached by a dynamic import so

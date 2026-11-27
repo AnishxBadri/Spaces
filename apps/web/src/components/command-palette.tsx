@@ -17,7 +17,7 @@ import { formatDay } from '@spaces/core/format'
 import { NAV_ITEMS } from './app-sidebar'
 import { useClock } from './clock'
 import { ASKS_REASON, MoveStageDialog } from './deal-board'
-import { DocumentPreview } from './document-preview'
+import { useOpenFile } from './files/file-window-nav'
 import { PreviewPane } from './palette-preview'
 import type {
   PaneAction,
@@ -53,7 +53,6 @@ import type {
 } from '#/lib/page-actions'
 import { recordPath } from '#/lib/record-path'
 import {
-  getDocumentPreview,
   listJumpViews,
   previewObject,
   previewPassage,
@@ -1299,19 +1298,12 @@ export function CommandPalette({
     setTimeout(() => setMoving(handoff), 0)
   }
 
-  /** The file viewer, opened once the palette has closed (as `run`). */
-  const [viewer, setViewer] = useState<{
-    doc: NonNullable<Awaited<ReturnType<typeof getDocumentPreview>>>
-    page: number | null
-  } | null>(null)
+  const openFileWindow = useOpenFile()
 
+  /** The file's window, opened once the palette has closed (as `run`). */
   function openFile(id: string, page: number | null) {
     onOpenChange(false)
-    setTimeout(() => {
-      void getDocumentPreview({ data: { id } }).then((doc) => {
-        if (doc) setViewer({ doc, page })
-      })
-    }, 0)
+    setTimeout(() => openFileWindow(id, page), 0)
   }
 
   return (
@@ -1353,13 +1345,6 @@ export function CommandPalette({
           onMoved={() => void router.invalidate()}
         />
       )}
-      <DocumentPreview
-        doc={viewer?.doc ?? null}
-        {...(viewer?.page ? { page: viewer.page } : {})}
-        onOpenChange={(next) => {
-          if (!next) setViewer(null)
-        }}
-      />
     </>
   )
 }
