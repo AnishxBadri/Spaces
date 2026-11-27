@@ -17,7 +17,7 @@ describe('teamLine', () => {
     expect(teamLine(entry({ objectName: 'Q3 board deck.pdf' }))).toBe(
       'Anika Rao filed Q3 board deck.pdf on Exponent',
     )
-    expect(teamLine(entry({}))).toBe('Anika Rao filed a file on Exponent')
+    expect(teamLine(entry({}))).toBe('Anika Rao filed a file under Exponent')
   })
 
   it('reads a known verb in the past tense', () => {

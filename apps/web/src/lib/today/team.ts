@@ -50,7 +50,7 @@ const PHRASES: Record<string, string> = {
 function phraseOf(e: TeamEntry): string {
   const subject = e.subjectName ?? 'a record'
   if (e.verb === 'document.filed' || e.verb === 'document.refiled')
-    return `filed ${e.objectName ?? 'a file'} on ${subject}`
+    return `filed ${e.objectName ?? 'a file'} under ${subject}`
   // The record stays; only the file went.
   if (e.verb === 'document.deleted')
     return `deleted ${e.objectName ?? 'a file'} from ${subject}`
