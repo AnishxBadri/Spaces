@@ -15,6 +15,8 @@ import { cn } from '#/lib/utils.ts'
  *   opens the field, and `Esc` folds it again.
  * - `onClose`, for a field the caller shows on demand: `Esc`, or leaving the
  *   field empty, asks the caller to hide it.
+ * - `count`, with text, is what the query found (`4 on 3 pages`), before
+ *   the clear cell.
  */
 export function SearchField({
   value,
@@ -25,6 +27,7 @@ export function SearchField({
   fold = false,
   autoFocus = false,
   onClose,
+  count,
   className,
 }: {
   value: string
@@ -36,6 +39,7 @@ export function SearchField({
   fold?: boolean
   autoFocus?: boolean
   onClose?: () => void
+  count?: string | undefined
   /** The field's width, from the caller. */
   className?: string
 }) {
@@ -91,6 +95,15 @@ export function SearchField({
         aria-keyshortcuts={slash ? '/' : undefined}
         className="h-full min-w-0 flex-1 bg-transparent px-2 text-ui outline-none placeholder:text-graphite"
       />
+      {value !== '' && count !== undefined ? (
+        <span
+          aria-live="polite"
+          data-search-count
+          className="tabular mr-2 shrink-0 mono text-micro whitespace-nowrap text-graphite"
+        >
+          {count}
+        </span>
+      ) : null}
       {value !== '' ? (
         <Tooltip>
           <TooltipTrigger asChild>

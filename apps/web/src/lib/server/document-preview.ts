@@ -55,6 +55,28 @@ export const getDocumentDetails = createServerFn()
   })
 
 /**
+ * The viewer's find: hits for `query` in one file's stored text, grouped by
+ * page, or null when the reader may not have the file. The query is
+ * `findInDocumentProgram`, reached by a dynamic import so drizzle and Effect
+ * stay out of the client bundle.
+ */
+export const findInDocument = createServerFn({ method: 'POST' })
+  .validator(
+    input(
+      Schema.Struct({
+        id: uuid,
+        query: Schema.String.check(Schema.isMaxLength(200)),
+      }),
+    ),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { findInDocumentProgram } = await import('../documents/find')
+    const { effectFn } = await import('./effect')
+    return effectFn(findInDocumentProgram)(u, data.id, data.query)
+  })
+
+/**
  * The viewer's bytes: a signed URL, a fetch under way from the document's
  * provider (a `remote` row under `retain: text`), or why neither. The viewer
  * opens with `poll: false` and asks again with `poll: true`.
