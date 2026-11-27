@@ -4,32 +4,12 @@ import { storageLinkProvider } from '#/lib/documents/storage-link'
 import { cn } from '#/lib/utils'
 
 /**
- * The marks a document carries when it came from a storage source, and its
- * external links.
- * - Shared by `/files` and the Files tab so the surfaces cannot disagree
- *   about what "gone" or an external link looks like.
+ * The external links of a document that came from a storage source.
+ * - Shared by every surface that offers one, so they cannot disagree about
+ *   what an external link looks like.
  * - A document nobody linked renders nothing: a null `external_url` is no
- *   action, not a disabled one; a null `external_status` is no marker, not
- *   a dash.
+ *   action, not a disabled one.
  */
-
-/**
- * The file was deleted on the provider's side and ours was kept.
- * Warning rather than destructive: nothing of ours is lost — the bytes, the
- * extracted text and every filing stay — but the link on the row now points
- * at something that is not there, and the reader needs to know that before
- * they click it.
- */
-export function GoneMarker() {
-  return (
-    <span
-      title="Deleted in the source. Our copy stays — we never delete theirs, and they never delete ours."
-      className="shrink-0 mono text-micro text-warning"
-    >
-      gone
-    </span>
-  )
-}
 
 /**
  * "Open in source" — the provider's own link, in their tab.

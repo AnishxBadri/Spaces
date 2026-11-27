@@ -6,9 +6,6 @@ export type RecordDocument = Awaited<
   ReturnType<typeof listRecordDocuments>
 >[number]
 
-/** One place a document is filed: a record or a space. */
-export type FilingEdge = RecordDocument['filedIn'][number]
-
 /**
  * A file action a row's `···` offers beyond the fixed ones — Read deck,
  * Summarize, Extract key terms, Read with vision — when its lane can run.

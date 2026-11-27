@@ -24,7 +24,7 @@ import { unfiledPredicate } from './unfiled'
  * The Files page's filters as SQL over the bare `document` table, which
  * every caller selects unaliased. The rules mirror what a row prints: a
  * file's source as its source lane says it, its format as its glyph draws
- * it (`fileFormat`), so a chip's count is the rows it then shows.
+ * it, so a chip's count is the rows it then shows.
  */
 
 const values = (list: ReadonlyArray<string>): SQL =>
@@ -66,9 +66,10 @@ const extension = sql`lower(coalesce(substring(${document.filename} from '\\.([^
 const mime = sql`lower(coalesce(${document.mime}, ''))`
 
 /**
- * A file's format, one of `FILES_FORMATS` or null: `fileFormat` in SQL,
- * clause for clause in `fileType`'s order (a clip, a Google file by its
- * type or its link, the extension, then the mime).
+ * A file's format, one of `FILES_FORMATS` or null: a clipped page is a web
+ * page whatever its name, otherwise `FORMAT_OF_TYPE` of its glyph's type,
+ * clause for clause in `fileType`'s order (a Google file by its type or its
+ * link, the extension, then the mime).
  */
 export const formatSql: SQL<FilesFormat | null> = (() => {
   const clauses: Array<SQL> = [sql`when ${document.url} is not null then 'web'`]

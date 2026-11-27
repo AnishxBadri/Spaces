@@ -25,7 +25,6 @@ import {
   ArrowsHorizontal,
   ArrowsVertical,
   ArrowUp as CarbonArrowUp,
-  At as CarbonAt,
   Attachment as CarbonAttachment,
   Book as CarbonBook,
   Building as CarbonBuilding,
@@ -75,7 +74,6 @@ import {
   Layers as CarbonLayers,
   Link as CarbonLink,
   List as CarbonList,
-  ListChecked as CarbonListChecked,
   Locked as CarbonLocked,
   Logout,
   MagicWand,
@@ -239,7 +237,6 @@ export const icon = {
 export const ArrowDown = carbon(CarbonArrowDown, 'arrow--down')
 export const ArrowDownRight = carbon(CarbonArrowDownRight, 'arrow--down-right')
 export const ArrowUp = carbon(CarbonArrowUp, 'arrow--up')
-export const At = carbon(CarbonAt, 'at')
 export const Attachment = carbon(CarbonAttachment, 'attachment')
 export const Book = carbon(CarbonBook, 'book')
 export const Building = carbon(CarbonBuilding, 'building')
@@ -275,7 +272,6 @@ export const Laptop = carbon(CarbonLaptop, 'laptop')
 export const Layers = carbon(CarbonLayers, 'layers')
 export const Link = icon.copyLink
 export const List = carbon(CarbonList, 'list')
-export const ListChecked = carbon(CarbonListChecked, 'list--checked')
 export const Locked = carbon(CarbonLocked, 'locked')
 export const MailAll = carbon(CarbonMailAll, 'mail--all')
 /** Carbon's `Event`, named for what it marks: the global `Event` is taken. */

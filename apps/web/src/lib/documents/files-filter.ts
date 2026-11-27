@@ -1,5 +1,4 @@
 import { Schema } from 'effect'
-import { fileType } from './files-tab'
 import type { FileType } from './files-tab'
 
 /**
@@ -101,20 +100,6 @@ export const FORMAT_OF_TYPE: Readonly<Record<FileType, FilesFormat | null>> = {
   zip: null,
   eml: null,
   file: null,
-}
-
-/**
- * A file's format as `Type` counts it: a clipped page is a web page whatever
- * its name; otherwise its glyph's type decides. `formatSql` is the same rule
- * in SQL.
- */
-export function fileFormat(doc: {
-  readonly url: string | null
-  readonly filename: string
-  readonly mime: string | null
-  readonly externalUrl: string | null
-}): FilesFormat | null {
-  return doc.url !== null ? 'web' : FORMAT_OF_TYPE[fileType(doc)]
 }
 
 /**
