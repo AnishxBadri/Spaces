@@ -3,9 +3,18 @@ import { Effect, Schema } from 'effect'
 import { and, asc, desc, eq, isNull, notExists, sql } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@spaces/db'
-import { document, entity, entitySpace, link } from '@spaces/db/schema'
+import {
+  document,
+  entity,
+  entitySpace,
+  integration,
+  link,
+} from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
+import { documentFilingEdgesProgram } from '#/lib/server/shared'
+import type { DocumentFilingEdge } from '#/lib/server/shared'
+import { inSyncedFolderSql, keptVersionsSql } from './deletable-sql'
 
 /**
  * The documents filed **into** one space: the space-page twin of
@@ -56,6 +65,17 @@ export type SpaceSource = {
    */
   sinceMs: number
   snippet: string | null
+  /** The delete confirm's facts: where it came from and what goes with it. */
+  externalUrl: string | null
+  sourcePath: string | null
+  sourceCapability: string | null
+  inSyncedFolder: boolean
+  versions: number
+}
+
+/** A source filed here, with every record and space it is filed under. */
+export type FiledSource = SpaceSource & {
+  filedIn: Array<DocumentFilingEdge>
 }
 
 /**
@@ -95,6 +115,13 @@ const sourceColumns = {
   snippet: sql<
     string | null
   >`left(${document.extractedText}, ${SNIPPET_CHARS})`,
+  externalUrl: document.externalUrl,
+  sourcePath: document.sourcePath,
+  sourceCapability: sql<
+    string | null
+  >`(select ${integration.capabilityId} from ${integration} where ${integration.id} = ${document.sourceRef})`,
+  inSyncedFolder: inSyncedFolderSql,
+  versions: keptVersionsSql,
 }
 
 type SourceRow = Pick<
@@ -108,7 +135,16 @@ type SourceRow = Pick<
   | 'blobSha'
   | 'url'
   | 'createdAt'
-> & { id: string; uploadedByName: string | null; snippet: string | null }
+  | 'externalUrl'
+  | 'sourcePath'
+> & {
+  id: string
+  uploadedByName: string | null
+  snippet: string | null
+  sourceCapability: string | null
+  inSyncedFolder: boolean
+  versions: number
+}
 
 /** `now` is passed in so every row of one read shares one clock. */
 function toSource(r: SourceRow, now: number): SpaceSource {
@@ -126,6 +162,11 @@ function toSource(r: SourceRow, now: number): SpaceSource {
     createdAt: r.createdAt.toISOString(),
     sinceMs: now - r.createdAt.getTime(),
     snippet: excerpt(r.snippet ?? '') || null,
+    externalUrl: r.externalUrl,
+    sourcePath: r.sourcePath,
+    sourceCapability: r.sourceCapability,
+    inSyncedFolder: r.inSyncedFolder,
+    versions: r.versions,
   }
 }
 
@@ -133,7 +174,7 @@ export const spaceSourcesProgram = Effect.fn('spaceSourcesProgram')(function* (
   spaceId: string,
   /** Whose canRead applies: a private attachment is its author's. */
   viewerId: string,
-): Effect.fn.Return<Array<SpaceSource>, SpaceSourcesFailed> {
+): Effect.fn.Return<Array<FiledSource>, SpaceSourcesFailed> {
   const rows = yield* Effect.tryPromise({
     try: () =>
       db
@@ -155,8 +196,15 @@ export const spaceSourcesProgram = Effect.fn('spaceSourcesProgram')(function* (
     catch: (cause) => new SpaceSourcesFailed({ cause }),
   })
 
+  // Every filing, for the delete confirm's list of what the file leaves.
+  const filings = yield* documentFilingEdgesProgram(rows.map((r) => r.id)).pipe(
+    Effect.mapError((cause) => new SpaceSourcesFailed({ cause })),
+  )
   const now = Date.now()
-  return rows.map((r) => toSource(r, now))
+  return rows.map((r) => ({
+    ...toSource(r, now),
+    filedIn: filings.get(r.id) ?? [],
+  }))
 })
 
 /**

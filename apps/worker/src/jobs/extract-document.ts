@@ -194,7 +194,7 @@ export class ExtractionStore extends Context.Service<
         Effect.tryPromise({
           try: () =>
             db.transaction(async (tx) => {
-              await tx
+              const wrote = await tx
                 .update(document)
                 .set({
                   extractedText: text,
@@ -207,6 +207,11 @@ export class ExtractionStore extends Context.Service<
                   extractedAt: new Date(),
                 })
                 .where(eq(document.entityId, documentId))
+                .returning({ id: document.entityId })
+              // A file deleted while it was being read has no row to link
+              // from: the edge would fail its foreign key and retry a job
+              // with nothing left to do.
+              if (wrote.length === 0) return
               // Glossary terms the text mentions become
               // `link(document → term, mentions, extracted)`, in the same
               // transaction so the text and its concept edges never

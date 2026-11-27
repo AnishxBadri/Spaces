@@ -4,24 +4,25 @@ import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { LedgerFigure, LedgerRow, LedgerSection } from './ledger-section'
 import { Button } from './ui/button'
-import { useConfirm } from './ui/confirm-dialog'
+import { MoreMenu } from './ui/more-menu'
 import { FileNameLink, useOpenFile } from './files/file-window-nav'
+import { useDeleteFile, useDeletingFiles } from './files/delete-file'
+import { unfileWithUndo } from './files/unfile'
 import { OpenSourceButton } from './document-source'
 import { Twinkle } from './twinkle'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import { formatSince } from '@spaces/core/format'
 import type {
+  FiledSource,
   InheritedSource,
   SpaceSource,
 } from '#/lib/documents/space-sources'
 import { uploadDocument } from '#/lib/documents/upload'
 import { droppedUrl } from '#/lib/documents/uri-list'
 import { recordPath } from '#/lib/record-path'
-import {
-  clipUrl,
-  deleteDocument,
-  getDocumentDownloadUrl,
-} from '#/lib/server-fns'
+import { filingKind } from '#/lib/documents/delete-confirm'
+import type { DeletableFile } from '#/lib/documents/delete-confirm'
+import { clipUrl, getDocumentDownloadUrl } from '#/lib/server-fns'
 import { cn } from '#/lib/utils'
 
 /**
@@ -55,7 +56,7 @@ export function SpaceSources({
 }: {
   spaceId: string
   spaceName: string
-  sources: Array<SpaceSource>
+  sources: Array<FiledSource>
   /**
    * Documents reached through the companies tagged into this space.
    * They render in a closed disclosure under the filed rows and
@@ -68,6 +69,9 @@ export function SpaceSources({
   const [dragging, setDragging] = useState(false)
   const [pending, setPending] = useState<Array<Pending>>([])
   const openFile = useOpenFile()
+  // A file whose delete was just confirmed leaves at once.
+  const deleting = useDeletingFiles()
+  const shown = sources.filter((s) => !deleting.has(s.id))
 
   useExtractionPolling(sources, router)
 
@@ -118,7 +122,7 @@ export function SpaceSources({
     }
   }
 
-  const bytes = sources.reduce((n, s) => n + (s.sizeBytes ?? 0), 0)
+  const bytes = shown.reduce((n, s) => n + (s.sizeBytes ?? 0), 0)
 
   return (
     /* The whole section is the drop target — a space is filed *into*, so the
@@ -152,9 +156,9 @@ export function SpaceSources({
       <LedgerSection
         label="Sources"
         count={
-          sources.length === 0
+          shown.length === 0
             ? '0 sources'
-            : `${sources.length} source${sources.length === 1 ? '' : 's'} · ${formatBytes(bytes)}`
+            : `${shown.length} source${shown.length === 1 ? '' : 's'} · ${formatBytes(bytes)}`
         }
         link={
           <button
@@ -185,17 +189,18 @@ export function SpaceSources({
           </LedgerRow>
         ))}
 
-        {sources.map((s) => (
+        {shown.map((s) => (
           <SourceRow
             key={s.id}
             source={s}
+            spaceId={spaceId}
             spaceName={spaceName}
             onPreview={() => openFile(s.id)}
           />
         ))}
 
         {/* Empty is a row that says what belongs here, never an empty grid. */}
-        {sources.length === 0 && pending.length === 0 ? (
+        {shown.length === 0 && pending.length === 0 ? (
           <LedgerRow last>
             <button
               type="button"
@@ -258,6 +263,22 @@ export function SpaceSources({
   )
 }
 
+/** A source as the delete confirm reads it. */
+function deletableSource(source: FiledSource): DeletableFile {
+  return {
+    id: source.id,
+    filename: source.filename,
+    mime: source.mime,
+    externalUrl: source.externalUrl,
+    sizeBytes: source.sizeBytes,
+    sourceCapability: source.sourceCapability,
+    sourcePath: source.sourcePath,
+    inSyncedFolder: source.inSyncedFolder,
+    versions: source.versions,
+    filings: source.filedIn.map((e) => ({ name: e.name, kind: filingKind(e) })),
+  }
+}
+
 /**
  * One source. Two lines inside the row, as "Filed here" is two lines: the
  * filename a person reads, then what the instrument knows about it — the
@@ -266,16 +287,17 @@ export function SpaceSources({
  */
 function SourceRow({
   source,
+  spaceId,
   spaceName,
   onPreview,
 }: {
-  source: SpaceSource
+  source: FiledSource
+  spaceId: string
   spaceName: string
   onPreview: () => void
 }) {
   const router = useRouter()
-  const [busy, setBusy] = useState(false)
-  const { confirm, confirmDialog } = useConfirm()
+  const { deleteFile, deleteDialog } = useDeleteFile()
 
   async function download() {
     try {
@@ -286,25 +308,11 @@ function SourceRow({
     }
   }
 
-  async function remove() {
-    const ok = await confirm({
-      title: `Delete ${source.filename}?`,
-      body: `It leaves ${spaceName} and the server. This cannot be undone.`,
-      action: 'Delete',
-    })
-    if (!ok) return
-    setBusy(true)
-    try {
-      await deleteDocument({ data: { id: source.id } })
-      void router.invalidate()
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not delete')
-      setBusy(false)
-    }
-  }
-
   return (
-    <li className="group flex items-center gap-3 border-b border-rule px-(--inset) py-2.5">
+    <li
+      data-row
+      className="group flex items-center gap-3 border-b border-rule px-(--inset) py-2.5"
+    >
       <Page className="size-4 shrink-0 text-graphite" />
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <FileNameLink
@@ -351,19 +359,33 @@ function SourceRow({
             <icon.download />
           </Button>
         )}
-        <Button
-          size="icon-xs"
-          variant="ghost"
-          disabled={busy}
-          aria-label={`Delete ${source.filename}`}
-          onClick={remove}
-          className="text-graphite opacity-0 group-hover:opacity-100 hover:text-destructive focus-visible:opacity-100"
-        >
-          <icon.delete />
-        </Button>
+        <MoreMenu
+          variant="row"
+          label={source.filename}
+          items={[
+            {
+              label: `Unfile from ${spaceName}`,
+              icon: <icon.unfile />,
+              onSelect: () =>
+                void unfileWithUndo({
+                  documentId: source.id,
+                  target: { kind: 'space', entityId: spaceId },
+                  name: spaceName,
+                  refresh: () => router.invalidate(),
+                }),
+            },
+            {
+              label: 'Delete…',
+              icon: <icon.delete />,
+              destructive: true,
+              opens: true,
+              onSelect: () => void deleteFile(deletableSource(source)),
+            },
+          ]}
+        />
       </div>
       <LedgerFigure tone="muted">{formatBytes(source.sizeBytes)}</LedgerFigure>
-      {confirmDialog}
+      {deleteDialog}
     </li>
   )
 }

@@ -1,4 +1,4 @@
-import { Link, useRouter } from '@tanstack/react-router'
+import { Link, useNavigate, useRouter } from '@tanstack/react-router'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { AskButton } from '../ui/ask-control'
@@ -16,7 +16,9 @@ import { blobless } from '../document-preview'
 import { ChevronDown, icon } from '#/components/icons'
 import { useClock } from '#/components/clock'
 import { FileGlyphLarge } from './file-glyph'
+import { deletableView, useDeleteFile } from './delete-file'
 import { downloadDocument } from './file-row'
+import { useCloseFile } from './file-window-nav'
 import { NewerVersionDialog } from './newer-version-dialog'
 import { laneName } from './viewer-sidebar'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
@@ -187,6 +189,9 @@ export function FileHead({
   const router = useRouter()
   const { today } = useClock()
   const [versioning, setVersioning] = useState(false)
+  const { deleteFile, deleteDialog } = useDeleteFile()
+  const closeFile = useCloseFile()
+  const navigate = useNavigate()
   const { doc } = view
   const inWindow = container === 'window'
   const Title = inWindow ? DialogTitle : 'h1'
@@ -282,6 +287,20 @@ export function FileHead({
               icon: <icon.copyLink />,
               copy: () => new URL(page, window.location.origin).href,
             },
+            {
+              label: 'Delete…',
+              icon: <icon.delete />,
+              destructive: true,
+              opens: true,
+              // The confirm stands over the viewer; on Delete file the
+              // viewer goes with it, the window closing and the page
+              // returning to Files.
+              onSelect: () =>
+                void deleteFile(deletableView(view), () => {
+                  if (inWindow) closeFile()
+                  else void navigate({ to: '/files' })
+                }),
+            },
           ]}
         />
         {inWindow ? (
@@ -302,6 +321,7 @@ export function FileHead({
           onOpenChange={setVersioning}
         />
       )}
+      {deleteDialog}
     </header>
   )
 }

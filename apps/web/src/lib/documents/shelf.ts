@@ -7,6 +7,7 @@ import { user } from '@spaces/db/schema/auth'
 import { documentFilingEdges } from '#/lib/server/shared'
 import { unfiledPredicate } from '#/lib/documents/unfiled'
 import { canReadDocumentSql } from '@spaces/core/writes/read/can-read-sql'
+import { inSyncedFolderSql, keptVersionsSql } from './deletable-sql'
 
 /**
  * The shelf behind `/documents`: every document in the workspace as one row,
@@ -84,6 +85,10 @@ export type ShelfDocument = {
   snippet: string | null
   records: Array<ShelfRecord>
   spaces: Array<ShelfSpace>
+  /** Brought by a linked folder's sync: the delete confirm's `Won't sync back`. */
+  inSyncedFolder: boolean
+  /** Its kept revisions and itself, which a delete takes with it. */
+  versions: number
 }
 
 /**
@@ -131,6 +136,8 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
             snippet: sql<
               string | null
             >`left(${document.extractedText}, ${SNIPPET_CHARS})`,
+            inSyncedFolder: inSyncedFolderSql,
+            versions: keptVersionsSql,
           })
           .from(document)
           .innerJoin(entity, eq(entity.id, document.entityId))
@@ -204,6 +211,8 @@ export const listDocumentsProgram = Effect.fn('listDocumentsProgram')(
         snippet: excerpt(r.snippet ?? '') || null,
         records,
         spaces,
+        inSyncedFolder: r.inSyncedFolder,
+        versions: r.versions,
       }
     })
   },

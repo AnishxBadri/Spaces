@@ -5,7 +5,7 @@ import type { Root } from 'react-dom/client'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RecordFiles } from '../record-files'
-import { FileRow, removeConfirmOptions } from './file-row'
+import { FileRow } from './file-row'
 import { FolderBand } from './folder-band'
 import { RevisionLedger } from './revision-ledger'
 import type { RecordDocument } from './types'
@@ -19,8 +19,8 @@ const markup = (node: ReactNode) =>
 /**
  * The Files tab as the printed sheets draw it: our files under their
  * kind, an empty kind left out, every row ending on its end lane and state
- * word, no extracted text; the row's `···` and the Remove confirm saying
- * whether the file leaves the server.
+ * word, no extracted text; the row's `···` with `Unfile from` and the drawn
+ * `Delete…` confirm.
  * - A happy-dom window's DOM globals are installed by hand before React
  *   loads, as in the other window tests.
  */
@@ -113,7 +113,6 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 const FLENT = '00000000-0000-4000-8000-000000000001'
-const SERIES_A = '00000000-0000-4000-8000-000000000002'
 
 const here = {
   kind: 'record' as const,
@@ -380,58 +379,11 @@ describe('a folder just linked', () => {
   })
 })
 
-describe('the Remove confirm', () => {
-  it('says the file leaves the server when it is filed only here', () => {
-    const options = removeConfirmOptions(doc({ filename: 'v2.pdf' }), {
-      recordId: FLENT,
-      recordName: 'Flent',
-      mode: 'record',
-      chunks: 41,
-    })
-    expect(options.leaves).toBe(true)
-    expect(options.title).toBe('Remove v2.pdf?')
-    expect(options.body).toBe(
-      'It is filed only on Flent, so it leaves the server.',
-    )
-    expect(options.rows).toEqual([
-      { name: 'Leaves the server', meta: '4.1 MB · 41 chunks' },
-    ])
-    expect(options.action).toBe('Remove')
-  })
-
-  it('keeps it on the server when it is filed elsewhere too', () => {
-    const options = removeConfirmOptions(
-      doc({
-        filedIn: [
-          here,
-          {
-            kind: 'record',
-            id: SERIES_A,
-            name: 'Flent — Series A',
-            entityKind: 'deal',
-            objectSlug: null,
-          },
-        ],
-      }),
-      { recordId: FLENT, recordName: 'Flent', mode: 'record', chunks: 41 },
-    )
-    expect(options.leaves).toBe(false)
-    expect(options.body).toContain('stays on the server and leaves only Flent')
-  })
-})
-
 let root: Root | null = null
 let host: HTMLElement | null = null
 
 beforeEach(() => {
   vi.clearAllMocks()
-  fns.getDocumentDetails.mockResolvedValue({
-    chunks: 41,
-    words: 100,
-    pages: 2,
-    sha: null,
-    mentionedIn: [],
-  })
   fns.deleteDocument.mockResolvedValue({})
   fns.unfileDocument.mockResolvedValue({})
 })
@@ -498,13 +450,19 @@ async function click(el: Element) {
 }
 
 describe('the row’s ···', () => {
-  it('holds Open, Download, Change kind and Remove…, and no Newer version of… with nothing to replace', async () => {
+  it('holds Open, Download, Change kind, Unfile from and Delete…, and no Newer version of… with nothing to replace', async () => {
     await mountRow(doc({ filename: 'v2.pdf', kind: 'deck' }))
     await openMenu('v2.pdf')
     const items = [...document.querySelectorAll('[role="menuitem"]')].map(
       (el) => el.textContent.trim(),
     )
-    expect(items).toEqual(['Open', 'Download', 'Change kind', 'Remove…'])
+    expect(items).toEqual([
+      'Open',
+      'Download',
+      'Change kind',
+      'Unfile from Flent',
+      'Delete…',
+    ])
   })
 
   it('Newer version of… picks among the same kind and writes the link', async () => {
@@ -531,18 +489,18 @@ describe('the row’s ···', () => {
     })
   })
 
-  it('confirms Remove with what leaves, and deletes a file filed only here', async () => {
+  it('asks before Delete with what the file leaves, opening at once, then deletes it', async () => {
     await mountRow(doc({ id: 'a2', filename: 'v2.pdf', kind: 'deck' }))
     await openMenu('v2.pdf')
-    await click(byText('[role="menuitem"]', 'Remove…'))
+    await click(byText('[role="menuitem"]', 'Delete…'))
     const dialog = document.querySelector('[role="dialog"]')
-    expect(dialog?.textContent).toContain('Remove v2.pdf?')
-    expect(dialog?.textContent).toContain(
-      'It is filed only on Flent, so it leaves the server.',
-    )
-    expect(dialog?.textContent).toContain('4.1 MB · 41 chunks')
-    expect(byText('button', 'Cancel')).toBeDefined()
-    await click(byText('button', 'Remove'))
+    expect(dialog?.textContent).toContain('Delete this file?')
+    expect(dialog?.textContent).toContain('PDF · 4.1 MB · the only copy')
+    expect(dialog?.textContent).toContain('FlentCompany')
+    expect(dialog?.textContent).toContain("Can't be undone")
+    expect(fns.getDocumentDetails).not.toHaveBeenCalled()
+    expect(document.activeElement?.textContent).toBe('Cancel')
+    await click(byText('button', 'Delete file'))
     expect(fns.deleteDocument).toHaveBeenCalledWith({ data: { id: 'a2' } })
     expect(fns.unfileDocument).not.toHaveBeenCalled()
   })
@@ -937,7 +895,8 @@ describe('email attachments whose file stays in Gmail', () => {
       'Keep a copy',
       'File under…',
       'Change kind',
-      'Remove…',
+      'Unfile from Flent',
+      'Delete…',
     ])
     await click(byText('[role="menuitem"]', 'Keep a copy'))
     expect(fns.keepDocumentCopy).toHaveBeenCalledWith({

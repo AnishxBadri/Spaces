@@ -440,27 +440,42 @@ const NOUNS: Record<NounKind, (u: (level: Level) => string) => ReactNode> = {
   ),
 }
 
+/** The part of the 160×120 grid a drawing shows, when not all of it. */
+export type NounCrop = {
+  readonly x: number
+  readonly y: number
+  readonly width: number
+  readonly height: number
+}
+
 /**
  * An empty page's picture: its kind's object, drawn in paper, ink and pine
  * dither. Decorative; the title under it says what is missing.
+ * - `tone` dithers it in crimson instead, for a destructive confirm.
+ * - `crop` draws only part of the grid, at that part's own size.
  */
 export function DitherNoun({
   kind,
+  tone = 'primary',
+  crop,
   className,
 }: {
   kind: NounKind
+  tone?: 'primary' | 'destructive'
+  crop?: NounCrop | undefined
   className?: string | undefined
 }) {
   // Pattern ids are document-wide, so each drawing scopes its own.
   const id = useId()
   const u = (level: Level) => `url(#${id}-d${level})`
+  const box = crop ?? { x: 0, y: 0, width: 160, height: 120 }
   return (
     <svg
       aria-hidden
       data-dither-noun={kind}
-      width="160"
-      height="120"
-      viewBox="0 0 160 120"
+      width={box.width}
+      height={box.height}
+      viewBox={`${String(box.x)} ${String(box.y)} ${String(box.width)} ${String(box.height)}`}
       shapeRendering="crispEdges"
       className={cn('shrink-0', className)}
     >
@@ -480,7 +495,11 @@ export function DitherNoun({
                 y={y}
                 width="2"
                 height="2"
-                fill="var(--primary)"
+                fill={
+                  tone === 'destructive'
+                    ? 'var(--destructive)'
+                    : 'var(--primary)'
+                }
               />
             ))}
           </pattern>

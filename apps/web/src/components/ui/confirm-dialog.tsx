@@ -35,6 +35,13 @@ export type ConfirmOptions = {
   note?: string
   /** Destructive is the default — that is what confirms are for. */
   kind?: 'destructive' | 'primary'
+  /**
+   * The drawn confirm: the picture on bone at the left, the question beside
+   * it on paper, with no head band.
+   */
+  drawing?: ReactNode
+  /** Under the title: the thing's name, then its one facts line. */
+  subject?: { name: string; facts: string }
 }
 
 /**
@@ -42,7 +49,8 @@ export type ConfirmOptions = {
  * question; on paper under it, one sentence and an optional ledger of what is
  * affected on a rule border; then the 52px bone foot: the note, Cancel, and
  * the acting button, whose tooltip carries ⌘↵. Focus lands on Cancel; the
- * destructive choice is one key further away.
+ * destructive choice is one key further away. Given a `drawing`, the head
+ * band gives way to the picture on bone beside the question.
  */
 export function ConfirmDialog({
   open,
@@ -59,10 +67,33 @@ export function ConfirmDialog({
   const rows = options.rows ?? []
   const hasBody = Boolean(options.body) || rows.length > 0
   const keep = useRef<HTMLButtonElement>(null)
+  const drawn = options.drawing !== undefined
+  const foot = (
+    <DialogFooter
+      className={cn('border-rule', drawn && 'mx-0 mt-0 mb-0 border-hairline')}
+      {...(options.note === undefined ? {} : { note: options.note })}
+    >
+      <DialogClose asChild>
+        <Button ref={keep} variant="outline">
+          {options.keep ?? 'Cancel'}
+        </Button>
+      </DialogClose>
+      {options.action === undefined ? null : (
+        <Button
+          variant={kind === 'destructive' ? 'destructive' : 'default'}
+          shortcut="⌘↵"
+          onClick={onConfirm}
+        >
+          {options.action}
+        </Button>
+      )}
+    </DialogFooter>
+  )
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         size="s"
+        flush={drawn}
         onOpenAutoFocus={(e) => {
           e.preventDefault()
           keep.current?.focus()
@@ -78,63 +109,83 @@ export function ConfirmDialog({
           }
         }}
       >
-        <DialogHeader
-          className={cn('flex-nowrap items-center', !hasBody && 'mb-0')}
-        >
-          <DialogTitle>{options.title}</DialogTitle>
-        </DialogHeader>
-        {hasBody ? (
-          <div className="flex flex-col gap-2.5">
-            {options.body ? (
-              <DialogDescription className="font-sans text-ui leading-4.75 text-foreground">
-                {options.body}
-              </DialogDescription>
-            ) : null}
-            {rows.length > 0 ? (
-              <ul className="flex flex-col border border-rule">
-                {rows.map((row, i) => (
-                  <li
-                    key={`${row.name}-${i}`}
-                    className="flex h-[1.625rem] items-center justify-between gap-3 border-b border-rule px-2.5 last:border-b-0"
-                  >
-                    <span className="flex min-w-0 items-center gap-2">
-                      {row.icon}
-                      <span className="min-w-0 truncate text-label">
-                        {row.name}
-                      </span>
-                    </span>
-                    {row.meta ? (
-                      <span className="shrink-0 mono text-micro text-graphite">
-                        {row.meta}
-                      </span>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-        ) : null}
-        <DialogFooter
-          className="border-rule"
-          {...(options.note === undefined ? {} : { note: options.note })}
-        >
-          <DialogClose asChild>
-            <Button ref={keep} variant="outline">
-              {options.keep ?? 'Cancel'}
-            </Button>
-          </DialogClose>
-          {options.action === undefined ? null : (
-            <Button
-              variant={kind === 'destructive' ? 'destructive' : 'default'}
-              shortcut="⌘↵"
-              onClick={onConfirm}
+        {drawn ? (
+          <div data-confirm-drawn className="flex">
+            <div
+              aria-hidden
+              className="flex w-38 shrink-0 items-center justify-center border-r border-hairline bg-bone px-4 py-5"
             >
-              {options.action}
-            </Button>
-          )}
-        </DialogFooter>
+              {options.drawing}
+            </div>
+            <div className="flex min-w-0 flex-1 flex-col justify-center gap-2.5 px-4 py-5">
+              <DialogTitle>{options.title}</DialogTitle>
+              {options.subject === undefined ? null : (
+                <DialogDescription className="flex flex-col gap-0.5 font-sans">
+                  <span className="truncate text-ui leading-5 font-medium text-foreground">
+                    {options.subject.name}
+                  </span>
+                  <span className="text-label text-graphite">
+                    {options.subject.facts}
+                  </span>
+                </DialogDescription>
+              )}
+              {options.body ? (
+                <p className="text-ui leading-4.75">{options.body}</p>
+              ) : null}
+              <ConfirmLedger rows={rows} />
+            </div>
+          </div>
+        ) : (
+          <>
+            <DialogHeader
+              className={cn('flex-nowrap items-center', !hasBody && 'mb-0')}
+            >
+              <DialogTitle>{options.title}</DialogTitle>
+            </DialogHeader>
+            {hasBody ? (
+              <div className="flex flex-col gap-2.5">
+                {options.body ? (
+                  <DialogDescription className="font-sans text-ui leading-4.75 text-foreground">
+                    {options.body}
+                  </DialogDescription>
+                ) : null}
+                <ConfirmLedger rows={rows} />
+              </div>
+            ) : null}
+          </>
+        )}
+        {foot}
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** What is affected: name left, mono meta right, on a rule border. */
+function ConfirmLedger({
+  rows,
+}: {
+  rows: NonNullable<ConfirmOptions['rows']>
+}) {
+  if (rows.length === 0) return null
+  return (
+    <ul className="flex flex-col border border-rule">
+      {rows.map((row, i) => (
+        <li
+          key={`${row.name}-${i}`}
+          className="flex h-[1.625rem] items-center justify-between gap-3 border-b border-rule px-2.5 last:border-b-0"
+        >
+          <span className="flex min-w-0 items-center gap-2">
+            {row.icon}
+            <span className="min-w-0 truncate text-label">{row.name}</span>
+          </span>
+          {row.meta ? (
+            <span className="shrink-0 mono text-micro text-graphite">
+              {row.meta}
+            </span>
+          ) : null}
+        </li>
+      ))}
+    </ul>
   )
 }
 

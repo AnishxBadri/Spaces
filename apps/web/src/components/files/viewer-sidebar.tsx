@@ -8,16 +8,13 @@ import { FileUnderButton, FilingKindIcon, FilingName } from './file-under'
 import { useOpenFile } from './file-window-nav'
 import { FollowedRevisions } from './revision-ledger'
 import { useKeepCopy } from './keep-copy'
+import { unfileWithUndo } from './unfile'
 import type { KeepCopy } from './keep-copy'
 import type { FileViewData } from './file-head'
 import type { RemoteBytes } from '#/lib/documents/files-tab'
 import type { FileUnderOption } from '#/lib/documents/file-under'
 import type { FileOrigin, RailVersion } from '#/lib/documents/file-view'
-import {
-  fileDocument,
-  reExtractDocument,
-  unfileDocument,
-} from '#/lib/server-fns'
+import { reExtractDocument } from '#/lib/server-fns'
 import { recordPath } from '#/lib/record-path'
 import { formatDay, formatWhen } from '@spaces/core/format'
 import { cn } from '#/lib/utils'
@@ -158,31 +155,15 @@ function FiledUnder({
   const shown = unfolded ? filings : filings.slice(0, FOLD_AT)
   const folded = filings.length - shown.length
 
-  // No dialog: the filing goes, and the toast's Undo files it again through
-  // the same write as any filing, so a Gmail-held file keeps its copy.
   async function unfile(option: FileUnderOption) {
     setBusy(true)
-    try {
-      await unfileDocument({ data: { documentId, target: option.target } })
-      await router.invalidate()
-      toast(`Unfiled from ${option.name}`, {
-        action: {
-          label: 'Undo',
-          onClick: () =>
-            void fileDocument({ data: { documentId, target: option.target } })
-              .then(() => router.invalidate())
-              .catch((err: unknown) => {
-                toast.error(
-                  err instanceof Error ? err.message : 'Could not file it',
-                )
-              }),
-        },
-      })
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not unfile it')
-    } finally {
-      setBusy(false)
-    }
+    await unfileWithUndo({
+      documentId,
+      target: option.target,
+      name: option.name,
+      refresh: () => router.invalidate(),
+    })
+    setBusy(false)
   }
 
   return (

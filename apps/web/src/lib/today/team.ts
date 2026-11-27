@@ -51,6 +51,9 @@ function phraseOf(e: TeamEntry): string {
   const subject = e.subjectName ?? 'a record'
   if (e.verb === 'document.filed' || e.verb === 'document.refiled')
     return `filed ${e.objectName ?? 'a file'} on ${subject}`
+  // The record stays; only the file went.
+  if (e.verb === 'document.deleted')
+    return `deleted ${e.objectName ?? 'a file'} from ${subject}`
   if (Object.hasOwn(PHRASES, e.verb)) return `${PHRASES[e.verb]} ${subject}`
   // An unnamed verb reads as its words: `space.moved` → `moved Fintech`.
   const action = e.verb.split('.').at(-1) ?? e.verb

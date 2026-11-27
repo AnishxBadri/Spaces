@@ -5,7 +5,7 @@ import { db } from '@spaces/db'
 import { document } from '@spaces/db/schema'
 import { DOCUMENT_KINDS, MAX_UPLOAD_BYTES } from '@spaces/core/documents'
 import { storage } from '@spaces/core/writes/storage'
-import { deleteDocumentWithBlobGcProgram, requireUser } from './shared'
+import { requireUser } from './shared'
 import type { DocumentBirthInput } from '@spaces/core/writes/documents/birth'
 import { input } from './input'
 import { serverQuery } from './query'
@@ -334,19 +334,23 @@ export const getDocumentDownloadUrl = createServerFn({ method: 'POST' })
   })
 
 /**
- * Real delete, not an archive flag: a misfiled upload the operator can't
- * remove is worse than the audit trail it costs.
- * - The blob goes only when no other document row shares its digest.
- * - What dies with the entity is the `ENTITY_REFS` registry's answer; never
- *   hand-list tables here (a hand list missed `entity_space`).
- * - The work is `deleteDocumentWithBlobGcProgram`; this handler is the auth
- *   check.
+ * `Delete…`: a real delete, not an archive flag, and only of a file the
+ * caller can read. The work and the History lines are
+ * `deleteDocumentProgram`; this handler is the session check, and turns its
+ * refusals into sentences.
  */
 export const deleteDocument = createServerFn({ method: 'POST' })
   .validator(input(Schema.Struct({ id: uuid })))
   .handler(async ({ data }) => {
-    await requireUser()
-    return Effect.runPromise(deleteDocumentWithBlobGcProgram(data.id))
+    const u = await requireUser()
+    const { deleteDocumentProgram, deleteDocumentMessage } =
+      await import('../documents/delete')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(deleteDocumentProgram)(u.id, data.id)
+    } catch (failure) {
+      throw new Error(deleteDocumentMessage(failure))
+    }
   })
 
 /**

@@ -41,6 +41,7 @@ const PRODUCED = [
   'document.arrived',
   'document.kind_changed',
   'document.reextract_requested',
+  'document.deleted',
   'space.tagged',
   'space.untagged',
   'entity.merged',

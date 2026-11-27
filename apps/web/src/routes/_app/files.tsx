@@ -12,6 +12,8 @@ import type { IconComponent } from '#/components/icons'
 import { useId, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { FileNameLink, useOpenFile } from '#/components/files/file-window-nav'
+import { useDeletingFiles } from '#/components/files/delete-file'
+import { ShelfRowMenu } from '#/components/files/shelf-row-menu'
 import {
   GoneMarker,
   OpenInSourceButton,
@@ -79,8 +81,8 @@ const col = createColumnHelper<DocumentRow>()
 // FROZEN: renaming resets saved column layouts with no recovery path.
 const PREFS_KEY = 'dealos.documents-table.v1'
 
-/** The exception lane's width: `Failed` and its Re-read. */
-const EXCEPTION_WIDTH = 150
+/** The trailing lane's width: `Failed` and its Re-read, then the `···`. */
+const ROW_END_WIDTH = 180
 
 /**
  * How many chips fit a 36px row before the count takes over. Three names plus
@@ -99,7 +101,14 @@ function DocumentsPage() {
   // The page's title and open tab name its table to a screen reader.
   const titleId = useId()
   const viewId = useId()
-  const { documents, counts } = Route.useLoaderData()
+  const { documents: loaded, counts } = Route.useLoaderData()
+  // A file whose delete was just confirmed leaves at once; a failed delete
+  // brings it back.
+  const deleting = useDeletingFiles()
+  const documents = useMemo(
+    () => loaded.filter((d) => !deleting.has(d.id)),
+    [loaded, deleting],
+  )
   const { filed } = Route.useSearch()
   const navigate = Route.useNavigate()
   const [globalFilter, setGlobalFilter] = useState('')
@@ -315,8 +324,13 @@ function DocumentsPage() {
                 labelledBy={[titleId, viewId]}
                 stickyColumnId="filename"
                 onRowClick={(r) => openFile(r.id)}
-                rowEnd={(r) => <ExceptionLane doc={r} />}
-                rowEndWidth={EXCEPTION_WIDTH}
+                rowEnd={(r) => (
+                  <span className="flex items-center justify-end gap-1">
+                    <ExceptionLane doc={r} />
+                    <ShelfRowMenu doc={r} onOpen={() => openFile(r.id)} />
+                  </span>
+                )}
+                rowEndWidth={ROW_END_WIDTH}
               />
             )}
           </PageBody>

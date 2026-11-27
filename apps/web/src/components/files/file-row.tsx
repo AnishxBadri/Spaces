@@ -3,8 +3,6 @@ import { useId, useState } from 'react'
 import type { ReactNode } from 'react'
 import { toast } from 'sonner'
 import { MENU_RULE, MoreMenu } from '../ui/more-menu'
-import { useConfirm } from '../ui/confirm-dialog'
-import type { ConfirmOptions } from '../ui/confirm-dialog'
 import { cellsFor } from '../dither'
 import { FileGlyph } from './file-glyph'
 import { icon } from '#/components/icons'
@@ -14,16 +12,15 @@ import { FileOnDialog } from './file-on-dialog'
 import { FileNameLink } from './file-window-nav'
 import { keepCopyItems, useKeepCopy } from './keep-copy'
 import { bytesUrl } from '../document-preview'
-import type { FileAction, FilingEdge, RecordDocument } from './types'
+import { deletableRow, useDeleteFile, useDeletingFiles } from './delete-file'
+import { unfileWithUndo } from './unfile'
+import type { FileAction, RecordDocument } from './types'
 import { DOCUMENT_KIND_LABELS, formatBytes } from '@spaces/core/documents'
 import type { DocumentKind } from '@spaces/core/documents'
 import {
-  deleteDocument,
   followDocument,
-  getDocumentDetails,
   getDocumentDownloadUrl,
   setDocumentKind,
-  unfileDocument,
   unfollowDocument,
 } from '#/lib/server-fns'
 import {
@@ -171,7 +168,7 @@ export function FileRow({
   doc: RecordDocument
   recordId: string
   recordName: string
-  /** A file in a bound Drive folder: Drive's tree, `Remove from record`. */
+  /** A file in a bound Drive folder: Drive's tree, not the kind bands. */
   inFolder?: boolean
   actions?: ReadonlyArray<FileAction>
   /** Files this one may be the newer version of; none hides the item. */
@@ -182,13 +179,14 @@ export function FileRow({
   onView: () => void
 }) {
   const router = useRouter()
-  const { remove, removeDialog } = useRemoveFile(recordId, recordName)
+  const { deleteFile, deleteDialog } = useDeleteFile()
   const [versioning, setVersioning] = useState(false)
   const [filingOn, setFilingOn] = useState(false)
   const keeper = useKeepCopy()
   const follow = useFollow(recordId)
   const { today } = useClock()
   const followed = followLane(doc, today)
+  const deleting = useDeletingFiles()
 
   async function setKind(kind: DocumentKind) {
     if (kind === doc.kind) return
@@ -214,6 +212,9 @@ export function FileRow({
       : where === null
         ? null
         : brandOf(where)
+
+  // Gone the moment the delete is confirmed; a failed delete brings it back.
+  if (deleting.has(doc.id)) return null
 
   return (
     <li
@@ -342,16 +343,28 @@ export function FileRow({
             disabled: a.busy,
             onSelect: a.run,
           })),
+          MENU_RULE,
           {
-            label: inFolder ? 'Remove from record…' : 'Remove…',
-            icon: inFolder ? <icon.unlink /> : <icon.delete />,
+            label: `Unfile from ${recordName}`,
+            icon: <icon.unfile />,
+            onSelect: () =>
+              void unfileWithUndo({
+                documentId: doc.id,
+                target: { kind: 'record', entityId: recordId },
+                name: recordName,
+                refresh: () => router.invalidate(),
+              }),
+          },
+          {
+            label: 'Delete…',
+            icon: <icon.delete />,
             destructive: true,
             opens: true,
-            onSelect: () => void remove(doc, 'record'),
+            onSelect: () => void deleteFile(deletableRow(doc)),
           },
         ]}
       />
-      {removeDialog}
+      {deleteDialog}
       {doc.fromEmail ? (
         <FileOnDialog doc={doc} open={filingOn} onOpenChange={setFilingOn} />
       ) : null}
@@ -489,100 +502,4 @@ function DitherBar({ fraction }: { fraction: number }) {
       <rect x="1" y="1" width={filled} height="8" fill={`url(#${id})`} />
     </svg>
   )
-}
-
-/**
- * What the Remove confirm says: whether the file leaves the server or
- * only this record, and the ledger of what goes.
- * - `record` removes it from this record; it leaves the server only when it
- *   is filed nowhere else.
- * - `server` deletes it outright, from every record it is filed on.
- */
-export function removeConfirmOptions(
-  doc: Pick<RecordDocument, 'filename' | 'sizeBytes' | 'filedIn'>,
-  {
-    recordId,
-    recordName,
-    mode,
-    chunks,
-  }: {
-    recordId: string
-    recordName: string
-    mode: 'record' | 'server'
-    chunks: number | null
-  },
-): ConfirmOptions & { leaves: boolean } {
-  const elsewhere = doc.filedIn.filter((e) => e.id !== recordId)
-  const leaves = mode === 'server' || elsewhere.length === 0
-  const names = elsewhere.map((e) => e.name).join(', ')
-  const ledger = [
-    formatBytes(doc.sizeBytes) || null,
-    chunks === null
-      ? null
-      : `${String(chunks)} chunk${chunks === 1 ? '' : 's'}`,
-  ]
-    .filter((part) => part !== null)
-    .join(' · ')
-  if (!leaves)
-    return {
-      leaves,
-      title: `Remove ${doc.filename}?`,
-      body: `It is also filed under ${names}, so it stays on the server and leaves only ${recordName}.`,
-      rows: elsewhere.map((e: FilingEdge) => ({
-        name: `Stays on ${e.name}`,
-        meta: e.kind === 'space' ? 'space' : e.entityKind,
-      })),
-      action: 'Remove',
-    }
-  return {
-    leaves,
-    title: `${mode === 'server' ? 'Delete' : 'Remove'} ${doc.filename}?`,
-    body:
-      elsewhere.length === 0
-        ? `It is filed only on ${recordName}, so it leaves the server.`
-        : `It leaves ${recordName}, ${names} and the server.`,
-    rows: [{ name: 'Leaves the server', meta: ledger }],
-    action: mode === 'server' ? 'Delete' : 'Remove',
-  }
-}
-
-/** Remove (or delete) a file behind the Remove confirm, then refresh the tab. */
-export function useRemoveFile(recordId: string, recordName: string) {
-  const router = useRouter()
-  const { confirm, confirmDialog } = useConfirm()
-
-  async function remove(
-    doc: RecordDocument,
-    mode: 'record' | 'server',
-  ): Promise<boolean> {
-    // The chunk count is only for the ledger: a confirm without it still says
-    // what leaves.
-    const details = await getDocumentDetails({ data: { id: doc.id } }).catch(
-      () => null,
-    )
-    const { leaves, ...options } = removeConfirmOptions(doc, {
-      recordId,
-      recordName,
-      mode,
-      chunks: details?.chunks ?? null,
-    })
-    if (!(await confirm(options))) return false
-    try {
-      if (leaves) await deleteDocument({ data: { id: doc.id } })
-      else
-        await unfileDocument({
-          data: {
-            documentId: doc.id,
-            target: { kind: 'record', entityId: recordId },
-          },
-        })
-      await router.invalidate()
-      return true
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Could not remove')
-      return false
-    }
-  }
-
-  return { remove, removeDialog: confirmDialog }
 }

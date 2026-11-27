@@ -108,6 +108,8 @@ export const VERB_LABELS: Record<string, string> = {
   'document.kind_changed': 'changed a document’s kind',
   'document.reextract_requested': 'asked for a document to be read again',
   'document.kept': 'kept a copy of an email attachment',
+  // No object: the file is gone, and its name is the figure.
+  'document.deleted': 'deleted the file',
   'space.tagged': 'tagged into a space',
   'space.untagged': 'removed from a space',
   'entity.merged': 'merged a duplicate record',
@@ -152,6 +154,7 @@ export const VERB_TYPES: Record<string, string> = {
   'document.kind_changed': 'file',
   'document.reextract_requested': 'file',
   'document.kept': 'file',
+  'document.deleted': 'file',
   'space.tagged': 'space',
   'space.untagged': 'space',
   'entity.merged': 'merge',
