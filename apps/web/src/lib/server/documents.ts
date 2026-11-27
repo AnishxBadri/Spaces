@@ -419,6 +419,27 @@ export const unfileDocument = createServerFn({ method: 'POST' })
   })
 
 /**
+ * The `File under…` popover's read: what the file is filed under, and the
+ * bands to offer (`Named in the file` and `Recent` with nothing typed, kind
+ * bands while typing). The work is `fileUnderOptionsProgram`.
+ */
+export const getFileUnderOptions = createServerFn()
+  .validator(
+    input(
+      Schema.Struct({
+        documentId: uuid,
+        q: Schema.String.check(Schema.isMaxLength(120)),
+      }),
+    ),
+  )
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { fileUnderOptionsProgram } = await import('../documents/file-under')
+    const { effectFn } = await import('./effect')
+    return effectFn(fileUnderOptionsProgram)(u, data.documentId, data.q)
+  })
+
+/**
  * A kind outside `DOCUMENT_KINDS` dies in the validator, not the program: the
  * boundary is the one place the untrusted string exists.
  */

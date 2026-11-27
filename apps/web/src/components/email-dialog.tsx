@@ -11,7 +11,7 @@ import { WidenDialog } from '#/components/email/who-can-read'
 import { useKeepCopy } from '#/components/files/keep-copy'
 import type { KeepCopy } from '#/components/files/keep-copy'
 import { NewerVersionDialog } from '#/components/files/newer-version-dialog'
-import { FilingPickers } from '#/components/files/viewer-sidebar'
+import { FileUnderPanel } from '#/components/files/file-under'
 import type { RecordDocument } from '#/components/files/types'
 import { PickPopover } from '#/components/record/details-add'
 import { ProviderMark } from '#/components/provider-mark'
@@ -29,7 +29,6 @@ import {
 import { MENU_RULE, MoreMenu } from '#/components/ui/more-menu'
 import type { MoreMenuEntry } from '#/components/ui/more-menu'
 import {
-  fileDocument,
   fileInteractionOnEntity,
   getEmail,
   listRecordDocuments,
@@ -168,7 +167,7 @@ function emailLink(id: string): string {
   return url.toString()
 }
 
-/** `File on…` for an attachment: the record search and the space tree. */
+/** `File under…` for an attachment: the rail's popover in a window. */
 function FileOnDialog({
   attachment,
   onOpenChange,
@@ -176,7 +175,6 @@ function FileOnDialog({
   attachment: EmailAttachment | null
   onOpenChange: (open: boolean) => void
 }) {
-  const [busy, setBusy] = useState(false)
   return (
     <Dialog open={attachment !== null} onOpenChange={onOpenChange}>
       <DialogContent size="s">
@@ -187,30 +185,13 @@ function FileOnDialog({
           </DialogDescription>
         </DialogHeader>
         {attachment === null ? null : (
-          <FilingPickers
-            filedIds={[]}
-            disabled={busy}
-            onPick={(target) => {
-              setBusy(true)
-              fileDocument({
-                data: { documentId: attachment.documentId, target },
-              })
-                .then(() => {
-                  toast('Filed')
-                  onOpenChange(false)
-                })
-                .catch((err: unknown) => {
-                  toast.error(
-                    err instanceof Error ? err.message : 'Could not file it',
-                  )
-                })
-                .finally(() => setBusy(false))
-            }}
-          />
+          <div className="border border-hairline">
+            <FileUnderPanel documentId={attachment.documentId} />
+          </div>
         )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancel
+            Done
           </Button>
         </DialogFooter>
       </DialogContent>

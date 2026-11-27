@@ -8,7 +8,6 @@ import { RecordFiles } from '../record-files'
 import { FileRow, removeConfirmOptions } from './file-row'
 import { FolderBand } from './folder-band'
 import { RevisionLedger } from './revision-ledger'
-import { textLine } from './viewer-sidebar'
 import type { RecordDocument } from './types'
 import { ClockProvider } from '#/components/clock'
 
@@ -377,17 +376,6 @@ describe('a folder just linked', () => {
     expect(html).not.toContain('aria-label="More for Acme Data Room"')
     expect(html).toMatch(
       /data-variant="outline" data-size="xs"[^>]*><svg[^>]*data-icon="unlink"[^]*?<\/svg>Unlink<\/button>/,
-    )
-  })
-})
-
-describe('the viewer’s TEXT line', () => {
-  it('prints pages and words once read, and what the read is doing before', () => {
-    expect(textLine(doc({}), { words: 3812, pages: 14 })).toBe(
-      '14 pages read, 3,812 words.',
-    )
-    expect(textLine(doc({ extractionStatus: 'pending' }), null)).toBe(
-      'Reading the text.',
     )
   })
 })

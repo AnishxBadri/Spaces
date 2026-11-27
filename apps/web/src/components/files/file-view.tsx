@@ -34,15 +34,8 @@ export function FileView({
       />
       <div className="flex min-h-0 flex-1">
         <FileBody key={doc.id} doc={doc} startPage={startPage} />
-        <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-hairline bg-paper">
-          <FileViewerSidebar
-            doc={doc}
-            // The rail's record only answers Follow, which it never offers
-            // here; Unfollow needs none. A file with no record passes itself.
-            recordId={
-              doc.filedIn.find((e) => e.kind === 'record')?.id ?? doc.id
-            }
-          />
+        <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-l border-rule bg-bone">
+          <FileViewerSidebar view={view} container={container} />
         </aside>
       </div>
     </>
