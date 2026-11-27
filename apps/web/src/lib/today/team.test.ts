@@ -13,9 +13,9 @@ const entry = (over: Partial<TeamEntry>): TeamEntry => ({
 })
 
 describe('teamLine', () => {
-  it('says who filed what on which record, with no verb code', () => {
+  it('says who filed what under which record, with no verb code', () => {
     expect(teamLine(entry({ objectName: 'Q3 board deck.pdf' }))).toBe(
-      'Anika Rao filed Q3 board deck.pdf on Exponent',
+      'Anika Rao filed Q3 board deck.pdf under Exponent',
     )
     expect(teamLine(entry({}))).toBe('Anika Rao filed a file under Exponent')
   })
