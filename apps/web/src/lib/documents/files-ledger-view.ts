@@ -167,6 +167,8 @@ export function firstLineOf(text: string | null): string | null {
   const line = text
     .split(/\r?\n/)
     .map((l) => l.replace(/\s+/g, ' ').trim())
-    .find((l) => /[\p{L}\p{N}]/u.test(l))
+    // The extractor's own `[Page 1]`, `[Slide 1]` and `[Sheet name]` lines
+    // are markers, not what the file says.
+    .find((l) => /[\p{L}\p{N}]/u.test(l) && !/^\[[^\]]+\]$/.test(l))
   return line === undefined ? null : line.slice(0, FIRST_LINE_CHARS)
 }
