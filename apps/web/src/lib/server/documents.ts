@@ -215,51 +215,42 @@ export const listRecordDocuments = createServerFn()
   })
 
 /**
- * Every document in the workspace, one row each: the `/files` shelf. The
- * query is `listDocumentsProgram`, kept out of the server-fn modules so a test
- * can drive it without a request.
- * - `filed: 'unfiled'` is the inbox (arrivals with no filing edge), a filter
- *   on this list rather than a route of its own.
- * - Defaults to `'all'`, matching the route's `validateSearch`.
+ * The Files page's list: unfiled first, then newest first, the open tab's
+ * kind and the search applied, `limit` rows from the top, with the tab
+ * counts. The query is `filesLedgerProgram`, kept out of the server-fn
+ * modules so a test can drive it without a request.
  */
-export const listDocuments = createServerFn()
+export const listFiles = createServerFn()
   .validator(
     input(
       Schema.Struct({
-        filed: Schema.Literals(['all', 'unfiled']).pipe(
-          Schema.withDecodingDefault(Effect.succeed('all' as const)),
+        tab: Schema.Literals(['all', ...DOCUMENT_KINDS]),
+        limit: Schema.Int.check(
+          Schema.isGreaterThanOrEqualTo(1),
+          Schema.isLessThanOrEqualTo(1000),
         ),
-      }).pipe(
-        Schema.withDecodingDefault(Effect.succeed({ filed: 'all' as const })),
-      ),
+        q: Schema.String.check(Schema.isMaxLength(200)),
+      }),
     ),
   )
   .handler(async ({ data }) => {
     const u = await requireUser()
-    const { listDocumentsProgram } = await import('../documents/shelf')
+    const { filesLedgerProgram } = await import('../documents/files-ledger')
     const { effectFn } = await import('./effect')
-    return effectFn(listDocumentsProgram)({ filed: data.filed, viewer: u })
+    return effectFn(filesLedgerProgram)({ ...data, viewer: u })
   })
 
 /**
  * How many documents are unfiled, for Today's readout strip. Its own server
  * fn so no other domain's reader answers for documents. Uses
- * `unfiledPredicate()`, the same fragment `listDocuments({ filed: 'unfiled' })`
- * filters with, so the badge and the list cannot disagree.
+ * `unfiledPredicate()`, the same fragment the Files page's `Unfiled` band
+ * counts with, so the badge and the band cannot disagree.
  */
 export const countUnfiledDocuments = createServerFn().handler(async () => {
   const u = await requireUser()
   const { countUnfiledProgram } = await import('../documents/shelf')
   const { effectFn } = await import('./effect')
   return effectFn(countUnfiledProgram)(u)
-})
-
-/** The shelf's `All n · Unfiled n` tab counts, whichever tab is open. */
-export const countShelfDocuments = createServerFn().handler(async () => {
-  const u = await requireUser()
-  const { shelfCountsProgram } = await import('../documents/shelf')
-  const { effectFn } = await import('./effect')
-  return effectFn(shelfCountsProgram)(u)
 })
 
 /** Not a document private to someone else: the by-id reads' gate. */

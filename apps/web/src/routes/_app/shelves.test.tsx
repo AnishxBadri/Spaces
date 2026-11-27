@@ -24,8 +24,9 @@ import { ClockProvider } from '#/components/clock'
  *   target in the board's words;
  * - Portfolio: no tab bar, the count in the title, and Record a check
  *   writes an investment against the company it picks;
- * - Files: `All n · Unfiled n` with both counts, and the exception lane —
- *   `Extracting…`, or `Failed` with Re-read.
+ * - Files: the kind tabs with their counts, `Unfiled` as the first band,
+ *   and the line under a row's name — its first line of text, `Reading
+ *   text`, or why it was not read with `Read again`.
  */
 
 const fns = vi.hoisted(() => ({
@@ -236,36 +237,62 @@ const doc = (n: number, filename: string, over: Record<string, unknown>) => ({
   id: id(300 + n),
   filename,
   kind: 'other',
-  sizeBytes: 2048,
   mime: 'application/pdf',
-  extractionStatus: 'done',
-  extractionError: null,
+  sizeBytes: 2048,
   blobSha: 'a'.repeat(64),
   url: null,
-  sourceClass: 'manual',
-  sourceCapability: null,
-  sourcePath: null,
   externalUrl: null,
-  externalStatus: null,
-  uploadedByName: 'Anish',
+  extractionStatus: 'done',
+  extractionError: null,
   createdAt: '2026-10-20T09:00:00.000Z',
-  sinceMs: 1000,
-  snippet: null,
+  unfiled: false,
+  firstLine: null,
+  pages: null,
+  words: null,
+  versionAt: null,
   records: [],
   spaces: [],
+  source: { via: 'upload', by: null },
+  guess: null,
+  hasOlder: false,
+  sourceCapability: null,
+  sourcePath: null,
+  inSyncedFolder: false,
+  versions: 1,
   ...over,
 })
 
 const filesData = () => ({
-  documents: [
-    doc(1, 'Deck.pdf', {}),
+  rows: [
+    doc(4, 'Term sheet.docx', {
+      unfiled: true,
+      createdAt: '2026-10-26T08:00:00.000Z',
+      guess: {
+        target: { kind: 'record', entityId: id(900) },
+        name: 'Flent',
+        kind: 'company',
+        object: null,
+        parents: [],
+      },
+    }),
+    doc(1, 'Deck.pdf', { firstLine: 'Leases under management' }),
     doc(2, 'Memo.pdf', { extractionStatus: 'pending' }),
     doc(3, 'Scan.pdf', {
       extractionStatus: 'failed',
       extractionError: 'no text layer and OCR failed',
     }),
   ],
-  counts: { all: 48, unfiled: 3 },
+  total: 48,
+  unfiled: 3,
+  counts: {
+    all: 48,
+    deck: 12,
+    cap_table: 0,
+    dd: 3,
+    legal: 0,
+    article: 2,
+    other: 31,
+  },
 })
 
 const LOADERS: Record<string, () => object> = {
@@ -507,36 +534,52 @@ describe('Portfolio', () => {
 })
 
 describe('Files', () => {
-  it('All and Unfiled carry both counts, and the title none', async () => {
+  it('the kinds are the tabs with their counts, and Unfiled is the first band', async () => {
     await mount('files')
     await until(
       'the tabs',
-      () => document.querySelector('[role="tab"]') !== null,
+      () => document.querySelector('[data-tab-bar] [role="tab"]') !== null,
     )
     expect(document.querySelector('[data-head-count]')).toBeNull()
     expect(
-      [...document.querySelectorAll('[role="tab"]')].map((t) => text(t)),
-    ).toEqual(['All48', 'Unfiled3'])
+      [...document.querySelectorAll('[data-tab-bar] [role="tab"]')].map((t) =>
+        text(t),
+      ),
+    ).toEqual([
+      'All48',
+      'Decks12',
+      'Cap tables',
+      'Diligence3',
+      'Legal',
+      'Articles2',
+      'Other31',
+    ])
     expect(
-      [...document.querySelectorAll('[role="columnheader"]')]
-        .map((h) => text(h))
-        .filter((h) => h !== ''),
-    ).toEqual(['File', 'Filed under', 'Space', 'Added by', 'Date', 'Size'])
+      [...document.querySelectorAll('[data-files-band]')].map((b) =>
+        b.getAttribute('data-files-band'),
+      ),
+    ).toEqual(['unfiled', 'last-week'])
+    expect(text(document.querySelector('[data-band]'))).toBe('Unfiled3')
+    expect(text(document.querySelector('[data-file-guess]'))).toBe(
+      'File under Flent↵',
+    )
+    expect(text(document.querySelector('[data-table-foot]'))).toBe(
+      '4 of 48·Load 50 more',
+    )
   })
 
-  it('the exception lane: Extracting…, or Failed with Re-read', async () => {
+  it('a row under its name: the first line, Reading text, or why it was not read with Read again', async () => {
     fns.reExtractDocument.mockResolvedValue({ queued: true })
     await mount('files')
     await until('the rows', () => document.querySelector('[data-row]') !== null)
-    const lanes = [...document.querySelectorAll('[data-row-end]')].map((l) =>
-      text(l),
-    )
-    expect(lanes).toEqual(['', 'Extracting…', 'FailedRe-read'])
-    const failed = document.querySelector('[data-exception="failed"]')
-    expect(failed?.firstElementChild?.getAttribute('title')).toBe(
-      'no text layer and OCR failed',
-    )
-    await click(failed?.querySelector('button'))
+    expect(
+      [...document.querySelectorAll('[data-file-line]')].map((l) => text(l)),
+    ).toEqual([
+      'Leases under management',
+      'Reading text',
+      'Text not read · no text layer and OCR failedRead again',
+    ])
+    await click(byText('button', 'Read again'))
     expect(fns.reExtractDocument).toHaveBeenCalledWith({
       data: { documentId: id(303) },
     })
