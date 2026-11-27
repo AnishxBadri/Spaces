@@ -38,6 +38,8 @@ export type UploadDocumentInput = {
   fileAgainst: FileAgainst
   /** Defaults to `guessDocumentKind(file.name)`. */
   kind?: FinalizeInput['kind']
+  /** The digest when the caller already took it, so the file is read once. */
+  sha?: string
   onPhase: (phase: UploadPhase) => void
   /** The PUT's progress, 0 to 1; the PUT goes through XHR when it is given. */
   onProgress?: (fraction: number) => void
@@ -53,6 +55,7 @@ export async function uploadDocument({
   file,
   fileAgainst,
   kind,
+  sha: hashed,
   onPhase,
   onProgress,
   signal,
@@ -65,7 +68,7 @@ export async function uploadDocument({
   }
 
   onPhase('hashing')
-  const sha = await sha256Hex(file)
+  const sha = hashed ?? (await sha256Hex(file))
 
   const { uploadUrl, uploadHeaders } = await prepareDocumentUpload({
     data: { sha, sizeBytes: file.size },

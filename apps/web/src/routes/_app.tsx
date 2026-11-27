@@ -16,7 +16,7 @@ import { KeyboardHelp } from '#/components/keyboard-help'
 import { CommandPalette } from '#/components/command-palette'
 import { AskDock } from '#/components/ask/ask-dock'
 import { toggleAsk } from '#/lib/ask/dock-store'
-import { UploadDialog } from '#/components/upload-dialog'
+import { AddFilesInput } from '#/components/files/add-files-input'
 import { ComposeWindows } from '#/components/email/compose-windows'
 import { FileWindow } from '#/components/files/file-window'
 import { Wordmark } from '#/components/wordmark'
@@ -192,10 +192,8 @@ function AppShell() {
           onOpenChange={setCommandOpen}
           objects={objects}
         />
-        {/* Mounted once, here: an upload has to outlive the sheet it was
-          started from, so closing the dialog leaves in-flight files
-          running. */}
-        <UploadDialog />
+        {/* Mounted once, here: the one file chooser every Upload opens. */}
+        <AddFilesInput />
         <ComposeWindows />
         <FileWindow />
         <KeyboardHelp open={keyboardOpen} onOpenChange={setKeyboardOpen} />

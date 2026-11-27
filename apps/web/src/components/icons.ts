@@ -70,6 +70,7 @@ import {
   Image as CarbonImage,
   ImageSearch,
   Keyboard as CarbonKeyboard,
+  Laptop as CarbonLaptop,
   Launch,
   Layers as CarbonLayers,
   Link as CarbonLink,
@@ -270,6 +271,7 @@ export const Folder = carbon(CarbonFolder, 'folder')
 export const Hashtag = carbon(CarbonHashtag, 'hashtag')
 export const Image = carbon(CarbonImage, 'image')
 export const Keyboard = carbon(CarbonKeyboard, 'keyboard')
+export const Laptop = carbon(CarbonLaptop, 'laptop')
 export const Layers = carbon(CarbonLayers, 'layers')
 export const Link = icon.copyLink
 export const List = carbon(CarbonList, 'list')

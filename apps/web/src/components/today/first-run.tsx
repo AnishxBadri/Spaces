@@ -3,7 +3,7 @@ import { CreateCompanyDialog } from '#/components/create-company-dialog'
 import type { RegistryEntry } from '#/components/attributes/value-editor'
 import { DitherNoun } from '#/components/dither-noun'
 import { Button } from '#/components/ui/button'
-import { openUploadDialog } from '#/lib/upload-dialog-store'
+import { chooseFilesToAdd } from '#/lib/documents/arrivals'
 
 /**
  * Today in a workspace with no companies: the empty-state block with the
@@ -27,7 +27,7 @@ export function FirstRun({ registry }: { registry: Array<RegistryEntry> }) {
               CSV or Airtable export
             </span>
           </div>
-          <Button variant="outline" onClick={openUploadDialog}>
+          <Button variant="outline" onClick={chooseFilesToAdd}>
             Drop a deck
           </Button>
           <CreateCompanyDialog

@@ -380,16 +380,14 @@ describe('E10 · one ink object on a page: the folder', () => {
   })
 
   it('frames a list’s table as the folder and a tabless table as a rule card', () => {
-    for (const list of [
-      'companies',
-      'people',
-      'deals',
-      'o.$objectSlug',
-      'files',
-    ])
+    for (const list of ['companies', 'people', 'deals', 'o.$objectSlug'])
       expect(read(`routes/_app/${list}.tsx`), list).toMatch(
         /<RecordTable\s+joined[^>]*?\n\s+folder\n/,
       )
+    // Files is a ledger, not a table: its body is the folder itself.
+    expect(read('components/files/files-ledger.tsx')).toMatch(
+      /<FolderBody\b[\s\S]*<ListFoot\s+folder\n/,
+    )
     expect(read('routes/_app/portfolio.tsx')).not.toMatch(/\bfolder\b/)
     const table = read('components/table/record-table.tsx')
     expect(table).toContain("folder ? 'border-hairline' : 'border-rule'")
@@ -649,9 +647,13 @@ describe('E6 · every create is + New x, in pine', () => {
   })
 
   it('reads Upload on Files and Record a check, filled, on Portfolio', () => {
+    // The Files head's `Upload` is the left half of its split button.
     const files = read('routes/_app/files.tsx')
-    expect(files).toMatch(/<icon\.upload[^>]*\/>\s*Upload\s*<\/Button>/)
+    expect(files).toContain('action={<UploadButton />}')
     expect(files).not.toContain('NewButton')
+    expect(read('components/files/upload-menu.tsx')).toMatch(
+      /<icon\.upload[^>]*\/>\s*Upload\s*<\/Button>/,
+    )
     expect(read('routes/_app/portfolio.tsx')).toContain(
       'trigger={<Button>Record a check</Button>}',
     )
@@ -849,6 +851,7 @@ describe('E7 · one icon list, one brand mark', () => {
       'components/dither.tsx',
       'components/files/file-glyph.tsx',
       'components/files/file-row.tsx',
+      'components/files/files-drop.tsx',
       'components/ledger-section.tsx',
       'components/note-kind-icon.tsx',
       'components/provider-mark.tsx',

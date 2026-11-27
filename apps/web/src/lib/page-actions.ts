@@ -1,7 +1,7 @@
 import { useEffect, useRef, useSyncExternalStore } from 'react'
 import { icon } from '#/components/icons'
 import type { IconComponent } from '#/components/icons'
-import { openUploadDialog } from './upload-dialog-store'
+import { chooseFilesToAdd } from './documents/arrivals'
 
 /**
  * The verbs a page publishes to Cmd-K's Actions group.
@@ -85,7 +85,7 @@ export const GLOBAL_ACTIONS: ReadonlyArray<PageAction> = [
     label: 'Upload a file…',
     icon: icon.upload,
     words: 'upload file document deck attach drop',
-    run: openUploadDialog,
+    run: chooseFilesToAdd,
   },
 ]
 

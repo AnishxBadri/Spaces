@@ -9,6 +9,7 @@ import { FolderBody } from '../ui/tabs'
 import { useDeletingFiles } from './delete-file'
 import { FilesRow } from './files-row'
 import { UnfiledBand } from './unfiled-band'
+import { useArrivals } from '#/lib/documents/arrivals'
 import type {
   FilesLedger as Ledger,
   FilesLedgerRow,
@@ -59,6 +60,8 @@ export function FilesLedger({
 }) {
   const { today } = useClock()
   const deleting = useDeletingFiles()
+  // Files still arriving stand in `Unfiled`, so the folder is not empty.
+  const arriving = useArrivals().length > 0
   const rows = useMemo(
     () => ledger.rows.filter((r) => !deleting.has(r.id)),
     [ledger.rows, deleting],
@@ -92,7 +95,7 @@ export function FilesLedger({
         data-files-ledger
         className="md:min-h-0 md:flex-1 md:overflow-y-auto"
       >
-        {rows.length === 0 ? (
+        {rows.length === 0 && !arriving ? (
           <p
             data-list-state="none"
             className="flex h-ledger-row items-center border-b border-rule px-(--inset) text-ui text-graphite"

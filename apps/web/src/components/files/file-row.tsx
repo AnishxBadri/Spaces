@@ -463,16 +463,23 @@ export function PendingRow({
   )
 }
 
-/** A dithered progress bar, 120px, filled from the left. */
-function DitherBar({ fraction }: { fraction: number }) {
+/** A dithered progress bar, filled from the left; 120 by 10 unless told. */
+export function DitherBar({
+  fraction,
+  width = 120,
+  height = 10,
+}: {
+  fraction: number
+  width?: number
+  height?: number
+}) {
   const id = useId()
-  const width = 120
   const filled = Math.round(Math.max(0, Math.min(1, fraction)) * (width - 2))
   return (
     <svg
       width={width}
-      height="10"
-      viewBox={`0 0 ${String(width)} 10`}
+      height={height}
+      viewBox={`0 0 ${String(width)} ${String(height)}`}
       aria-hidden
       shapeRendering="crispEdges"
       className="shrink-0 text-foreground"
@@ -495,11 +502,17 @@ function DitherBar({ fraction }: { fraction: number }) {
         x="0.5"
         y="0.5"
         width={width - 1}
-        height="9"
+        height={height - 1}
         fill="none"
         stroke="currentColor"
       />
-      <rect x="1" y="1" width={filled} height="8" fill={`url(#${id})`} />
+      <rect
+        x="1"
+        y="1"
+        width={filled}
+        height={height - 2}
+        fill={`url(#${id})`}
+      />
     </svg>
   )
 }

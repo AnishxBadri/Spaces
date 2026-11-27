@@ -84,6 +84,20 @@ export const prepareDocumentUpload = createServerFn({ method: 'POST' })
   })
 
 /**
+ * The file the reader may read whose bytes are `sha`, or null: the Files
+ * page asks before storing anything, so a file already here does not land
+ * twice. The work is `alreadyHereProgram`.
+ */
+export const findStoredDocument = createServerFn({ method: 'POST' })
+  .validator(input(Schema.Struct({ sha: shaKey })))
+  .handler(async ({ data }) => {
+    const u = await requireUser()
+    const { alreadyHereProgram } = await import('../documents/already-here')
+    const { effectFn } = await import('./effect')
+    return effectFn(alreadyHereProgram)(u, data.sha)
+  })
+
+/**
  * The bytes must actually be in the store: a client that skipped the PUT
  * would otherwise leave a document row pointing at nothing.
  */
