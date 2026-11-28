@@ -1,5 +1,16 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, desc, eq, inArray, isNotNull, like, sql } from 'drizzle-orm'
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  inArray,
+  isNotNull,
+  like,
+  lte,
+  sql,
+} from 'drizzle-orm'
 import type { SQL } from 'drizzle-orm'
 import { condenseBursts } from '@spaces/core/timeline/bursts'
 import { db } from '@spaces/db'
@@ -33,6 +44,9 @@ import {
 import type { Json } from '@spaces/core/json'
 import { resolveRefsProgram } from '@spaces/core/writes/context/names'
 import type { ResolvedRef } from '@spaces/core/writes/context/names'
+
+/** How many interactions still ahead a record's timeline reads, the next ones. */
+const AHEAD_LIMIT = 25
 
 /**
  * Merged timeline: macro activity + attribute_event bursts, condensed at
@@ -168,31 +182,49 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
         : []
     const readFrom = [...new Set([entityId, ...derived])]
 
-    // Interactions this entity participated in, with co-attendees.
-    const myInteractions = yield* query(() =>
-      db
-        .selectDistinct({
-          id: interaction.id,
-          kind: interaction.kind,
-          subject: interaction.subject,
-          occurredAt: interaction.occurredAt,
-          // The write-up, when there is one. Null is the ordinary case — a
-          // meeting logged in twenty seconds has no body.
-          noteId: interaction.noteId,
-          threadId: interaction.threadId,
-          sourceRef: interaction.sourceRef,
-          meta: interaction.meta,
-          hasAttachments: hasAttachmentsSql(),
-        })
-        .from(interactionEntity)
-        .innerJoin(
-          interaction,
-          eq(interaction.id, interactionEntity.interactionId),
-        )
-        .where(inArray(interactionEntity.entityId, readFrom))
-        .orderBy(desc(interaction.occurredAt))
-        .limit(50),
-    )
+    // Interactions this entity participated in, with co-attendees. What is
+    // still ahead is read apart from what has happened, earliest first: a
+    // standing series reaches years out, and newest-first alone would hand
+    // back its far end and none of the record's past.
+    const interactionsOf = (ahead: boolean) =>
+      query(() =>
+        db
+          .selectDistinct({
+            id: interaction.id,
+            kind: interaction.kind,
+            subject: interaction.subject,
+            occurredAt: interaction.occurredAt,
+            // The write-up, when there is one. Null is the ordinary case — a
+            // meeting logged in twenty seconds has no body.
+            noteId: interaction.noteId,
+            threadId: interaction.threadId,
+            sourceRef: interaction.sourceRef,
+            meta: interaction.meta,
+            hasAttachments: hasAttachmentsSql(),
+          })
+          .from(interactionEntity)
+          .innerJoin(
+            interaction,
+            eq(interaction.id, interactionEntity.interactionId),
+          )
+          .where(
+            and(
+              inArray(interactionEntity.entityId, readFrom),
+              ahead
+                ? gt(interaction.occurredAt, sql`now()`)
+                : lte(interaction.occurredAt, sql`now()`),
+            ),
+          )
+          .orderBy(
+            ahead ? asc(interaction.occurredAt) : desc(interaction.occurredAt),
+          )
+          .limit(ahead ? AHEAD_LIMIT : 50),
+      )
+    // Newest first throughout, as the rows below expect.
+    const myInteractions = [
+      ...(yield* interactionsOf(true)).reverse(),
+      ...(yield* interactionsOf(false)),
+    ]
     const interactionIds = myInteractions.map((i) => i.id)
     const attendees =
       interactionIds.length > 0

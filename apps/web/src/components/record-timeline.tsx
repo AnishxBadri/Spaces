@@ -501,7 +501,13 @@ function UpcomingMenu({ item }: { item: InteractionItem }) {
   ]
   if (items.length === 0) return null
   return (
-    <MoreMenu variant="row" label={item.subject || 'meeting'} items={items} />
+    // Always the `···`: one verb shown in the lane would cover the start.
+    <MoreMenu
+      variant="row"
+      label={item.subject || 'meeting'}
+      items={items}
+      forceMenu
+    />
   )
 }
 

@@ -352,3 +352,51 @@ describe('a meeting row’s answer', () => {
     expect(meetingAnswer(null, [])).toBeNull()
   })
 })
+
+/**
+ * A standing series puts hundreds of meetings ahead of a record. The
+ * timeline still hands back the next ones and the record's past.
+ */
+describe('the record timeline, for a record with a long series ahead', () => {
+  it('reads the next meetings and what has happened, not the far end', async () => {
+    const { db } = await import('@spaces/db')
+    const { interaction, interactionEntity } = await import('@spaces/db/schema')
+    const { resolveEntity } =
+      await import('@spaces/core/writes/entities/resolve')
+    const { recordTimelineProgram } = await import('./record')
+
+    const { entityId } = await resolveEntity({
+      kind: 'company',
+      name: 'Standing Series Co',
+      keys: { domain: 'standing-series.example' },
+      source: { class: 'manual' },
+    })
+    const day = 86_400_000
+    const at = (days: number) => new Date(Date.now() + days * day)
+    const rows = await db
+      .insert(interaction)
+      .values([
+        { kind: 'call' as const, subject: 'Happened', occurredAt: at(-2) },
+        ...Array.from({ length: 60 }, (_, i) => ({
+          kind: 'meeting' as const,
+          subject: `Ahead ${i + 1}`,
+          occurredAt: at(i + 1),
+        })),
+      ])
+      .returning({ id: interaction.id })
+    await db
+      .insert(interactionEntity)
+      .values(rows.map((r) => ({ interactionId: r.id, entityId })))
+
+    const items = await Effect.runPromise(
+      recordTimelineProgram(entityId, FIXTURE_ACTOR),
+    )
+    const subjects = items.flatMap((i) =>
+      i.type === 'interaction' ? [i.subject] : [],
+    )
+    expect(subjects).toContain('Happened')
+    expect(subjects).toContain('Ahead 1')
+    expect(subjects).not.toContain('Ahead 60')
+    expect(subjects.filter((s) => s.startsWith('Ahead'))).toHaveLength(25)
+  })
+})
