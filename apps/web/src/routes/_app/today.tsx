@@ -222,7 +222,7 @@ function TodayLedger({
     }
   }
 
-  // The section's day moves with ‹ ›, and the strip follows it.
+  // The strip's head moves the day with ‹ ›, and the section follows it.
   const [day, setDay] = useState(today)
   const [version, setVersion] = useState(0)
   const shown = useDayMeetings(meetings.calendar ? day : null, version)
@@ -399,6 +399,7 @@ function TodayLedger({
       who: whoLine(m.external),
       startsAt: m.startsAt,
       endsAt: m.endsAt,
+      callLink: m.callLink,
     }))
 
   return (
@@ -411,6 +412,12 @@ function TodayLedger({
           <DayStrip
             day={day}
             today={today}
+            onDay={setDay}
+            count={
+              shown === null || shown === 'failed' || shown.length === 0
+                ? null
+                : shown.length
+            }
             meetings={stripDay}
             onOpen={(id) => openMeeting(id)}
           />
@@ -478,7 +485,6 @@ function TodayLedger({
                 audience={meetings.audience}
                 today={today}
                 day={day}
-                onDay={setDay}
                 meetings={shown}
                 preparing={preparing}
                 onOpen={openMeeting}

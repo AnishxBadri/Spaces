@@ -8,12 +8,13 @@ import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { formatTime } from '@spaces/core/format'
 import type { SetupAudience, TodayMeeting } from '#/lib/server-fns'
+import { DayStrip } from './day-strip'
 import { MeetingsSection } from './meetings'
 
 /**
- * Today's Meetings section: the head carries the day's count once in ink,
+ * Today's Meetings: the strip's head carries the day's count once,
  * `‹ Today ›` and `All meetings ›`, with `Back to today` and the day away
- * from today; a row is the start time, the title, the action (Write after,
+ * from today, and the section's head is its title alone; a row is the start time, the title, the action (Write after,
  * Prep before, Preparing… while it runs), who outside the workspace, and
  * `···`; every state is one line — cancelled, read failed, no calendar for
  * an admin and for a member, nothing that day.
@@ -35,6 +36,7 @@ const INTRO: TodayMeeting = {
   artifacts: ['transcript', 'recording_link'],
   noteId: null,
   external: ['Ana Reyes', 'ben@flent.io'],
+  callLink: 'https://meet.google.com/abc-defg-hij',
 }
 
 const MOVED: TodayMeeting = {
@@ -48,6 +50,7 @@ const MOVED: TodayMeeting = {
   artifacts: [],
   noteId: null,
   external: [],
+  callLink: null,
 }
 
 async function render(props: {
@@ -65,7 +68,6 @@ async function render(props: {
           audience={props.audience ?? ADMIN}
           today="2026-10-13"
           day={props.day ?? '2026-10-13'}
-          onDay={() => {}}
           meetings={
             props.meetings === undefined ? [INTRO, MOVED] : props.meetings
           }
@@ -81,10 +83,31 @@ async function render(props: {
   return renderToStaticMarkup(<RouterProvider router={router} />)
 }
 
-describe('MeetingsSection — the head', () => {
-  it('carries the day’s count once, ‹ Today › and All meetings', async () => {
-    const html = await render({ calendar: true })
-    expect(html).toMatch(/data-section-count[^>]*text-foreground[^>]*>2</)
+/** The strip with the section's two meetings, cancelled one counted. */
+async function renderStrip(day = '2026-10-13') {
+  const router = createRouter({
+    routeTree: createRootRoute({
+      component: () => (
+        <DayStrip
+          day={day}
+          today="2026-10-13"
+          onDay={() => {}}
+          count={2}
+          meetings={[]}
+          onOpen={() => {}}
+        />
+      ),
+    }),
+    history: createMemoryHistory({ initialEntries: ['/today'] }),
+  })
+  await router.load()
+  return renderToStaticMarkup(<RouterProvider router={router} />)
+}
+
+describe('the day’s head', () => {
+  it('is the strip’s: the count once, ‹ Today › and All meetings; the section’s head is its title', async () => {
+    const html = await renderStrip()
+    expect(html).toMatch(/data-strip-count[^>]*>2</)
     expect(html.match(/>2</g)).toHaveLength(1)
     expect(html).toContain('aria-label="Previous day"')
     expect(html).toContain('>Today<')
@@ -92,10 +115,15 @@ describe('MeetingsSection — the head', () => {
     expect(html).toContain('href="/meetings"')
     expect(html).toContain('All meetings ›')
     expect(html).not.toContain('Back to today')
+
+    const section = await render({ calendar: true })
+    expect(section).not.toContain('data-section-count')
+    expect(section).not.toContain('aria-label="Previous day"')
+    expect(section).not.toContain('All meetings')
   })
 
   it('names the day away from today, after Back to today', async () => {
-    const html = await render({ calendar: true, day: '2026-10-14' })
+    const html = await renderStrip('2026-10-14')
     expect(html).toContain('>Wed 14 Oct<')
     expect(html).not.toContain('>Today<')
     expect(html.indexOf('Back to today')).toBeGreaterThan(-1)

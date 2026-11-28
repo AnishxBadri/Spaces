@@ -209,25 +209,36 @@ describe('dayMeetingsProgram', () => {
 })
 
 describe('unwrittenMeetingsProgram', () => {
+  const reader = { id: FIXTURE_ACTOR.id, email: FIXTURE_ACTOR.email }
+  /** A meeting with Ana that the reader was invited to. */
+  const invited = (over: Partial<MeetingMeta> = {}) =>
+    meta({
+      rsvp: { 'ana@flent.io': 'accepted', [reader.email]: 'accepted' },
+      ...over,
+    })
+
   it('lists past, uncancelled meetings with no write-up, and nothing ahead', async () => {
     const flent = await aCompany('Flent')
     const now = new Date('2027-03-13T12:00:00.000Z')
     const past = await aMeeting({
       subject: 'Flent intro',
       at: '2027-03-12T09:00:00.000Z',
-      meta: meta({ ends_at: '2027-03-12T09:30:00.000Z' }),
+      meta: invited({ ends_at: '2027-03-12T09:30:00.000Z' }),
       records: [flent],
     })
     await aMeeting({
       subject: 'Ahead',
       at: '2027-03-14T09:00:00.000Z',
-      meta: meta({ ends_at: '2027-03-14T09:30:00.000Z' }),
+      meta: invited({ ends_at: '2027-03-14T09:30:00.000Z' }),
       records: [flent],
     })
     await aMeeting({
       subject: 'Cancelled',
       at: '2027-03-11T09:00:00.000Z',
-      meta: meta({ ends_at: '2027-03-11T09:30:00.000Z', status: 'cancelled' }),
+      meta: invited({
+        ends_at: '2027-03-11T09:30:00.000Z',
+        status: 'cancelled',
+      }),
       records: [flent],
     })
     const [n] = await db
@@ -238,12 +249,12 @@ describe('unwrittenMeetingsProgram', () => {
     await aMeeting({
       subject: 'Written',
       at: '2027-03-10T09:00:00.000Z',
-      meta: meta({ ends_at: '2027-03-10T09:30:00.000Z' }),
+      meta: invited({ ends_at: '2027-03-10T09:30:00.000Z' }),
       records: [flent],
       noteId: n.id,
     })
 
-    expect(await run(unwrittenMeetingsProgram(now))).toEqual([
+    expect(await run(unwrittenMeetingsProgram(reader, now))).toEqual([
       {
         id: past,
         title: 'Flent intro',
@@ -276,10 +287,72 @@ describe('unwrittenMeetingsProgram', () => {
     })
     // The file's other meetings share the database; read this one.
     const row = (
-      await run(unwrittenMeetingsProgram(new Date('2027-03-13T12:00:00.000Z')))
+      await run(
+        unwrittenMeetingsProgram(reader, new Date('2027-03-13T12:00:00.000Z')),
+      )
     ).find((m) => m.title === 'Flent follow-up')
     expect(row?.who).toBe('Ben Okafor')
     expect(row?.sensitive).toBe('Flent')
+  })
+
+  it('leaves out a colleague’s meeting the reader was not in', async () => {
+    const kavya = await aMember('Kavya Iyer')
+    const now = new Date('2027-03-13T12:00:00.000Z')
+    await aMeeting({
+      subject: 'Ours',
+      at: '2027-03-12T09:00:00.000Z',
+      meta: invited({ ends_at: '2027-03-12T09:30:00.000Z' }),
+      records: [],
+    })
+    await aMeeting({
+      subject: 'Kavya’s',
+      at: '2027-03-12T10:00:00.000Z',
+      meta: meta({
+        ends_at: '2027-03-12T10:30:00.000Z',
+        organizer: kavya.email,
+        rsvp: { [kavya.email]: 'accepted', 'ana@flent.io': 'accepted' },
+      }),
+      records: [],
+    })
+    // The file's other meetings share the database; read these two.
+    const titles = async (who: { id: string; email: string }) =>
+      (await run(unwrittenMeetingsProgram(who, now)))
+        .map((m) => m.title)
+        .filter((t) => t === 'Ours' || t === 'Kavya’s')
+    expect(await titles(reader)).toEqual(['Ours'])
+    // Kavya sees her own and not the reader's.
+    expect(await titles(kavya)).toEqual(['Kavya’s'])
+  })
+
+  it('holds a recorded meeting back for the hour after it ends', async () => {
+    const recorder = await aMember('Recording Partner')
+    await db.insert(accountConnection).values({
+      userId: recorder.id,
+      provider: 'granola',
+      product: 'notes',
+      externalEmail: recorder.email,
+      tokensEnc: Buffer.from('x'),
+    })
+    // Past the list tests' horizon, so their counts never meet it.
+    const recorded = await aMeeting({
+      subject: 'Recorded',
+      at: '2027-05-20T11:00:00.000Z',
+      meta: meta({
+        ends_at: '2027-05-20T11:30:00.000Z',
+        rsvp: {
+          [reader.email]: 'accepted',
+          [recorder.email]: 'accepted',
+        },
+      }),
+      records: [],
+    })
+    const listed = async (iso: string) =>
+      (await run(unwrittenMeetingsProgram(reader, new Date(iso)))).some(
+        (m) => m.id === recorded,
+      )
+    expect(await listed('2027-05-20T11:30:00.000Z')).toBe(false)
+    expect(await listed('2027-05-20T12:29:59.999Z')).toBe(false)
+    expect(await listed('2027-05-20T12:30:00.000Z')).toBe(true)
   })
 })
 

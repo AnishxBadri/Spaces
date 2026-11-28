@@ -45,6 +45,8 @@ export type DayMeeting = {
 export type TodayMeeting = DayMeeting & {
   /** Participants outside the workspace, by name or address, in participant order. */
   external: ReadonlyArray<string>
+  /** The call's address; null for a meeting in a room. */
+  callLink: string | null
 }
 
 const pad = (n: number) => String(n).padStart(2, '0')
@@ -111,6 +113,49 @@ export function waitFor(ms: number): string {
   const m = minutes % 60
   if (h === 0) return `${String(m)}m`
   return m === 0 ? `${String(h)}h` : `${String(h)}h ${String(m)}m`
+}
+
+/** How long before it starts a call can be joined from Today's strip. */
+export const JOIN_LEAD_MS = 10 * 60_000
+
+/** What the day strip's head adds after its count, and its `Join ↗`. */
+export type StripHead = {
+  /** The wait to the next meeting today, `2h 20m`; null when none is left. */
+  next: string | null
+  /** The call to join now; null when none is live or about to start. */
+  join: string | null
+}
+
+/**
+ * The strip head's clock-bound parts, for today's meetings in start order.
+ * `now` is null away from today and before the browser clock is read, so
+ * neither part is said then. A call is joinable from `JOIN_LEAD_MS` before
+ * its start until its end; of several, the latest to start, so one running
+ * over never hides the next.
+ */
+export function stripHead(
+  meetings: ReadonlyArray<{
+    startsAt: string
+    endsAt: string
+    callLink: string | null
+  }>,
+  now: Date | null,
+): StripHead {
+  if (now === null) return { next: null, join: null }
+  const t = now.getTime()
+  const next = meetings.find((m) => Date.parse(m.startsAt) > t)
+  const join = meetings
+    .filter(
+      (m) =>
+        m.callLink !== null &&
+        Date.parse(m.startsAt) - JOIN_LEAD_MS <= t &&
+        t < Date.parse(m.endsAt),
+    )
+    .at(-1)
+  return {
+    next: next === undefined ? null : waitFor(Date.parse(next.startsAt) - t),
+    join: join?.callLink ?? null,
+  }
 }
 
 /** A row's time lane: `09:30–10:00`. */

@@ -252,30 +252,44 @@ describe('Today', () => {
 })
 
 describe('the day strip', () => {
-  const strip = (day: string, meetings: ReadonlyArray<DayStripMeeting> = []) =>
-    renderToStaticMarkup(
-      <DayStrip
-        day={day}
-        today="2026-10-13"
-        meetings={meetings}
-        onOpen={() => {}}
-      />,
-    )
+  // The head's nav links to Meetings, so the strip renders under a router.
+  const strip = async (
+    day: string,
+    meetings: ReadonlyArray<DayStripMeeting> = [],
+  ) => {
+    const router = createRouter({
+      routeTree: createRootRoute({
+        component: () => (
+          <DayStrip
+            day={day}
+            today="2026-10-13"
+            onDay={() => {}}
+            count={meetings.length === 0 ? null : meetings.length}
+            meetings={meetings}
+            onOpen={() => {}}
+          />
+        ),
+      }),
+      history: createMemoryHistory({ initialEntries: ['/today'] }),
+    })
+    await router.load()
+    return renderToStaticMarkup(<RouterProvider router={router} />)
+  }
 
-  it('spans the working window 08–20', () => {
-    const html = strip('2026-10-13')
+  it('spans the working window 08–20', async () => {
+    const html = await strip('2026-10-13')
     for (const h of ['08', '10', '12', '14', '16', '18', '20'])
       expect(html).toContain(`>${h}<`)
     for (const h of ['00', '06', '21']) expect(html).not.toContain(`>${h}<`)
   })
 
-  it('dithers a past day whole with no now-dot, and a future day not at all', () => {
-    const past = strip('2026-10-12')
+  it('dithers a past day whole with no now-dot, and a future day not at all', async () => {
+    const past = await strip('2026-10-12')
     expect(past).toContain('data-day-strip="past"')
     expect(past).toMatch(/data-elapsed[^>]*width="100%"/)
     expect(past).not.toContain('data-now')
 
-    const ahead = strip('2026-10-14')
+    const ahead = await strip('2026-10-14')
     expect(ahead).toContain('data-day-strip="future"')
     expect(ahead).not.toContain('data-elapsed')
     expect(ahead).not.toContain('data-now')
@@ -293,9 +307,9 @@ describe('the day strip', () => {
     expect(nowLabel(at(9, 5))).toBe('Now · 09:05')
   })
 
-  it('draws a meeting as a labelled block that opens its window', () => {
+  it('draws a meeting as a labelled block that opens its window', async () => {
     const day = (h: number) => new Date(2026, 9, 14, h).toISOString()
-    const html = strip('2026-10-14', [
+    const html = await strip('2026-10-14', [
       {
         id: 'm',
         label: 'Northgate',
@@ -303,6 +317,7 @@ describe('the day strip', () => {
         who: 'Priya Raman +1',
         startsAt: day(17),
         endsAt: day(18),
+        callLink: null,
       },
     ])
     expect(html).toMatch(/data-meeting[^>]*>Northgate</)

@@ -53,8 +53,8 @@ export const listDayMeetings = createServerFn()
 
 /**
  * Today's meeting reads that need no clock from the browser: whether a
- * calendar is connected, who a member asks, and the past meetings nobody
- * wrote up.
+ * calendar is connected, who a member asks, and the reader's past meetings
+ * nobody wrote up.
  */
 export const getTodayMeetings = createServerFn().handler(async () => {
   const user = await requireUser()
@@ -65,7 +65,10 @@ export const getTodayMeetings = createServerFn().handler(async () => {
   const [calendar, audience, unwritten] = await Promise.all([
     effectFn(calendarConnectedProgram)(),
     effectFn(setupAudienceProgram)(user.role ?? 'member'),
-    effectFn(unwrittenMeetingsProgram)(new Date()),
+    effectFn(unwrittenMeetingsProgram)(
+      { id: user.id, email: user.email },
+      new Date(),
+    ),
   ])
   return { calendar, audience, unwritten }
 })

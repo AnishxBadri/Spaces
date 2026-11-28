@@ -296,11 +296,15 @@ export const dayMeetingsProgram = Effect.fn('dayMeetingsProgram')(function* (
     hydrate(rows),
     rows.length === 0 ? Effect.succeed(new Set<string>()) : internalAddresses(),
   ])
+  const links = new Map(
+    rows.map((r) => [r.id, meetingMeta(r.meta)?.conference_url ?? null]),
+  )
   return meetings.map((m): TodayMeeting => ({
     ...m,
     external: m.participants
       .filter((p) => !internal.has(p.email.toLowerCase()))
       .map(participantName),
+    callLink: links.get(m.id) ?? null,
   }))
 })
 
@@ -396,15 +400,54 @@ const membersProgram = () =>
   })
 
 /**
+ * What makes a meeting the reader's and whether it owes a write-up, as SQL
+ * over `interaction`, so the Meetings page and Today's Write-ups agree.
+ * - Mine: the reader organised it or was invited, matched on their login
+ *   address and every connected account's; a row with no invite list (a
+ *   logged call or meeting) is theirs when they logged it or wrote it up.
+ * - Unwritten mirrors `isUnwritten`, recorder and grace hour included.
+ */
+const readerScopeProgram = (reader: MeetingReader, now: Date) =>
+  Effect.gen(function* () {
+    const team = yield* membersProgram()
+    const mine = team.addressesOf(new Set([reader.id]))
+    // The reader's login address is theirs even before a member row says so.
+    mine.add(reader.email.toLowerCase())
+    const recorders = team.addressesOf(team.recording)
+    const logged = yield* query(() =>
+      db
+        .select({ id: sql<string>`${activity.meta} ->> 'interactionId'` })
+        .from(activity)
+        .where(
+          and(
+            eq(activity.actorId, reader.id),
+            inArray(activity.verb, ['interaction.meeting', 'interaction.call']),
+          ),
+        ),
+    )
+    const loggedIds = logged.flatMap((l) => (UUID.test(l.id) ? [l.id] : []))
+    const graceEnd = new Date(now.getTime() - GRACE_MS)
+    const unwrittenSql = sql<boolean>`(${interaction.noteId} is null and not ${cancelledSql} and (not ${attendedBySql(recorders)} or ${endSql} <= ${graceEnd}))`
+    const noInvites = sql`coalesce(${interaction.meta} ->> 'kind', '') <> 'meeting'`
+    const mineSql = sql`(${attendedBySql(mine)} or (${noInvites} and (${
+      loggedIds.length === 0
+        ? sql`false`
+        : sql`${interaction.id} = any(array[${sql.join(
+            loggedIds.map((id) => sql`${id}`),
+            sql`, `,
+          )}]::uuid[])`
+    } or exists (select 1 from note wn where wn.entity_id = ${interaction.noteId} and wn.author_id = ${reader.id}))))`
+    return { team, mine, recorders, loggedIds, unwrittenSql, mineSql }
+  })
+
+/**
  * The Meetings page's read: one tab of the list for one params object.
  * - Upcoming: the meetings not yet ended that start before `until`,
  *   earliest first, cancelled ones kept and marked.
  * - Past: the meetings and calls that ended by `now`, cancelled ones left
  *   out; those owing a write-up first, then newest first, a page at a time.
- * - `whose: 'mine'` keeps the meetings the reader organised or was invited
- *   to, matched on their login address and every connected account's; a
- *   row with no invite list (a logged call) is theirs when they logged it
- *   or wrote it up. The counts follow the same choice.
+ * - `whose: 'mine'` keeps the reader's rows (`readerScopeProgram`); the
+ *   counts follow the same choice.
  * - A row owes a write-up by `isUnwritten`; the SQL that sorts and counts
  *   mirrors it, recorder and grace hour included.
  * - Every row is visible to every member; canRead decides only whether
@@ -416,35 +459,8 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
 ): Effect.fn.Return<MeetingsPage & { members: number }, MeetingReadFailed> {
   const now = new Date(params.now)
   const until = new Date(params.until)
-  const team = yield* membersProgram()
-  const mine = team.addressesOf(new Set([reader.id]))
-  // The reader's login address is theirs even before a member row says so.
-  mine.add(reader.email.toLowerCase())
-  const recorders = team.addressesOf(team.recording)
-  const logged = yield* query(() =>
-    db
-      .select({ id: sql<string>`${activity.meta} ->> 'interactionId'` })
-      .from(activity)
-      .where(
-        and(
-          eq(activity.actorId, reader.id),
-          inArray(activity.verb, ['interaction.meeting', 'interaction.call']),
-        ),
-      ),
-  )
-  const loggedIds = logged.flatMap((l) => (UUID.test(l.id) ? [l.id] : []))
-
-  const graceEnd = new Date(now.getTime() - GRACE_MS)
-  const unwrittenSql = sql<boolean>`(${interaction.noteId} is null and not ${cancelledSql} and (not ${attendedBySql(recorders)} or ${endSql} <= ${graceEnd}))`
-  const noInvites = sql`coalesce(${interaction.meta} ->> 'kind', '') <> 'meeting'`
-  const mineSql = sql`(${attendedBySql(mine)} or (${noInvites} and (${
-    loggedIds.length === 0
-      ? sql`false`
-      : sql`${interaction.id} = any(array[${sql.join(
-          loggedIds.map((id) => sql`${id}`),
-          sql`, `,
-        )}]::uuid[])`
-  } or exists (select 1 from note wn where wn.entity_id = ${interaction.noteId} and wn.author_id = ${reader.id}))))`
+  const { team, mine, recorders, loggedIds, unwrittenSql, mineSql } =
+    yield* readerScopeProgram(reader, now)
   const whoseSql = params.whose === 'mine' ? mineSql : sql`true`
   const upcomingSql = sql`(${interaction.kind} = 'meeting' and ${endSql} > ${now} and ${interaction.occurredAt} < ${until})`
   const pastSql = sql`(${interaction.kind} in ('meeting', 'call') and ${endSql} <= ${now} and not ${cancelledSql})`
@@ -686,11 +702,22 @@ export function firstExternal(
   return hit === undefined ? null : (hit.name ?? hit.email)
 }
 
+/**
+ * Today's Write-ups: the reader's own meetings from the last
+ * `UNWRITTEN_DAYS` that ended and owe a write-up, oldest first. Mine and
+ * owing are the Meetings page's rules (`readerScopeProgram`), so a recorded
+ * meeting waits out the grace hour here too.
+ */
 export const unwrittenMeetingsProgram = Effect.fn('unwrittenMeetingsProgram')(
   function* (
+    reader: MeetingReader,
     now: Date,
   ): Effect.fn.Return<Array<UnwrittenMeeting>, MeetingReadFailed> {
     const since = new Date(now.getTime() - UNWRITTEN_DAYS * 86_400_000)
+    const { team, unwrittenSql, mineSql } = yield* readerScopeProgram(
+      reader,
+      now,
+    )
     const rows = yield* query(() =>
       db
         .select({
@@ -703,27 +730,17 @@ export const unwrittenMeetingsProgram = Effect.fn('unwrittenMeetingsProgram')(
         .where(
           and(
             eq(interaction.kind, 'meeting'),
-            isNull(interaction.noteId),
             gte(interaction.occurredAt, since),
-            lt(interaction.occurredAt, now),
+            sql`${endSql} <= ${now}`,
+            unwrittenSql,
+            mineSql,
           ),
         )
-        .orderBy(asc(interaction.occurredAt)),
+        .orderBy(asc(interaction.occurredAt), asc(interaction.id)),
     )
-    const ended = rows.filter((r) => {
-      const meta = meetingMeta(r.meta)
-      return (
-        meta?.status !== 'cancelled' &&
-        Date.parse(endOf(r.occurredAt, meta)) <= now.getTime()
-      )
-    })
-    const [records, internal] = yield* Effect.all([
-      recordsOf(ended.map((r) => r.id)),
-      ended.length === 0
-        ? Effect.succeed(new Set<string>())
-        : internalAddresses(),
-    ])
-    return ended.map((r) => {
+    const records = yield* recordsOf(rows.map((r) => r.id))
+    const internal = new Set(team.byAddress.keys())
+    return rows.map((r) => {
       const linked = records.get(r.id) ?? []
       const named = linked.find((l) => l.kind !== 'person') ?? linked.at(0)
       const people = participantsOf(meetingMeta(r.meta), linked)

@@ -9,12 +9,10 @@ import { Button } from '#/components/ui/button'
 import { listDayMeetings } from '#/lib/server-fns'
 import type { SetupAudience, TodayMeeting } from '#/lib/server-fns'
 import {
-  dayLabel,
   dayTense,
   dayWindow,
   isUpcoming,
   nowIndex,
-  shiftDay,
   waitFor,
 } from '#/lib/meetings/day'
 import { adminNames } from '#/lib/setup/whats-set-up'
@@ -57,60 +55,6 @@ export function useDayMeetings(
   return state.meetings
 }
 
-/** A sans link or button in the head, ink. */
-const headLink =
-  'focus-ring shrink-0 font-sans text-label text-foreground hover:underline'
-
-/**
- * The head's right: `‹ Today ›`, and away from today `Back to today` before
- * `‹ Wed 14 Oct ›`; then `All meetings ›`.
- */
-function DayNav({
-  day,
-  today,
-  onDay,
-}: {
-  day: string
-  today: string
-  onDay: (day: string) => void
-}) {
-  const step =
-    'focus-ring px-1 text-graphite transition-colors duration-150 ease-out-quart hover:text-foreground'
-  return (
-    <>
-      {day === today ? null : (
-        <button type="button" className={headLink} onClick={() => onDay(today)}>
-          Back to today
-        </button>
-      )}
-      <span role="group" aria-label="Day" className="flex items-baseline">
-        <button
-          type="button"
-          aria-label="Previous day"
-          className={step}
-          onClick={() => onDay(shiftDay(day, -1))}
-        >
-          ‹
-        </button>
-        <span data-day className="px-1 text-foreground">
-          {dayLabel(day, today)}
-        </span>
-        <button
-          type="button"
-          aria-label="Next day"
-          className={step}
-          onClick={() => onDay(shiftDay(day, 1))}
-        >
-          ›
-        </button>
-      </span>
-      <Link to="/meetings" className={headLink}>
-        All meetings ›
-      </Link>
-    </>
-  )
-}
-
 /**
  * Between what has started and what is ahead: a pine square, `Now · 11:40`,
  * a hairline, and the wait to the next meeting when there is one.
@@ -141,18 +85,18 @@ function StateRow({ children }: { children: ReactNode }) {
 }
 
 /**
- * Today's Meetings: one day with `‹ Today ›`, a now-rule on today, Write
- * after a meeting and Prep before one, and `All meetings ›` to the Meetings
- * page. With no calendar connected it is the one line that says so.
+ * Today's Meetings: the day the strip's head picked, a now-rule on today,
+ * Write after a meeting and Prep before one. With no calendar connected it
+ * is the one line that says so.
  * - External meetings only: internal ones are never stored.
- * - The head's count is the day's count, and nothing else prints it.
+ * - The day's count, its nav and `All meetings ›` are the strip's head
+ *   (`DayStrip`), drawn whenever a calendar is, so this head is the title.
  */
 export function MeetingsSection({
   calendar,
   audience,
   today,
   day,
-  onDay,
   meetings,
   preparing,
   onOpen,
@@ -162,7 +106,6 @@ export function MeetingsSection({
   audience: SetupAudience
   today: string
   day: string
-  onDay: (day: string) => void
   meetings: DayMeetings
   /** The meeting whose Prep is running in its window; null when none. */
   preparing: string | null
@@ -219,11 +162,7 @@ export function MeetingsSection({
     now === null ? null : <NowRule key="now-rule" now={now} next={next} />
   return (
     <section aria-label="Meetings" className="flex flex-col">
-      <SectionHead
-        title="Meetings"
-        count={rows === null || rows.length === 0 ? undefined : rows.length}
-        action={<DayNav day={day} today={today} onDay={onDay} />}
-      />
+      <SectionHead title="Meetings" />
       <ol>
         {meetings === 'failed' ? (
           <StateRow>

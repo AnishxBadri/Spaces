@@ -19,8 +19,8 @@ import type * as TodayModule from '#/routes/_app/today'
 import type * as RouterModule from '@tanstack/react-router'
 
 /**
- * Today mounted on a happy-dom `Window`: `‹ ›` moves the Meetings day and
- * the day strip follows it — the day it reads, its blocks and its dither —
+ * Today mounted on a happy-dom `Window`: `‹ ›` in the strip's head moves the
+ * day, and the strip and the Meetings section follow it — the day it reads, its blocks and its dither —
  * and `Back to today` brings both home. The headline count reads the same
  * browser day.
  */
@@ -51,6 +51,7 @@ const listDayMeetings = vi.fn(
       artifacts: [],
       noteId: null,
       external: ['Priya Raman'],
+      callLink: null,
     }
     return Promise.resolve([meeting])
   },
@@ -214,9 +215,14 @@ const stripLabels = () =>
   [...document.querySelectorAll('[data-day-strip] [data-meeting]')].map(
     (el) => el.textContent,
   )
-const shownDay = () => meetings().querySelector('[data-day]')?.textContent
+const strip = () => {
+  const el = document.querySelector('[data-day-strip]')
+  if (el === null) throw new Error('no day strip')
+  return el
+}
+const shownDay = () => strip().querySelector('[data-day]')?.textContent
 const backToToday = () =>
-  [...meetings().querySelectorAll('button')].find(
+  [...strip().querySelectorAll('button')].find(
     (b) => b.textContent === 'Back to today',
   )
 
@@ -246,7 +252,7 @@ describe("Today's day nav", () => {
     expect(stripLabels()).toEqual([`Co ${day0}`])
     expect(meetings().textContent).toContain(`Catch-up ${day0}`)
 
-    await click(meetings().querySelector('[aria-label="Next day"]'))
+    await click(strip().querySelector('[aria-label="Next day"]'))
     expect(shownDay()).toBe(formatWeekday(day1, day0))
     expect(backToToday()).toBeDefined()
     expect(stripTense()).toBe('future')
@@ -260,7 +266,7 @@ describe("Today's day nav", () => {
     expect(stripTense()).toBe('today')
     expect(stripLabels()).toEqual([`Co ${day0}`])
 
-    await click(meetings().querySelector('[aria-label="Previous day"]'))
+    await click(strip().querySelector('[aria-label="Previous day"]'))
     expect(stripTense()).toBe('past')
     expect(stripLabels()).toEqual([`Co ${dayBack}`])
     expect(

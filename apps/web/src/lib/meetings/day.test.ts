@@ -6,6 +6,7 @@ import {
   isUpcoming,
   nowIndex,
   shiftDay,
+  stripHead,
   stripLabel,
   waitFor,
   whoLine,
@@ -52,6 +53,7 @@ describe('the row and the strip', () => {
     artifacts: [],
     noteId: null,
     external: [],
+    callLink: null,
     ...over,
   })
 
@@ -77,6 +79,40 @@ describe('the row and the strip', () => {
     expect(waitFor(2 * 3_600_000)).toBe('2h')
     expect(waitFor(140 * 60_000)).toBe('2h 20m')
     expect(waitFor(10_000)).toBe('1m')
+  })
+})
+
+describe('the strip’s head', () => {
+  const call = 'https://meet.google.com/abc-defg-hij'
+  // Today's meetings in start order: a room at 11:00, a call at 14:00.
+  const day = [
+    {
+      startsAt: '2026-10-13T11:00:00.000Z',
+      endsAt: '2026-10-13T11:30:00.000Z',
+      callLink: null,
+    },
+    {
+      startsAt: '2026-10-13T14:00:00.000Z',
+      endsAt: '2026-10-13T15:00:00.000Z',
+      callLink: call,
+    },
+  ]
+  const at = (iso: string) => stripHead(day, new Date(iso))
+
+  it('names the wait to the next meeting, and nothing once none is left', () => {
+    expect(at('2026-10-13T11:40:00.000Z').next).toBe('2h 20m')
+    expect(at('2026-10-13T13:52:00.000Z').next).toBe('8m')
+    expect(at('2026-10-13T14:00:00.000Z').next).toBeNull()
+    // Away from today, and before the browser clock is read, it says nothing.
+    expect(stripHead(day, null)).toEqual({ next: null, join: null })
+  })
+
+  it('offers Join from ten minutes before a call until it ends, never for a room', () => {
+    expect(at('2026-10-13T11:05:00.000Z').join).toBeNull()
+    expect(at('2026-10-13T13:49:59.999Z').join).toBeNull()
+    expect(at('2026-10-13T13:50:00.000Z').join).toBe(call)
+    expect(at('2026-10-13T14:59:59.999Z').join).toBe(call)
+    expect(at('2026-10-13T15:00:00.000Z').join).toBeNull()
   })
 })
 
