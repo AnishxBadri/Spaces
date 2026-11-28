@@ -20,7 +20,7 @@ import { ListPage, PageBody, PageHeader } from '#/components/page-header'
 import { useNow } from '#/components/today/day-strip'
 import { Button } from '#/components/ui/button'
 import { FolderBody } from '#/components/ui/tabs'
-import { defaultOpen, upcomingHorizon } from '#/lib/meetings/list'
+import { defaultOpen, nextToday, upcomingHorizon } from '#/lib/meetings/list'
 import type { MeetingsTab, Whose } from '#/lib/meetings/list'
 import { meetingsSearch } from '#/lib/route-search'
 import { listMeetings } from '#/lib/server-fns'
@@ -284,6 +284,7 @@ function MeetingsPage() {
                   key={open}
                   id={open}
                   frame="pane"
+                  next={tab === 'upcoming' && nextToday(rows, now) === open}
                   onClose={() => select(null)}
                   onChanged={reread}
                 />

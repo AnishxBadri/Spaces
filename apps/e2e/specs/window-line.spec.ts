@@ -4,13 +4,13 @@ import { ENV, fromEnv } from '../harness/shared.ts'
 import { expect, test } from '../harness/fixtures.ts'
 
 /**
- * A window's text stands on one 16px line (E3), measured in a real Chromium
- * at 1280px: the meeting window's head and its write-up start 16px inside
- * the sheet's 1px frame, and on its rail the Records label, the linked
- * record's row and the pin row start 16px inside the rail's rule; a head or
- * a row led by a mark stands the mark on the line. The company and the
- * meeting are written straight into the instance's own database, since this
- * suite imports nothing internal.
+ * A window's parts stand on their lines, measured in a real Chromium at
+ * 1280px: the meeting sheet's head leads its date leaf 20px inside the
+ * sheet's 1px frame, its body's cards stand 12px inside it on the bone, and
+ * on its rail the Records label, the linked record's row and the pin row
+ * start 16px inside the rail's rule; a row led by a mark stands the mark on
+ * the line. The company and the meeting are written straight into the
+ * instance's own database, since this suite imports nothing internal.
  */
 
 async function addLinkedMeeting(
@@ -58,7 +58,7 @@ async function leftOf(box: Locator): Promise<number> {
 
 test.use({ viewport: { width: 1280, height: 900 } })
 
-test('the meeting window stands its head and its rows on one line', async ({
+test('the meeting window stands its head, its cards and its rail rows on their lines', async ({
   adminPage,
   main,
 }) => {
@@ -75,12 +75,12 @@ test('the meeting window stands its head and its rows on one line', async ({
   const linked = rail.locator('section[aria-label="Records"]')
   await expect(linked).toContainText('Line Co')
 
-  const line = (await leftOf(win)) + 1 + 16
-  const head = win.locator('[data-slot="dialog-header"] > *').first()
-  // A filled row is a box: its edge stands on the line.
-  const writeUp = win.locator('section[aria-label="Write-up"] > *').first()
-  for (const [name, box] of Object.entries({ head, writeUp }))
-    expect(Math.round((await leftOf(box)) - line), name).toBe(0)
+  const frame = (await leftOf(win)) + 1
+  const leaf = win.locator('[data-slot="dialog-header"] > *').first()
+  expect(Math.round((await leftOf(leaf)) - frame - 20), 'leaf').toBe(0)
+  // A card is a box: its edge stands on the body's 12px gutter.
+  const card = win.locator('section[aria-label="No write-up"]')
+  expect(Math.round((await leftOf(card)) - frame - 12), 'card').toBe(0)
 
   const railLine = (await leftOf(rail)) + 1 + 16
   const label = linked.locator('[data-label-head] h2')

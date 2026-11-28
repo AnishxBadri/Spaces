@@ -3,14 +3,18 @@ import type { ReactNode } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { MeetingDetail, PrepEvent } from '#/lib/server-fns'
+import type {
+  MeetingDetail,
+  MeetingSheetData,
+  PrepEvent,
+} from '#/lib/server-fns'
 import { MeetingDialog } from './meeting-dialog'
 import { applyPrepEvent } from './meetings/meeting-sheet'
 
 /**
- * The meeting window: RSVPs shown and never editable with "Open in
- * Google" the only way to change one; artifacts by role; one close in the
- * foot and no `esc` or `↵` printed; Prep streamed on demand, never kept, and
+ * The meeting window: replies shown and never editable, Google Calendar the
+ * way to change one; artifacts by role; one close in the head and no `esc`
+ * or `↵` printed; Prep streamed on demand in the brief, never kept, and
  * "Save as note" sending the brief that was shown; a refusal said in place.
  * - A happy-dom window's DOM globals are installed by hand before React
  *   loads.
@@ -56,7 +60,7 @@ const ID = '00000000-0000-4000-8000-000000000001'
 const NOTE = '00000000-0000-4000-8000-0000000000ee'
 
 const fns = vi.hoisted(() => ({
-  getMeeting: vi.fn(),
+  getMeetingSheet: vi.fn(),
   prepMeeting: vi.fn(),
   savePrepAsNote: vi.fn(),
   acceptSuggestion: vi.fn(),
@@ -130,6 +134,31 @@ const DETAIL: MeetingDetail = {
   suggestions: [],
 }
 
+/** The sheet's read around a window's read. */
+const sheetOf = (
+  meeting: MeetingDetail,
+  over: Partial<Omit<MeetingSheetData, 'meeting'>> = {},
+): MeetingSheetData => ({
+  meeting,
+  kind: 'meeting',
+  firstMeeting: false,
+  people: meeting.participants.map((p, i) => ({
+    email: p.email,
+    name: p.name ?? p.email,
+    rsvp: p.rsvp,
+    host: i === 0,
+    new: i === 1,
+    you: false,
+    line: i === 0 ? 'Flent · CEO' : null,
+  })),
+  recent: { record: null, rows: [] },
+  ...over,
+})
+
+/** The sheet's read answers with `meeting`. */
+const reads = (meeting: MeetingDetail, over = {}) =>
+  fns.getMeetingSheet.mockResolvedValue(sheetOf(meeting, over))
+
 const streamOf = (events: ReadonlyArray<PrepEvent>) =>
   new ReadableStream<PrepEvent>({
     start(controller) {
@@ -144,7 +173,7 @@ let root: Root
 beforeEach(() => {
   for (const f of Object.values(fns)) f.mockReset()
   navigate.mockReset()
-  fns.getMeeting.mockResolvedValue(DETAIL)
+  reads(DETAIL)
   host = document.createElement('div')
   document.body.append(host)
   root = createRoot(host)
@@ -175,46 +204,48 @@ const buttons = (label: string) =>
   )
 
 describe('the meeting window', () => {
-  it('shows RSVPs and never offers to change them; Google Calendar is the way', async () => {
+  it('shows replies as a square and a word and never offers to change them; Google Calendar is the way', async () => {
     await open()
     const text = dialog()?.textContent ?? ''
     expect(text).toContain('Flent intro')
     expect(text).toContain('Ana Reyes')
     expect(text).toContain('ben@flent.io')
-    expect(
-      dialog()?.querySelector('[data-participant="ben@flent.io"] [data-rsvp]')
-        ?.textContent,
-    ).toBe('?Maybe')
+    const ben = dialog()?.querySelector('[data-participant="ben@flent.io"]')
+    const reply = ben?.querySelector('[data-reply]')
+    expect(reply?.getAttribute('data-square')).toBe('dithered')
+    expect(reply?.textContent).toBe('Maybe')
     expect(dialog()?.querySelector('select, input[type="radio"]')).toBeNull()
     const google = [...document.querySelectorAll('a')].find(
-      (a) => a.textContent === 'Google Calendar ›',
+      (a) => a.textContent === 'Google Calendar ↗',
     )
     expect(google?.getAttribute('href')).toContain('calendar.google.com')
+    // Two hours out, the call is not yet one to join from the head.
     expect(
-      dialog()?.querySelector(
-        '[data-slot="dialog-header"] [aria-label^="More for"]',
+      [...document.querySelectorAll('a')].some(
+        (a) => a.textContent === 'Join ↗',
       ),
-    ).toBeNull()
-    // The conference link is the head's one action.
+    ).toBe(false)
+  })
+
+  it('stands Join ↗ in the head within ten minutes of the start', async () => {
+    reads({ ...DETAIL, startsAt: fromNow(0.1), endsAt: fromNow(0.6) })
+    await open()
     const join = [...document.querySelectorAll('a')].find(
-      (a) => a.textContent === 'Join call ›',
+      (a) => a.textContent === 'Join ↗',
     )
     expect(join?.getAttribute('href')).toBe(
       'https://meet.google.com/abc-defg-hij',
     )
   })
 
-  it("prints no Participants head with nobody in the room, and carries Open in Google in the head's ···", async () => {
-    fns.getMeeting.mockResolvedValue({ ...DETAIL, participants: [] })
+  it("prints no People group with nobody in the room, and carries Join call and Google Calendar in the head's ···", async () => {
+    reads({ ...DETAIL, participants: [] })
     await open()
-    expect(dialog()?.querySelector('[aria-label="Participants"]')).toBeNull()
-    expect(dialog()?.textContent).not.toContain('Participants')
+    expect(dialog()?.querySelector('[aria-label="People"]')).toBeNull()
     const links = () =>
-      [...document.querySelectorAll('a')].filter((a) =>
-        a.textContent.startsWith('Open in Google'),
-      )
-    // A rare verb: at rest the head holds the `···`, not a link.
-    expect(links()).toHaveLength(0)
+      [...document.querySelectorAll('a')].map((a) => a.textContent)
+    // Rare verbs: at rest the head holds the `···`, not links.
+    expect(links()).not.toContain('Open in Google Calendar ↗')
     const trigger = dialog()?.querySelector(
       '[data-slot="dialog-header"] [aria-label^="More for"]',
     )
@@ -231,55 +262,86 @@ describe('the meeting window', () => {
       i++
     )
       await new Promise((resolve) => setTimeout(resolve, 10))
-    // One way to Google: the group's link went with the group.
-    expect(links()).toHaveLength(1)
-    expect(links()[0].getAttribute('href')).toContain('calendar.google.com')
+    expect(links()).toContain('Open in Google Calendar ↗')
+    expect(links()).toContain('Join call ↗')
   })
 
-  it('has one close, Done, in the foot, and prints no esc or ↵', async () => {
+  it('has one close, in the head after Open as a page, and prints no esc or ↵', async () => {
     await open()
     expect(buttons('Cancel')).toHaveLength(0)
-    expect(buttons('Done')).toHaveLength(1)
-    expect(
-      buttons('Done')[0].closest('[data-slot="dialog-footer"]'),
-    ).not.toBeNull()
+    expect(buttons('Done')).toHaveLength(0)
+    expect(document.querySelector('[data-slot="dialog-footer"]')).toBeNull()
+    const head = dialog()?.querySelector('[data-slot="dialog-header"]')
+    expect(head?.querySelector('[data-window-close]')).not.toBeNull()
+    // The router's Link is a bare anchor here: Open as a page is the one to /meetings.
+    expect(head?.querySelector('a[href="/meetings"]')).not.toBeNull()
     const text = dialog()?.textContent ?? ''
     expect(text).not.toMatch(/\besc\b/i)
     expect(text).not.toContain('↵')
   })
 
-  it('leads its head on the 20px calendar glyph', async () => {
+  it('leads its head on the large date leaf, the when-line under the title', async () => {
     await open()
-    const mark = dialog()?.querySelector(
-      '[data-slot="dialog-header"] [data-window-mark]',
+    const head = dialog()?.querySelector('[data-slot="dialog-header"]')
+    expect(head?.firstElementChild?.getAttribute('data-date-leaf')).toBe(
+      'large',
     )
-    expect(mark?.getAttribute('class')).toContain('size-5')
+    expect(head?.querySelector('[data-when-line]')?.textContent).toMatch(
+      / · \d\d:\d\d–\d\d:\d\d · \d+m/,
+    )
   })
 
-  it('reads a participant as a name and a mark on the rail, the answer and address a tooltip', async () => {
+  it('stamps a first meeting, and a cancelled one in place of it with the title struck', async () => {
+    reads(DETAIL, { firstMeeting: true })
+    await open()
+    expect(dialog()?.querySelector('[data-stamp]')?.textContent).toBe(
+      'First meeting',
+    )
+    await open(null)
+    reads({ ...DETAIL, cancelled: true }, { firstMeeting: true })
+    await open()
+    const stamp = dialog()?.querySelector('[data-stamp]')
+    expect(stamp?.textContent).toBe('Cancelled')
+    expect(stamp?.getAttribute('class')).toContain('stamp-destructive')
+    expect(
+      dialog()
+        ?.querySelector('[data-slot="dialog-title"]')
+        ?.getAttribute('class'),
+    ).toContain('line-through')
+  })
+
+  it('reads a person as a name with HOST and NEW, a line under it, and the reply at its end', async () => {
     await open()
     const rail = dialog()?.querySelector('[data-meeting-rail]')
     const ana = rail?.querySelector('[data-participant="ana@flent.io"]')
-    const mark = ana?.querySelector('[data-rsvp]')
-    expect(mark?.querySelector('[aria-hidden]')?.textContent).toBe('✓')
-    // The answer in words is for a screen reader; the address is never printed.
-    expect(ana?.textContent).toBe('Ana Reyes✓Accepted')
-    expect(rail?.textContent).not.toContain('ana@flent.io')
+    expect(ana?.querySelector('[data-name-mark="host"]')).not.toBeNull()
+    expect(ana?.textContent).toContain('Flent · CEO')
+    expect(ana?.querySelector('[data-reply]')?.textContent).toBe('Yes')
+    const ben = rail?.querySelector('[data-participant="ben@flent.io"]')
+    expect(ben?.querySelector('[data-name-mark="new"]')).not.toBeNull()
+    // The address is a tooltip, never printed for a named person.
+    expect(ana?.textContent).not.toContain('ana@flent.io')
   })
 
-  it('lays the write-up left and a rail of Participants and Records right, with no When block', async () => {
+  it('shows no replies once the meeting is over', async () => {
+    reads({ ...DETAIL, startsAt: fromNow(-2), endsAt: fromNow(-1.5) })
     await open()
-    const main = dialog()?.querySelector('[data-meeting-main]')
+    expect(dialog()?.querySelector('[data-reply]')).toBeNull()
+  })
+
+  it('lays cards left on bone and a rail of Where, People and Records right', async () => {
+    await open()
     const rail = dialog()?.querySelector('[data-meeting-rail]')
-    expect(main?.querySelector('[aria-label="Write-up"]')).not.toBeNull()
     expect(
-      [...(rail?.querySelectorAll('section') ?? [])].map((g) =>
+      [...(rail?.querySelectorAll(':scope > section') ?? [])].map((g) =>
         g.getAttribute('aria-label'),
       ),
-    ).toEqual(['Participants', 'Records'])
-    expect(rail?.getAttribute('class')).toContain('@4xl:w-68')
+    ).toEqual(['Where', 'People', 'Records'])
+    expect(rail?.getAttribute('class')).toContain('@4xl:w-74')
     expect(rail?.getAttribute('class')).toContain('bg-bone')
-    expect(dialog()?.textContent).not.toContain('When')
+    const where = rail?.querySelector('[data-where]')
+    expect(where?.textContent).toBe('Google Meetabc-defg-hij')
+    expect(rail?.textContent).toContain('Copy link')
     expect(rail?.textContent).toContain('Pin a record…')
   })
 
@@ -292,7 +354,7 @@ describe('the meeting window', () => {
   })
 
   it('opens the write-up in the note window when it sits over a record', async () => {
-    fns.getMeeting.mockResolvedValue({
+    reads({
       ...DETAIL,
       note: {
         id: NOTE,
@@ -316,6 +378,7 @@ describe('the meeting window', () => {
     await settle()
     const title = dialog()?.querySelector(`[data-note-link="${NOTE}"]`)
     if (!(title instanceof HTMLElement)) throw new Error('no note link')
+    expect(title.textContent).toBe('Open note ›')
     act(() => title.click())
     expect(opened).toEqual([NOTE])
     expect(navigate).not.toHaveBeenCalled()
@@ -343,7 +406,7 @@ describe('the meeting window', () => {
   })
 
   it("reads a recorder's write-up inline with Open in Granola, and its second note as a bordered row, each marked Via Granola", async () => {
-    fns.getMeeting.mockResolvedValue({
+    reads({
       ...DETAIL,
       note: {
         id: NOTE,
@@ -365,7 +428,7 @@ describe('the meeting window', () => {
       ],
     } satisfies MeetingDetail)
     await open()
-    expect(buttons('Write up')).toHaveLength(0)
+    expect(buttons('Write it up')).toHaveLength(0)
     const granola = [...document.querySelectorAll('a')].filter(
       (a) => a.textContent === 'Open in Granola ›',
     )
@@ -377,28 +440,33 @@ describe('the meeting window', () => {
       true,
     )
     const writeUp = dialog()?.querySelector('[aria-label="Write-up"]')
-    expect(writeUp?.textContent).toContain('Flent intro')
     expect(writeUp?.querySelector('[data-write-up-body]')?.textContent).toBe(
       'Raising a $3M seed.\n\nNext: data room.',
     )
     expect(writeUp?.textContent).toContain('Granola notes · Priya')
-    expect(writeUp?.querySelector('[data-write-up-line]')?.textContent).toMatch(
-      /^Via Granola · Anish · /,
-    )
+    expect(
+      writeUp?.querySelector('[data-card-head] [title]')?.getAttribute('title'),
+    ).toBe('Via Granola · Anish')
     expect(writeUp?.textContent).toContain('Via Granola · Priya')
   })
 
-  it('is one Write-up + row with nothing written', async () => {
-    fns.getMeeting.mockResolvedValue({ ...DETAIL, artifacts: [] })
+  it('is one No write-up card with Write it up once it is over and nothing is written', async () => {
+    reads({
+      ...DETAIL,
+      startsAt: fromNow(-2),
+      endsAt: fromNow(-1.5),
+      artifacts: [],
+    })
     await open()
-    const writeUp = dialog()?.querySelector('[aria-label="Write-up"]')
-    expect(writeUp?.querySelector('[data-empty-row]')?.textContent).toBe(
-      'Write-up+',
-    )
+    const card = dialog()?.querySelector('[aria-label="No write-up"]')
+    expect(card?.querySelector('[data-dither-noun="notes"]')).not.toBeNull()
+    expect(buttons('Write it up')).toHaveLength(1)
+    expect(dialog()?.querySelector('[aria-label="Write-up"]')).toBeNull()
+    expect(dialog()?.querySelector('[aria-label="Brief"]')).toBeNull()
   })
 
   it('lists task suggestions as action items, with Add task and Skip', async () => {
-    fns.getMeeting.mockResolvedValue({
+    reads({
       ...DETAIL,
       suggestions: [
         { id: 's1', kind: 'task', summary: 'Send the deck', due: null },
@@ -407,7 +475,9 @@ describe('the meeting window', () => {
     fns.acceptSuggestion.mockResolvedValue({ ok: true })
     await open()
     const items = dialog()?.querySelector('[aria-label="Action items"]')
-    expect(items?.textContent).toContain('1 in Review')
+    expect(items?.querySelector('[data-card-head]')?.textContent).toBe(
+      'Action items1',
+    )
     expect(items?.textContent).toContain('Send the deck')
     await act(async () => buttons('Add task')[0].click())
     await settle()
@@ -415,7 +485,7 @@ describe('the meeting window', () => {
   })
 
   it('offers no Prep once the meeting has started, not even from the row', async () => {
-    fns.getMeeting.mockResolvedValue({
+    reads({
       ...DETAIL,
       startsAt: fromNow(-1),
       endsAt: fromNow(-0.5),
@@ -428,8 +498,8 @@ describe('the meeting window', () => {
     expect(fns.prepMeeting).not.toHaveBeenCalled()
     // Over, there is no call to join either.
     expect(
-      [...document.querySelectorAll('a')].some(
-        (a) => a.textContent === 'Join call ›',
+      [...document.querySelectorAll('a')].some((a) =>
+        a.textContent.startsWith('Join'),
       ),
     ).toBe(false)
   })
@@ -455,7 +525,7 @@ describe('the meeting window', () => {
     expect(prep?.textContent).toContain('Flent is raising (Call notes).')
 
     expect(
-      document.querySelector('[data-slot="dialog-footer"]')?.textContent,
+      dialog()?.querySelector('[aria-label="Brief"]')?.textContent,
     ).toContain('Not kept unless saved')
     fns.savePrepAsNote.mockResolvedValue({ noteId: NOTE })
     await act(async () => buttons('Save as note')[0].click())

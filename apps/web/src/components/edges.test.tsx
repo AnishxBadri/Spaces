@@ -853,6 +853,8 @@ describe('E7 · one icon list, one brand mark', () => {
       'components/files/file-row.tsx',
       'components/files/files-drop.tsx',
       'components/ledger-section.tsx',
+      'components/meetings/date-leaf.tsx',
+      'components/meetings/reply-mark.tsx',
       'components/note-kind-icon.tsx',
       'components/provider-mark.tsx',
       'components/record/record-parts.tsx',

@@ -5,7 +5,8 @@ import { Dialog, DialogContent } from '#/components/ui/dialog'
  * The meeting window: the meeting's sheet (`MeetingSheet`) in a dialog.
  * - Opens from `?modal=meeting&id=` over a record or Today, and from a
  *   Meetings row below the page's two-pane width.
- * - Done is the one close; Prep, then Save as note, is the one commit.
+ * - The head's close is the one close; Prep, then Save as note, is the
+ *   one commit.
  */
 export function MeetingDialog({
   id,

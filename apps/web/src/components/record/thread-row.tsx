@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { ReactNode } from 'react'
 import { Link, useSearch } from '@tanstack/react-router'
 import { Attachment, Email, Meeting, Phone } from '#/components/icons'
+import { NoteIcon } from '#/components/note-kind-icon'
 import { Day } from '#/components/ledger-section'
 import { openModalId } from '#/lib/modal-search'
 import type { RecordTab } from '#/lib/records/record-tabs'
@@ -57,27 +58,37 @@ export const KIND_GLYPHS: Record<string, typeof Email> = {
   email: Email,
   meeting: Meeting,
   call: Phone,
+  note: NoteIcon,
 }
 
 /**
  * A thread's subject: an email opens its window (`?modal=email&id=`), a
  * written-up row its note's (`?modal=note&id=`), anything else is plain
- * text.
+ * text. With `onOpen` the subject is a button that calls it instead, for a
+ * page that opens the row's window itself.
  */
 export function ThreadSubject({
   item,
   tab,
+  onOpen,
   className,
 }: {
   item: Pick<ThreadItem, 'id' | 'kind' | 'subject' | 'noteId'>
   /** The tab the window opens over; the link's own when absent. */
   tab?: RecordTab | undefined
+  onOpen?: (() => void) | undefined
   className?: string | undefined
 }) {
   const link = cn(
     'focus-ring min-w-0 shrink truncate text-ui text-foreground hover:underline',
     className,
   )
+  if (onOpen !== undefined)
+    return (
+      <button type="button" onClick={onOpen} className={cn('text-left', link)}>
+        {item.subject || 'Untitled'}
+      </button>
+    )
   if (item.kind === 'email')
     return (
       <Link
@@ -177,6 +188,8 @@ export function ThreadRow({
   menu = null,
   summaryLines = 1,
   pane,
+  onOpen,
+  people: peopleLane = true,
 }: {
   item: ThreadItem
   /** The tab an email's window opens over. */
@@ -192,6 +205,10 @@ export function ThreadRow({
   summaryLines?: 1 | 2
   /** Drawn narrow, in a list pane, selecting rather than opening a window. */
   pane?: ThreadPaneRow | undefined
+  /** The subject opens the row's window through this rather than the URL. */
+  onOpen?: (() => void) | undefined
+  /** The people lane; off where every row is on the same records. */
+  people?: boolean | undefined
 }) {
   const people = threadPeople(item)
   // Body-derived, so private with the body.
@@ -298,7 +315,7 @@ export function ThreadRow({
       <div className="flex h-5 min-w-0 items-center gap-3">
         <KindMark kind={item.kind} />
         <span className="flex min-w-0 flex-1 items-baseline gap-2">
-          <ThreadSubject item={item} tab={tab} />
+          <ThreadSubject item={item} tab={tab} onOpen={onOpen} />
           {messages > 1 ? (
             <span
               data-messages
@@ -308,12 +325,14 @@ export function ThreadRow({
             </span>
           ) : null}
         </span>
-        <span
-          data-people
-          className="w-60 shrink-0 truncate text-label text-graphite"
-        >
-          {people}
-        </span>
+        {peopleLane ? (
+          <span
+            data-people
+            className="w-60 shrink-0 truncate text-label text-graphite"
+          >
+            {people}
+          </span>
+        ) : null}
         <Day at={item.at} />
         {menu === null ? null : (
           <span className="flex w-6 shrink-0 justify-end">{menu}</span>

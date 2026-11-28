@@ -729,6 +729,13 @@
   color: var(--foreground);
 }
 
+/** A stamp for a thing that is off (`CANCELLED`): crimson. Used with `stamp`. */
+@utility stamp-destructive {
+  border-color: var(--destructive);
+  background: var(--destructive);
+  color: var(--paper);
+}
+
 /**
  * The open tab of a folder: paper with a 1px ink edge on three sides, open
  * at the foot so it joins the body under it with no line between.

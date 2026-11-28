@@ -8,12 +8,15 @@ import { useClock } from '#/components/clock'
  * title; `RecordHeader` takes exactly one.
  * - `sensitive` appends a lock and `SENSITIVE`.
  * - `archived` is the outline: 1px ink on paper, `ARCHIVED` and the day.
+ * - `tone: 'destructive'` prints it in crimson, for a thing that is off
+ *   (`CANCELLED`).
  */
 export type StampProps =
   | {
       /** The kind of thing — `Company`, an object's singular, `Space`. */
       kind: string
       state?: 'sensitive' | undefined
+      tone?: 'ink' | 'destructive' | undefined
     }
   | {
       kind: string
@@ -44,7 +47,9 @@ export function Stamp(props: StampProps) {
   return (
     <span
       data-stamp={props.state === 'sensitive' ? 'sensitive' : 'live'}
-      className="stamp"
+      className={
+        props.tone === 'destructive' ? 'stamp stamp-destructive' : 'stamp'
+      }
     >
       {props.kind}
       {props.state === 'sensitive' ? (
