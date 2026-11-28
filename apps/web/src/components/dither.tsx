@@ -1,5 +1,3 @@
-import { cn } from '#/lib/utils'
-
 /**
  * Texture — the Dither Rule. One bit, pine or ink, never under text, and
  * animated only for a working state (`Twinkle`). Allowed in empty states,
@@ -50,77 +48,4 @@ export function ditherShadowUrl(ink: string): string {
     `<rect x='${o}' y='${o}' width='100%' height='100%' fill='url(#d)'/>` +
     `<rect x='-${o}' y='-${o}' width='100%' height='100%'/></svg>`
   return `url("data:image/svg+xml,${svg.replace(/[<>#%]/g, (c) => encodeURIComponent(c))}")`
-}
-
-/** An 8px tile pattern at one of sixteen densities. */
-function DitherPattern({
-  id,
-  level,
-  fill,
-}: {
-  id: string
-  level: number
-  fill: string
-}) {
-  return (
-    <pattern
-      id={id}
-      width="8"
-      height="8"
-      patternUnits="userSpaceOnUse"
-      shapeRendering="crispEdges"
-    >
-      {cellsFor(level).map(([x, y]) => (
-        <rect key={`${x}-${y}`} x={x} y={y} width="2" height="2" fill={fill} />
-      ))}
-    </pattern>
-  )
-}
-
-/**
- * Loading — a density ramp, not a shimmer: dense on the left, sparse on the
- * right, ink. Static by design (only a working state moves, and that is
- * the `Twinkle`); the ramp itself says "filling in".
- */
-export function DensityRamp({
-  width = 240,
-  height = 8,
-  className,
-}: {
-  width?: number
-  height?: number
-  className?: string
-}) {
-  const bands = [16, 12, 8, 5, 3, 1]
-  const bandW = width / bands.length
-  return (
-    <svg
-      aria-hidden
-      width={width}
-      height={height}
-      viewBox={`0 0 ${width} ${height}`}
-      className={cn('shrink-0', className)}
-    >
-      <defs>
-        {bands.map((level, i) => (
-          <DitherPattern
-            key={level}
-            id={`density-ramp-${i}`}
-            level={level}
-            fill="var(--hairline)"
-          />
-        ))}
-      </defs>
-      {bands.map((_, i) => (
-        <rect
-          key={i}
-          x={Math.round(i * bandW)}
-          y="0"
-          width={Math.ceil(bandW)}
-          height={height}
-          fill={`url(#density-ramp-${i})`}
-        />
-      ))}
-    </svg>
-  )
 }

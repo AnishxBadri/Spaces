@@ -1,6 +1,6 @@
 import type { AskRef } from '@spaces/db/schema/ask'
 import type { MeetingRsvp } from '@spaces/db/schema/interactions'
-import { formatTime, formatWeekday } from '@spaces/core/format'
+import { formatWeekday } from '@spaces/core/format'
 
 /**
  * The meeting surfaces' pure half, client-safe: the row shapes the server
@@ -157,27 +157,6 @@ export function stripHead(
     next: next === undefined ? null : waitFor(Date.parse(next.startsAt) - t),
     join: join?.callLink ?? null,
   }
-}
-
-/** A row's time lane: `09:30–10:00`. */
-export function timeSpan(startsAt: string, endsAt: string): string {
-  return `${formatTime(startsAt)}–${formatTime(endsAt)}`
-}
-
-/** The RSVP mark printed after a name. Shown, never edited. */
-export const RSVP_MARK: Record<MeetingRsvp, string> = {
-  accepted: '✓',
-  declined: '✕',
-  tentative: '?',
-  needs_action: '·',
-}
-
-/** The words a mark stands for, for its title. */
-export const RSVP_WORD: Record<MeetingRsvp, string> = {
-  accepted: 'accepted',
-  declined: 'declined',
-  tentative: 'maybe',
-  needs_action: 'no answer',
 }
 
 /** A participant's printed name: the record's, else the address. */
