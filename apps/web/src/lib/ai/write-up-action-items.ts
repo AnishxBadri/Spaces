@@ -1,7 +1,7 @@
 import { Effect } from 'effect'
 import { and, eq } from 'drizzle-orm'
 import { db } from '@spaces/db'
-import { interaction, note } from '@spaces/db/schema'
+import { interaction, jobRun, note } from '@spaces/db/schema'
 import { QUEUES } from '@spaces/core/queue/names'
 import { enqueue } from '#/lib/queue'
 import {
@@ -36,15 +36,39 @@ const sharedWriteUp = (noteId: string) =>
   })
 
 /**
+ * Whether the write-up was read already: a finished run of the job about
+ * this note. A read that found no action items leaves no suggestion behind,
+ * so the ledger is what remembers it and a later close costs no model call.
+ */
+const readBefore = (noteId: string) =>
+  Effect.tryPromise({
+    try: () =>
+      db
+        .select({ id: jobRun.id })
+        .from(jobRun)
+        .where(
+          and(
+            eq(jobRun.queue, QUEUES.recordedNoteTasks),
+            eq(jobRun.entityId, noteId),
+            eq(jobRun.status, 'succeeded'),
+          ),
+        )
+        .limit(1)
+        .then((rows) => rows.length > 0),
+    catch: (cause) => new RecordedNoteTasksQueryFailed({ cause }),
+  })
+
+/**
  * A note window closed: when the note is a meeting's write-up, its action
- * items are read in the background. The job reads a note once; a later
- * close finds it already read and proposes nothing. Answers whether a read
- * was queued.
+ * items are read in the background, once. A close after that read queues
+ * nothing; `Find action items` is how it is read again. Answers whether a
+ * read was queued.
  */
 export const writeUpClosedProgram = Effect.fn('writeUpClosedProgram')(
   function* (noteId: string) {
     const interactionId = yield* sharedWriteUp(noteId)
     if (interactionId === null) return { queued: false }
+    if (yield* readBefore(noteId)) return { queued: false }
     // `enqueue` never fails: a job that could not be sent answers null.
     const sent = yield* Effect.promise(() =>
       enqueue(

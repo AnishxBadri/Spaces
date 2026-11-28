@@ -74,5 +74,13 @@ export const recordedNoteTasks: JobDef<RecordedNoteTasksData> = {
   name: QUEUES.recordedNoteTasks,
   schema: recordedNoteTasksData,
   retry: { limit: 2, delaySeconds: 60, backoff: true },
+  // The note is the run's entity: a finished run is how a later close knows
+  // the write-up was read, whatever the read found.
+  refs: (data) => ({
+    entityId: data.noteId,
+    ...(data.integrationId === undefined
+      ? {}
+      : { integrationId: data.integrationId }),
+  }),
   run: (data) => runRecordedNoteTasks(data),
 }
