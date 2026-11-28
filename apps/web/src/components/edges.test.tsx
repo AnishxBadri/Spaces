@@ -177,8 +177,12 @@ describe('E1 · the 24px edge', () => {
       expect(at, `${file} ${marker}`).toBeGreaterThan(-1)
       expect(read(file).slice(at, at + 240), marker).toMatch(/\bcard\b/)
     }
+    // The strip is a card of a head over the hours, each taking the inset.
     expect(read('components/today/day-strip.tsx')).toMatch(
-      /h-16 shrink-0 card px-\(--inset\)/,
+      /flex shrink-0 flex-col card/,
+    )
+    expect(read('components/today/day-strip.tsx')).toMatch(
+      /h-16 px-\(--inset\)/,
     )
     expect(read('components/today/rail.tsx')).toMatch(
       /h-7 shrink-0 items-center border-b border-rule px-\(--inset\) label-caps/,
