@@ -2,6 +2,7 @@ import { Option, Schema } from 'effect'
 import { uuidString } from '@spaces/core/attributes/registry'
 import { PROVIDER_TABS } from '#/lib/connections/provider-view'
 import { EMAIL_TABS, THREAD_FILTERS } from '#/lib/email/threads'
+import { MONTH } from '#/lib/meetings/filter'
 import { MEETINGS_TABS, WHOSE } from '#/lib/meetings/list'
 import { composeSearchShape, modalSearchShape } from '#/lib/modal-search'
 import { caught, fallback, searchValidator } from '#/lib/search-validator'
@@ -58,12 +59,23 @@ export const importBatchSearch = searchValidator(
  * `/meetings`: the tab, whose meetings, and the open meeting by `id` (a
  * copied `modal=meeting&id=` link opens the same one); a file's window over
  * the page takes `modal=file&id=`.
+ * - The search is `q`; the filters are `with` (a record's id), `member` (a
+ *   member's id), `kind` and `wu` (comma lists), and `cancelled`; `month`
+ *   is Past's `Jump to`. Each is absent at its default and read by
+ *   `meetingFiltersOf`, which drops what it does not know.
  */
 export const meetingsSearch = searchValidator(
   Schema.Struct({
     ...modalSearchShape,
     tab: caught(Schema.Literals(MEETINGS_TABS)),
     whose: caught(Schema.Literals(WHOSE)),
+    q: caught(Schema.String.check(Schema.isMaxLength(200))),
+    with: caught(Schema.String.check(Schema.isMaxLength(100))),
+    member: caught(Schema.String.check(Schema.isMaxLength(100))),
+    kind: caught(Schema.String.check(Schema.isMaxLength(100))),
+    wu: caught(Schema.String.check(Schema.isMaxLength(100))),
+    cancelled: caught(Schema.Boolean),
+    month: caught(Schema.String.check(Schema.isPattern(MONTH))),
   }),
 )
 

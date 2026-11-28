@@ -3,7 +3,7 @@ import type { ReactNode } from 'react'
 import { Meeting, Phone, Time, Video } from '#/components/icons'
 import { PluginMark } from '#/components/integrations/integration-ledger'
 import { Button } from '#/components/ui/button'
-import { pastDay, peopleLine, rowClock } from '#/lib/meetings/list'
+import { laterDay, pastDay, peopleLine, rowClock } from '#/lib/meetings/list'
 import type { ListedMeeting } from '#/lib/meetings/list'
 import { cn } from '#/lib/utils'
 
@@ -180,6 +180,7 @@ export function AgendaRow({
  * A past row: the kind (a calendar, or a phone for a call), the title and
  * the day; then the people and the record; then, when the reader may read
  * the write-up, its summary, led by the recorder's mark when one wrote it.
+ * A cancelled one, listed only when the filter shows them, is struck.
  */
 export function PastRow({
   meeting: m,
@@ -195,7 +196,11 @@ export function PastRow({
   const Kind = m.kind === 'call' ? Phone : Meeting
   const who = peopleLine(m.people) !== '' || m.record !== null
   return (
-    <li data-past-row className="border-b border-rule">
+    <li
+      data-past-row
+      {...(m.cancelled ? { 'data-cancelled': '' } : {})}
+      className="border-b border-rule"
+    >
       <RowButton id={m.id} open={open} onOpen={onOpen}>
         <span className="flex h-5 min-w-0 items-center gap-3">
           <Kind
@@ -204,8 +209,10 @@ export function PastRow({
           />
           <span
             className={cn(
-              'min-w-0 flex-1 truncate text-ui text-foreground',
-              open && 'font-medium',
+              'min-w-0 flex-1 truncate text-ui',
+              // Shown only under `Cancelled · Show`, struck as on the agenda.
+              m.cancelled ? 'text-graphite line-through' : 'text-foreground',
+              open && !m.cancelled && 'font-medium',
             )}
           >
             {m.title ?? (m.kind === 'call' ? 'Call' : 'Meeting')}
@@ -232,6 +239,64 @@ export function PastRow({
             >
               {m.summary}
             </span>
+          </span>
+        )}
+      </RowButton>
+    </li>
+  )
+}
+
+/**
+ * A row of Upcoming's `Later` fold: one 40px line with no leaf, the day in
+ * mono (`Tue 3`), the time, the title and the record at the end. A
+ * cancelled one is struck, as on the agenda.
+ */
+export function LaterRow({
+  meeting: m,
+  open,
+  onOpen,
+}: {
+  meeting: ListedMeeting
+  open: boolean
+  onOpen: () => void
+}) {
+  return (
+    <li
+      data-later-row
+      {...(m.cancelled ? { 'data-cancelled': '' } : {})}
+      className="border-b border-rule"
+    >
+      <RowButton
+        id={m.id}
+        open={open}
+        onOpen={onOpen}
+        className="h-ledger-row flex-row items-baseline gap-3 pt-2.5 pb-0"
+      >
+        <span className="w-11 shrink-0 mono text-micro text-graphite">
+          {laterDay(m.startsAt)}
+        </span>
+        <span
+          className={cn(
+            'w-10 shrink-0 mono text-label',
+            m.cancelled
+              ? 'text-graphite line-through'
+              : 'font-medium text-foreground',
+          )}
+        >
+          {formatTime(m.startsAt)}
+        </span>
+        <span
+          className={cn(
+            'min-w-0 flex-1 truncate text-ui',
+            m.cancelled ? 'text-graphite line-through' : 'text-foreground',
+            open && !m.cancelled && 'font-medium',
+          )}
+        >
+          {m.title ?? 'Meeting'}
+        </span>
+        {m.record === null ? null : (
+          <span className="max-w-40 shrink-0 truncate text-label text-graphite">
+            {m.record.name}
           </span>
         )}
       </RowButton>

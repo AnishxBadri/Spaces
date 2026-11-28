@@ -9,7 +9,8 @@ import { cn } from '#/lib/utils'
  * (`Filter 1`), and the panel it opens, one row per facet. A facet is a
  * label, an optional picker the list draws (a record, a member) and chips
  * with counts; a chip is pressed to turn it on and again to turn it off.
- * The panel's foot holds `Clear` and what the filters leave (`96 of 214`).
+ * The panel's foot holds `Clear` and what the filters leave (`96 of 214`),
+ * or the list's own words for it with nothing on (`19 meetings`).
  * Knows nothing of what is listed: the rows, the counts and what pressing
  * does are the list's.
  */
@@ -43,6 +44,7 @@ export function FilterControl({
   onClear,
   active,
   count,
+  words,
   open,
   onOpenChange,
 }: {
@@ -55,6 +57,8 @@ export function FilterControl({
   active: number
   /** The foot's `96 of 214`; null while it is read. */
   count: { readonly shown: number; readonly total: number } | null
+  /** Mono words in the count's place: `19 meetings`. */
+  words?: string | undefined
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {
@@ -85,6 +89,7 @@ export function FilterControl({
           onToggle={onToggle}
           onClear={onClear}
           count={count}
+          words={words}
         />
       </PopoverContent>
     </Popover>
@@ -98,12 +103,14 @@ export function FilterPanel({
   onToggle,
   onClear,
   count,
+  words,
 }: {
   facets: ReadonlyArray<FilterFacetRow>
   on: Readonly<Record<string, ReadonlyArray<string>>>
   onToggle: (facet: string, chip: string) => void
   onClear: () => void
   count: { readonly shown: number; readonly total: number } | null
+  words?: string | undefined
 }) {
   return (
     <div data-filter-panel className="flex flex-col">
@@ -141,7 +148,14 @@ export function FilterPanel({
         >
           Clear
         </button>
-        {count === null ? null : (
+        {words !== undefined ? (
+          <span
+            data-filter-count
+            className="tabular mono text-micro text-graphite"
+          >
+            {words}
+          </span>
+        ) : count === null ? null : (
           <span
             data-filter-count
             className="tabular mono text-micro text-graphite"

@@ -442,9 +442,13 @@ describe('Meetings', () => {
       audience: { isAdmin: true, admins: [] },
       team: true,
       rows: [],
+      later: [],
       nextCursor: null,
       // What the server counted, over more meetings than it sent.
       counts: { upcoming: 4, past: 12, unwritten: 3 },
+      shown: 4,
+      bands: null,
+      named: { with: null, member: null },
     })
     await mount('meetings', '/meetings', () => null)
     await until('the counts', () =>

@@ -11,8 +11,15 @@ import {
 import { toast } from 'sonner'
 import { useClock } from '#/components/clock'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
+import { FilterChips } from '#/components/list/filter-chips'
 import { MeetingDialog } from '#/components/meeting-dialog'
 import { MeetingSheet } from '#/components/meetings/meeting-sheet'
+import {
+  JumpTo,
+  MeetingsFilter,
+  MeetingsSearch,
+  meetingsAppliedFilters,
+} from '#/components/meetings/meetings-filters'
 import { MeetingsLedger } from '#/components/meetings/meetings-ledger'
 import type { LedgerState } from '#/components/meetings/meetings-ledger'
 import { MeetingsTabBar } from '#/components/meetings/meetings-tab-bar'
@@ -20,6 +27,15 @@ import { ListPage, PageBody, PageHeader } from '#/components/page-header'
 import { useNow } from '#/components/today/day-strip'
 import { Button } from '#/components/ui/button'
 import { FolderBody } from '#/components/ui/tabs'
+import {
+  NO_MEETING_FILTERS,
+  browserTimeZone,
+  filtersFor,
+  meetingAddressOf,
+  meetingFiltersOf,
+  meetingFiltersOn,
+} from '#/lib/meetings/filter'
+import type { MeetingsFilters } from '#/lib/meetings/filter'
 import { defaultOpen, nextToday, upcomingHorizon } from '#/lib/meetings/list'
 import type { MeetingsTab, Whose } from '#/lib/meetings/list'
 import { meetingsSearch } from '#/lib/route-search'
@@ -37,6 +53,11 @@ import { listMeetings } from '#/lib/server-fns'
  * - `Mine · Everyone` is the URL's `whose`, remembered per browser; `Mine`
  *   until the reader picks. A one-member workspace has no control.
  * - `Log interaction` (`L`) opens the log window on Call with nobody in it.
+ * - The search (`q`), the filters and Past's `Jump to` month are the URL's
+ *   too, so Back restores them. `Member` names one colleague's meetings and
+ *   the control then reads `Everyone`; picking `Mine` lets the member go.
+ *   A change keeps the open meeting while the new list holds it, else the
+ *   pane opens the default one.
  */
 export const Route = createFileRoute('/_app/meetings')({
   validateSearch: meetingsSearch,
@@ -118,13 +139,34 @@ const MEETINGS_QUERY = 'meetings'
 /** Where a page of the list was read from: the instants travel with Past's cursor. */
 type PageParam = { now: string; until: string; cursor: string } | null
 
+/** The address's facet keys, cleared when the tab changes: each tab reads its own. */
+const TAB_FACETS = {
+  kind: undefined,
+  wu: undefined,
+  cancelled: undefined,
+  month: undefined,
+} as const
+
 function MeetingsPage() {
   const search = Route.useSearch()
   const go = Route.useNavigate()
   const queries = useQueryClient()
   const tab: MeetingsTab = search.tab ?? 'upcoming'
   const { stored, ready } = useStoredWhose()
-  const whose: Whose = search.whose ?? stored ?? 'mine'
+  const q = search.q ?? ''
+  const { with: withId, member, kind, wu, cancelled } = search
+  const allFilters = useMemo(
+    () => meetingFiltersOf({ with: withId, member, kind, wu, cancelled }),
+    [withId, member, kind, wu, cancelled],
+  )
+  const filters = useMemo(() => filtersFor(allFilters, tab), [allFilters, tab])
+  const month = tab === 'past' ? (search.month ?? null) : null
+  // `Member` is one colleague's meetings, so it reads under `Everyone`.
+  const whose: Whose =
+    filters.member !== null ? 'everyone' : (search.whose ?? stored ?? 'mine')
+  const on = meetingFiltersOn(filters, tab)
+  const narrowed = on > 0 ? 'filter' : q !== '' ? 'search' : 'none'
+  const zone = useMemo(() => browserTimeZone(), [])
   // A file's window over the page takes the `id`; Back gives it back.
   const open = search.modal === 'file' ? null : (search.id ?? null)
   const split = useSplit()
@@ -133,7 +175,7 @@ function MeetingsPage() {
   const now = useMemo(() => ticking ?? new Date(loadedAt), [ticking, loadedAt])
 
   const query = useInfiniteQuery({
-    queryKey: [MEETINGS_QUERY, tab, whose],
+    queryKey: [MEETINGS_QUERY, tab, whose, q, filters, month],
     enabled: ready,
     // Annotated: inference otherwise narrows `pageParam` to the literal
     // type of `initialPageParam` and refuses the cursor a later page carries.
@@ -149,6 +191,10 @@ function MeetingsPage() {
           whose,
           now: from.now,
           until: from.until,
+          q,
+          filters,
+          tz: zone,
+          ...(month === null ? {} : { month }),
           ...(pageParam === null ? {} : { cursor: pageParam.cursor }),
         },
       })
@@ -164,6 +210,7 @@ function MeetingsPage() {
   const rows = useMemo(() => (pages ?? []).flatMap((p) => p.rows), [pages])
   const first = pages?.at(0)
   const last = pages?.at(-1)
+  const named = first?.named ?? { with: null, member: null }
 
   const reread = useCallback(
     () => void queries.invalidateQueries({ queryKey: [MEETINGS_QUERY] }),
@@ -185,24 +232,62 @@ function MeetingsPage() {
     [go],
   )
 
+  // A filter is its own history step, so Back undoes it.
+  const filterBy = (next: MeetingsFilters) =>
+    void go({
+      search: (prev) => ({ ...prev, ...meetingAddressOf(next) }),
+      resetScroll: false,
+    })
+  const searchFor = (text: string) =>
+    void go({
+      search: (prev) => ({ ...prev, q: text === '' ? undefined : text }),
+      replace: true,
+      resetScroll: false,
+    })
+  const jump = (to: string | null) =>
+    void go({
+      search: (prev) => ({ ...prev, month: to ?? undefined }),
+      resetScroll: false,
+    })
+
   // Once per list, so a pane closed on purpose stays closed and a meeting
-  // opened below the split is never one the reader did not pick.
-  const listed = `${tab}\n${whose}`
-  const opened = useRef<string | null>(null)
+  // opened below the split is never one the reader did not pick. When the
+  // search, a filter or the month changed the list, the open meeting stays
+  // only while the new list holds it.
+  const scope = `${tab}\n${whose}`
+  const listed = `${scope}\n${JSON.stringify([q, filters, month])}`
+  const opened = useRef<{ listed: string; scope: string } | null>(null)
   const firstOpen = first === undefined ? null : defaultOpen(tab, first.rows)
+  const held =
+    first === undefined || open === null
+      ? false
+      : rows.some((m) => m.id === open) ||
+        first.later.some((m) => m.id === open)
   useEffect(() => {
-    if (split !== true || first === undefined || opened.current === listed)
+    if (
+      split !== true ||
+      first === undefined ||
+      opened.current?.listed === listed
+    )
       return
-    opened.current = listed
-    if (open === null && firstOpen !== null) select(firstOpen, true)
-  }, [split, first, firstOpen, listed, open, select])
+    const narrowedHere = opened.current?.scope === scope
+    opened.current = { listed, scope }
+    if (open === null) {
+      if (firstOpen !== null) select(firstOpen, true)
+    } else if (narrowedHere && !held) select(firstOpen, true)
+  }, [split, first, firstOpen, listed, scope, open, held, select])
 
   const state: LedgerState =
     first !== undefined && last !== undefined
       ? {
           kind: 'loaded',
           rows,
+          later: first.later,
           counts: last.counts,
+          shown: first.shown,
+          bands: first.bands,
+          narrowed,
+          jumped: month !== null,
           calendar: first.calendar,
           audience: first.audience,
           ...(tab === 'past'
@@ -223,6 +308,7 @@ function MeetingsPage() {
         ? { kind: 'failed', onRetry: () => void query.refetch() }
         : { kind: 'loading' }
 
+  const read = { tab, whose, q, filters, tz: zone }
   return (
     <ListPage>
       <PageHeader
@@ -244,6 +330,7 @@ function MeetingsPage() {
           void go({
             search: (prev) => ({
               ...prev,
+              ...TAB_FACETS,
               tab: t === 'upcoming' ? undefined : t,
               modal: undefined,
               id: undefined,
@@ -255,16 +342,33 @@ function MeetingsPage() {
         onWhoseChange={(w) => {
           keepWhose(w)
           void go({
-            search: (prev) => ({ ...prev, whose: w, id: undefined }),
+            search: (prev) => ({
+              ...prev,
+              whose: w,
+              // `Mine` is the reader's own: a chosen colleague lets go.
+              ...(w === 'mine' ? { member: undefined } : {}),
+              id: undefined,
+            }),
             replace: true,
             resetScroll: false,
           })
         }}
+        trail={
+          <>
+            <MeetingsFilter read={read} named={named} onChange={filterBy} />
+            {tab === 'past' ? (
+              <JumpTo read={read} month={month} onJump={jump} />
+            ) : null}
+            <MeetingsSearch q={q} onSearch={searchFor} />
+          </>
+        }
       />
       <PageBody className="min-h-0 pt-0">
         <FolderBody label="Meetings" className="min-h-0 flex-1 flex-row">
           <div data-meeting-list className={LIST_PANE}>
             <MeetingsLedger
+              // A jump opens the list at the top of the month it read.
+              key={month ?? ''}
               tab={tab}
               state={state}
               everyone={whose === 'everyone'}
@@ -272,6 +376,17 @@ function MeetingsPage() {
               now={now}
               today={today}
               onOpen={(id) => select(id)}
+              head={
+                <FilterChips
+                  filters={meetingsAppliedFilters(
+                    filters,
+                    tab,
+                    named,
+                    filterBy,
+                  )}
+                  onClear={() => filterBy(NO_MEETING_FILTERS)}
+                />
+              }
             />
           </div>
           <div data-open-pane className={OPEN_PANE}>

@@ -3,6 +3,10 @@ import { isoDay } from './day'
 import {
   byDay,
   defaultOpen,
+  LATER_SHOWN,
+  laterDay,
+  laterEnd,
+  laterMonths,
   nextToday,
   rowClock,
   upcomingHorizon,
@@ -134,5 +138,34 @@ describe('an agenda row’s clock', () => {
       kind: 'length',
       text: '1h',
     })
+  })
+})
+
+describe('the later months', () => {
+  // Local noon, so no clock reads a different day or month.
+  const on = (y: number, m: number, d: number) =>
+    aMeeting({ startsAt: new Date(y, m - 1, d, 12).toISOString() })
+
+  it('bands the meetings after the two weeks by month, with their counts, the fold reaching the last one', () => {
+    const november = [on(2026, 11, 3), on(2026, 11, 5), on(2026, 11, 11)]
+    const more = [on(2026, 11, 19), on(2026, 11, 24)]
+    const december = [on(2026, 12, 1), on(2026, 12, 14)]
+    const january = [on(2027, 1, 6)]
+    const rows = [...november, ...more, ...december, ...january]
+    const months = laterMonths(rows, '2026-10-15')
+
+    expect(
+      months.map((m) => ({ label: m.label, count: m.rows.length })),
+    ).toEqual([
+      { label: 'November', count: 5 },
+      { label: 'December', count: 2 },
+      { label: 'January 2027', count: 1 },
+    ])
+    // Three show, then `2 more in November`.
+    expect(months[0].rows.slice(0, LATER_SHOWN)).toEqual(november)
+    expect(months[0].rows.length - LATER_SHOWN).toBe(2)
+    expect(laterEnd(rows, '2026-10-15')).toBe('to 6 Jan 2027')
+    expect(laterEnd([], '2026-10-15')).toBeNull()
+    expect(laterDay(november[0].startsAt)).toBe('Tue 3')
   })
 })

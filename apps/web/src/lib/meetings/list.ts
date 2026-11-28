@@ -2,6 +2,7 @@ import { dayKey, formatDay, weekdayOf } from '@spaces/core/format'
 import { weekBand } from '#/lib/timeline/weeks'
 import { isoDay, shiftDay, waitFor } from './day'
 import type { MeetingRecord } from './day'
+import type { MeetingsFilters } from './filter'
 
 /**
  * The Meetings page's pure half, client-safe: the list read's params and
@@ -37,6 +38,16 @@ export type MeetingsQuery = {
   until: string
   /** Past's next page, from the page before; absent for the first. */
   cursor?: string | undefined
+  /** The search over titles and people; absent or blank for none. */
+  q?: string | undefined
+  filters?: MeetingsFilters | undefined
+  /**
+   * `Jump to`: Past read from the end of this month down, `YYYY-MM`, newest
+   * first with no `No write-up` band ahead of it.
+   */
+  month?: string | undefined
+  /** The reader's time zone, which months and Past's weeks are read in. */
+  tz?: string | undefined
 }
 
 /**
@@ -81,12 +92,27 @@ export type MeetingCounts = {
   unwritten: number
 }
 
-/** One page of the list read, its counts over every meeting the tab holds. */
+/**
+ * One page of the list read. `counts` are over every meeting each tab holds
+ * for `Mine · Everyone`, search and filters aside; `shown` is what the
+ * search and filters leave of the open tab.
+ */
 export type MeetingsPage = {
+  /** Upcoming's two weeks, or one page of Past. */
   rows: Array<ListedMeeting>
+  /** Upcoming's meetings after the two weeks, earliest first; empty on Past. */
+  later: Array<ListedMeeting>
   /** Past's next page; null when this was the last, and always for Upcoming. */
   nextCursor: string | null
   counts: MeetingCounts
+  shown: number
+  /**
+   * Past's rows per band while the search or a filter is on, by
+   * `PastBand.key`; null otherwise, as a date band carries no count.
+   */
+  bands: Readonly<Record<string, number>> | null
+  /** The names the applied filters print: `With Flent`, `Member Priya`. */
+  named: { with: string | null; member: string | null }
 }
 
 /**
@@ -206,37 +232,121 @@ const MONTHS = [
   'December',
 ]
 
+/** A month's name: `September`. */
+export const monthName = (month: string): string =>
+  MONTHS[Number(month.slice(5, 7)) - 1] ?? month
+
 /** A month band's name: `September`, with the year when not `today`'s. */
-function monthBand(startsAt: string, today: string): string {
-  const [y, m] = dayKey(startsAt).split('-').map(Number)
-  const name = MONTHS[m - 1]
-  return String(y) === dayKey(today).slice(0, 4) ? name : `${name} ${String(y)}`
+function monthBand(month: string, today: string): string {
+  const name = monthName(month)
+  return month.slice(0, 4) === dayKey(today).slice(0, 4)
+    ? name
+    : `${name} ${month.slice(0, 4)}`
 }
 
-/** One band of Past: `No write-up` first, then the weeks, then months. */
+/** The local month a row falls in: `2026-09`. */
+const monthOf = (startsAt: string): string => dayKey(startsAt).slice(0, 7)
+
+/**
+ * One band of Past: `No write-up` first, then the weeks, then months. The
+ * key is `unwritten`, `This week`, `Last week` or the month (`2026-09`), as
+ * the read's band counts name it.
+ */
 export type PastBand<T> = { key: string; label: string; rows: Array<T> }
 
 /**
  * Past's bands in the order read: the meetings owing a write-up under
  * `No write-up`, then `This week`, `Last week` and a band per month. The
  * read sends the unwritten first and the rest newest first, so a band is
- * never split.
+ * never split. After `Jump to` the read is newest first alone, so
+ * `unwrittenFirst` is off and an unwritten row sits in its own month.
  */
 export function pastBands<
   T extends Pick<ListedMeeting, 'startsAt' | 'unwritten'>,
->(rows: ReadonlyArray<T>, today: string): Array<PastBand<T>> {
+>(
+  rows: ReadonlyArray<T>,
+  today: string,
+  unwrittenFirst = true,
+): Array<PastBand<T>> {
   const out: Array<PastBand<T>> = []
   for (const m of rows) {
     const week = weekBand(m.startsAt, today)
-    const label = m.unwritten
+    const owes = unwrittenFirst && m.unwritten
+    const month = monthOf(m.startsAt)
+    const key = owes ? 'unwritten' : week === 'Earlier' ? month : week
+    const label = owes
       ? 'No write-up'
       : week === 'Earlier'
-        ? monthBand(m.startsAt, today)
+        ? monthBand(month, today)
         : week
-    const key = m.unwritten ? 'unwritten' : label
     const last = out.at(-1)
     if (last?.key === key) last.rows.push(m)
     else out.push({ key, label, rows: [m] })
+  }
+  return out
+}
+
+/** One month of Upcoming's `Later` fold. */
+export type LaterMonth<T> = {
+  key: string
+  label: string
+  rows: Array<T>
+}
+
+/**
+ * Upcoming's meetings after the two weeks, in a band per month, earliest
+ * first; each band's count is its rows' length.
+ */
+export function laterMonths<T extends Pick<ListedMeeting, 'startsAt'>>(
+  rows: ReadonlyArray<T>,
+  today: string,
+): Array<LaterMonth<T>> {
+  const out: Array<LaterMonth<T>> = []
+  for (const m of rows) {
+    const key = monthOf(m.startsAt)
+    const last = out.at(-1)
+    if (last?.key === key) last.rows.push(m)
+    else out.push({ key, label: monthBand(key, today), rows: [m] })
+  }
+  return out
+}
+
+/** How many rows a `Later` month shows before `n more in November`. */
+export const LATER_SHOWN = 3
+
+/** The `Later` fold's end: `to 14 Dec`, the last meeting's day; null when none. */
+export function laterEnd(
+  rows: ReadonlyArray<Pick<ListedMeeting, 'startsAt'>>,
+  today: string,
+): string | null {
+  const last = rows.at(-1)
+  return last === undefined ? null : `to ${formatDay(last.startsAt, today)}`
+}
+
+/** A `Later` row's day: `Tue 3`. */
+export function laterDay(startsAt: string): string {
+  return `${weekdayOf(startsAt)} ${String(Number(dayKey(startsAt).slice(8, 10)))}`
+}
+
+/**
+ * `Jump to`'s rows: the months that have past meetings, newest first, under
+ * their years.
+ */
+export type MonthCount = { month: string; count: number }
+
+export function monthsByYear(
+  months: ReadonlyArray<MonthCount>,
+): Array<{ year: string; months: Array<MonthCount & { label: string }> }> {
+  const out: Array<{
+    year: string
+    months: Array<MonthCount & { label: string }>
+  }> = []
+  for (const m of [...months].sort((a, b) => b.month.localeCompare(a.month))) {
+    const year = m.month.slice(0, 4)
+    const entry = { ...m, label: monthName(m.month) }
+    const last = out.at(-1)
+    if (last?.year === year) last.months.push(entry)
+    else out.push({ year, months: [entry] })
   }
   return out
 }

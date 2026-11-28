@@ -2,6 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { Schema } from 'effect'
 import { requireUser } from './shared'
 import { input } from './input'
+import { MONTH, MeetingsFiltersSchema } from '../meetings/filter'
 
 export type {
   ArtifactRole,
@@ -19,6 +20,7 @@ export type {
   UnwrittenMeeting,
 } from '../interactions/meeting-read'
 export type { RecorderLink } from '../interactions/recorder-links'
+export type { MeetingFacets } from '../interactions/meeting-read'
 
 const uuid = Schema.String.check(Schema.isUUID())
 
@@ -73,20 +75,32 @@ export const getTodayMeetings = createServerFn().handler(async () => {
   return { calendar, audience, unwritten }
 })
 
+/** The Meetings list's params, the page's cursor aside. */
+const meetingsListFields = {
+  tab: Schema.Literals(['upcoming', 'past']),
+  whose: Schema.Literals(['mine', 'everyone']),
+  now: isoInstant,
+  until: isoInstant,
+  q: Schema.optional(Schema.String.check(Schema.isMaxLength(200))),
+  filters: Schema.optional(MeetingsFiltersSchema),
+  month: Schema.optional(Schema.String.check(Schema.isPattern(MONTH))),
+  tz: Schema.optional(
+    Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_+\-/]{1,64}$/)),
+  ),
+}
+
 /**
  * The Meetings page: one tab of the list for one params object, with
  * whether a calendar is connected, who a member asks, and whether the
  * workspace has more than one member (the `Mine · Everyone` control). The
- * browser sends both instants, so "this week and next" is the reader's.
+ * browser sends both instants and its time zone, so "this week and next"
+ * and `Jump to`'s months are the reader's.
  */
 export const listMeetings = createServerFn()
   .validator(
     input(
       Schema.Struct({
-        tab: Schema.Literals(['upcoming', 'past']),
-        whose: Schema.Literals(['mine', 'everyone']),
-        now: isoInstant,
-        until: isoInstant,
+        ...meetingsListFields,
         cursor: Schema.optional(
           Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,400}$/)),
         ),
@@ -107,6 +121,20 @@ export const listMeetings = createServerFn()
     ])
     const { members, ...page } = list
     return { calendar, audience, team: members > 1, ...page }
+  })
+
+/** The Meetings Filter panel's counts and `Jump to`'s months. */
+export const listMeetingFacets = createServerFn()
+  .validator(input(Schema.Struct(meetingsListFields)))
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { meetingFacetsProgram } =
+      await import('../interactions/meeting-read')
+    const { effectFn } = await import('./effect')
+    return effectFn(meetingFacetsProgram)(
+      { id: user.id, email: user.email },
+      data,
+    )
   })
 
 const byId = Schema.Struct({ id: uuid })

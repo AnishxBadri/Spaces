@@ -11,6 +11,7 @@ import {
   ne,
   sql,
 } from 'drizzle-orm'
+import type { SQL } from 'drizzle-orm'
 import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@spaces/db'
 import {
@@ -51,15 +52,37 @@ import type {
   MeetingRecord,
   TodayMeeting,
 } from '#/lib/meetings/day'
+import {
+  MONTH,
+  NO_MEETING_FILTERS,
+  filtersFor,
+  knownTimeZone,
+  meetingFiltersOn,
+} from '#/lib/meetings/filter'
+import type {
+  MeetingKind,
+  MeetingsFilters,
+  WriteUpFilter,
+} from '#/lib/meetings/filter'
 import { PAST_STEP } from '#/lib/meetings/list'
 import type {
   ListedMeeting,
   MeetingsPage,
   MeetingsQuery,
+  MonthCount,
   WriteUpState,
 } from '#/lib/meetings/list'
 import { GRACE_MS, isUnwritten } from '#/lib/meetings/unwritten'
 import { noteExcerpt } from '#/lib/notes/excerpt'
+import {
+  beforeMonthEndSql,
+  cancelledSql,
+  meetingFilterConditions,
+  monthKeySql,
+  pastBandKeySql,
+  writeUpSql,
+} from './meeting-filter-sql'
+import type { MeetingsFacet } from './meeting-filter-sql'
 import { recorderLinksProgram } from './recorder-links'
 import { notesViaProgram } from '../notes/via'
 import type { NoteVia } from '../notes/via-mark'
@@ -332,8 +355,6 @@ const attendedBySql = (emails: ReadonlySet<string>) =>
 /** When a row ended: a meeting's `ends_at`, else (a call) its start. */
 const endSql = sql`coalesce(case when ${interaction.meta} ->> 'kind' = 'meeting' then (${interaction.meta} ->> 'ends_at')::timestamptz end, ${interaction.occurredAt})`
 
-const cancelledSql = sql`(coalesce(${interaction.meta} ->> 'status', '') = 'cancelled')`
-
 /**
  * Past's cursor: whether the last row owed a write-up, its start as
  * Postgres printed it (so no precision is lost on the way back) and its id.
@@ -400,54 +421,131 @@ const membersProgram = () =>
   })
 
 /**
- * What makes a meeting the reader's and whether it owes a write-up, as SQL
- * over `interaction`, so the Meetings page and Today's Write-ups agree.
- * - Mine: the reader organised it or was invited, matched on their login
- *   address and every connected account's; a row with no invite list (a
- *   logged call or meeting) is theirs when they logged it or wrote it up.
- * - Unwritten mirrors `isUnwritten`, recorder and grace hour included.
+ * One member's meetings as SQL over `interaction`: they organised it or
+ * were invited, matched on every address that is theirs (and `login`, the
+ * address their session names); a row with no invite list (a logged call or
+ * meeting) is theirs when they logged it or wrote it up.
  */
-const readerScopeProgram = (reader: MeetingReader, now: Date) =>
+const memberScopeProgram = (
+  team: { addressesOf: (ids: ReadonlySet<string>) => Set<string> },
+  memberId: string,
+  login: string | null,
+) =>
   Effect.gen(function* () {
-    const team = yield* membersProgram()
-    const mine = team.addressesOf(new Set([reader.id]))
-    // The reader's login address is theirs even before a member row says so.
-    mine.add(reader.email.toLowerCase())
-    const recorders = team.addressesOf(team.recording)
+    const addresses = team.addressesOf(new Set([memberId]))
+    if (login !== null) addresses.add(login.toLowerCase())
     const logged = yield* query(() =>
       db
         .select({ id: sql<string>`${activity.meta} ->> 'interactionId'` })
         .from(activity)
         .where(
           and(
-            eq(activity.actorId, reader.id),
+            eq(activity.actorId, memberId),
             inArray(activity.verb, ['interaction.meeting', 'interaction.call']),
           ),
         ),
     )
     const loggedIds = logged.flatMap((l) => (UUID.test(l.id) ? [l.id] : []))
-    const graceEnd = new Date(now.getTime() - GRACE_MS)
-    const unwrittenSql = sql<boolean>`(${interaction.noteId} is null and not ${cancelledSql} and (not ${attendedBySql(recorders)} or ${endSql} <= ${graceEnd}))`
     const noInvites = sql`coalesce(${interaction.meta} ->> 'kind', '') <> 'meeting'`
-    const mineSql = sql`(${attendedBySql(mine)} or (${noInvites} and (${
+    const scopeSql = sql`(${attendedBySql(addresses)} or (${noInvites} and (${
       loggedIds.length === 0
         ? sql`false`
         : sql`${interaction.id} = any(array[${sql.join(
             loggedIds.map((id) => sql`${id}`),
             sql`, `,
           )}]::uuid[])`
-    } or exists (select 1 from note wn where wn.entity_id = ${interaction.noteId} and wn.author_id = ${reader.id}))))`
+    } or exists (select 1 from note wn where wn.entity_id = ${interaction.noteId} and wn.author_id = ${memberId}))))`
+    return { addresses, loggedIds, scopeSql }
+  })
+
+/**
+ * What makes a meeting the reader's and whether it owes a write-up, as SQL
+ * over `interaction`, so the Meetings page and Today's Write-ups agree.
+ * - Mine: `memberScopeProgram` for the reader, their login address
+ *   theirs even before a member row says so.
+ * - Unwritten mirrors `isUnwritten`, recorder and grace hour included.
+ */
+const readerScopeProgram = (reader: MeetingReader, now: Date) =>
+  Effect.gen(function* () {
+    const team = yield* membersProgram()
+    const {
+      addresses: mine,
+      loggedIds,
+      scopeSql: mineSql,
+    } = yield* memberScopeProgram(team, reader.id, reader.email)
+    const recorders = team.addressesOf(team.recording)
+    const graceEnd = new Date(now.getTime() - GRACE_MS)
+    const unwrittenSql = sql<boolean>`(${interaction.noteId} is null and not ${cancelledSql} and (not ${attendedBySql(recorders)} or ${endSql} <= ${graceEnd}))`
     return { team, mine, recorders, loggedIds, unwrittenSql, mineSql }
   })
 
 /**
+ * The parts every Meetings list read shares: the reader's scope, whose
+ * meetings the tab holds, each tab's base and the search and filters.
+ * - `Member` names one colleague's meetings whatever `Mine · Everyone`
+ *   says, so with it on the tab's total is the team's.
+ * - `counted` is what each tab holds for whose meetings, before the search
+ *   and filters: the tab counts and the foot's `of 241`.
+ */
+const listScopeProgram = (reader: MeetingReader, params: MeetingsQuery) =>
+  Effect.gen(function* () {
+    const now = new Date(params.now)
+    const scope = yield* readerScopeProgram(reader, now)
+    const filters = filtersFor(params.filters ?? NO_MEETING_FILTERS, params.tab)
+    const chosen =
+      filters.member === null
+        ? null
+        : yield* memberScopeProgram(scope.team, filters.member, null)
+    const whoseSql =
+      filters.member === null && params.whose === 'mine'
+        ? scope.mineSql
+        : sql`true`
+    const q = params.q?.trim() ?? ''
+    const tz = knownTimeZone(params.tz)
+    // Everything ahead: the agenda's two weeks and the `Later` fold after them.
+    const aheadSql = sql`(${interaction.kind} = 'meeting' and ${endSql} > ${now})`
+    const pastBaseSql = sql`(${interaction.kind} in ('meeting', 'call') and ${endSql} <= ${now})`
+    const pastSql = sql`(${pastBaseSql} and not ${cancelledSql})`
+    const tabSql = params.tab === 'upcoming' ? aheadSql : pastBaseSql
+    const narrowedBy = (except: MeetingsFacet | null) =>
+      meetingFilterConditions(
+        {
+          tab: params.tab,
+          filters,
+          q,
+          readerId: reader.id,
+          memberSql: chosen?.scopeSql ?? null,
+        },
+        except,
+      )
+    const narrowed = q !== '' || meetingFiltersOn(filters, params.tab) > 0
+    return {
+      ...scope,
+      now,
+      tz,
+      filters,
+      whoseSql,
+      aheadSql,
+      pastSql,
+      tabSql,
+      narrowedBy,
+      narrowed,
+    }
+  })
+
+/**
  * The Meetings page's read: one tab of the list for one params object.
- * - Upcoming: the meetings not yet ended that start before `until`,
- *   earliest first, cancelled ones kept and marked.
+ * - Upcoming: the meetings not yet ended, earliest first, cancelled ones
+ *   kept and marked; those starting before `until` are the agenda's `rows`,
+ *   the rest the `Later` fold's.
  * - Past: the meetings and calls that ended by `now`, cancelled ones left
  *   out; those owing a write-up first, then newest first, a page at a time.
+ *   With `month` (`Jump to`) it reads from that month's end down, newest
+ *   first alone, so the list opens on that month's band.
  * - `whose: 'mine'` keeps the reader's rows (`readerScopeProgram`); the
- *   counts follow the same choice.
+ *   counts follow the same choice, and `Member` overrides it.
+ * - The search and filters narrow the rows, `shown` and, on Past, the band
+ *   counts; the tab counts stay the tab's.
  * - A row owes a write-up by `isUnwritten`; the SQL that sorts and counts
  *   mirrors it, recorder and grace hour included.
  * - Every row is visible to every member; canRead decides only whether
@@ -457,13 +555,31 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
   reader: MeetingReader,
   params: MeetingsQuery,
 ): Effect.fn.Return<MeetingsPage & { members: number }, MeetingReadFailed> {
-  const now = new Date(params.now)
   const until = new Date(params.until)
-  const { team, mine, recorders, loggedIds, unwrittenSql, mineSql } =
-    yield* readerScopeProgram(reader, now)
-  const whoseSql = params.whose === 'mine' ? mineSql : sql`true`
-  const upcomingSql = sql`(${interaction.kind} = 'meeting' and ${endSql} > ${now} and ${interaction.occurredAt} < ${until})`
-  const pastSql = sql`(${interaction.kind} in ('meeting', 'call') and ${endSql} <= ${now} and not ${cancelledSql})`
+  const {
+    team,
+    mine,
+    recorders,
+    loggedIds,
+    unwrittenSql,
+    now,
+    tz,
+    filters,
+    whoseSql,
+    aheadSql,
+    pastSql,
+    tabSql,
+    narrowedBy,
+    narrowed,
+  } = yield* listScopeProgram(reader, params)
+  const month =
+    params.tab === 'past' &&
+    params.month !== undefined &&
+    MONTH.test(params.month)
+      ? params.month
+      : null
+  // After `Jump to` the owing rows sit in their months rather than lead.
+  const lead = month === null ? sql`${unwrittenSql}::int` : sql`0::int`
 
   const columns = {
     id: interaction.id,
@@ -491,7 +607,8 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
       ? undefined
       : cursor === null
         ? sql`false`
-        : sql`(${unwrittenSql}::int, ${interaction.occurredAt}, ${interaction.id}) < (${cursor.unwritten ? 1 : 0}, ${cursor.at}::timestamptz, ${cursor.id}::uuid)`
+        : sql`(${lead}, ${interaction.occurredAt}, ${interaction.id}) < (${month === null && cursor.unwritten ? 1 : 0}, ${cursor.at}::timestamptz, ${cursor.id}::uuid)`
+  const matching = and(tabSql, whoseSql, ...narrowedBy(null))
   const rowsRead =
     params.tab === 'upcoming'
       ? query(() =>
@@ -499,7 +616,7 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
             .select(columns)
             .from(interaction)
             .leftJoin(writeUp, eq(writeUp.id, interaction.noteId))
-            .where(and(upcomingSql, whoseSql))
+            .where(matching)
             .orderBy(asc(interaction.occurredAt), asc(interaction.id)),
         )
       : query(() =>
@@ -507,26 +624,55 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
             .select(columns)
             .from(interaction)
             .leftJoin(writeUp, eq(writeUp.id, interaction.noteId))
-            .where(and(pastSql, whoseSql, after))
+            .where(
+              and(
+                matching,
+                month === null ? undefined : beforeMonthEndSql(month, tz),
+                after,
+              ),
+            )
             .orderBy(
-              desc(unwrittenSql),
+              desc(lead),
               desc(interaction.occurredAt),
               desc(interaction.id),
             )
             .limit(PAST_STEP + 1),
         )
-  const [read, tally] = yield* Effect.all([
+  const bandsRead =
+    params.tab === 'past' && narrowed
+      ? query(() =>
+          db
+            .select({
+              key: sql<string>`${pastBandKeySql({ now, tz, unwrittenSql: month === null ? unwrittenSql : null })}`,
+              n: sql<number>`count(*)::int`,
+            })
+            .from(interaction)
+            .where(matching)
+            .groupBy(sql`1`),
+        )
+      : Effect.succeed(null)
+  const [read, tally, shownTally, bandRows, named] = yield* Effect.all([
     rowsRead,
     query(() =>
       db
         .select({
-          upcoming: sql<number>`count(*) filter (where ${upcomingSql})::int`,
+          upcoming: sql<number>`count(*) filter (where ${aheadSql})::int`,
           past: sql<number>`count(*) filter (where ${pastSql})::int`,
           unwritten: sql<number>`count(*) filter (where ${pastSql} and ${unwrittenSql})::int`,
         })
         .from(interaction)
         .where(and(inArray(interaction.kind, ['meeting', 'call']), whoseSql)),
     ),
+    narrowed
+      ? query(() =>
+          db
+            .select({ n: sql<number>`count(*)::int` })
+            .from(interaction)
+            .where(matching),
+        )
+      : Effect.succeed(null),
+    bandsRead,
+    namedProgram(filters, team),
   ])
   const more = params.tab === 'past' && read.length > PAST_STEP
   const rows = more ? read.slice(0, PAST_STEP) : read
@@ -659,20 +805,172 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
   })
   const last = rows.at(-1)
   const counts = tally.at(0) ?? { upcoming: 0, past: 0, unwritten: 0 }
+  const split = until.getTime()
   return {
-    rows: listed,
+    rows:
+      params.tab === 'upcoming'
+        ? listed.filter((m) => Date.parse(m.startsAt) < split)
+        : listed,
+    later:
+      params.tab === 'upcoming'
+        ? listed.filter((m) => Date.parse(m.startsAt) >= split)
+        : [],
     nextCursor:
       more && last !== undefined
         ? encodeCursor({
-            unwritten: last.owes,
+            unwritten: month === null && last.owes,
             at: last.at,
             id: last.id,
           })
         : null,
     counts,
+    shown:
+      shownTally?.at(0)?.n ??
+      (params.tab === 'upcoming' ? counts.upcoming : counts.past),
+    bands:
+      bandRows === null
+        ? null
+        : Object.fromEntries(bandRows.map((b) => [b.key, b.n])),
+    named,
     members: team.count,
   }
 })
+
+/** The names the applied `With` and `Member` filters print. */
+const namedProgram = (
+  filters: MeetingsFilters,
+  team: { byAddress: ReadonlyMap<string, { id: string; name: string }> },
+) =>
+  Effect.gen(function* () {
+    const withId = filters.with
+    const withName =
+      withId === null
+        ? null
+        : ((yield* query(() =>
+            db
+              .select({ name: entity.canonicalName })
+              .from(entity)
+              .where(eq(entity.id, withId)),
+          )).at(0)?.name ?? null)
+    const memberName =
+      filters.member === null
+        ? null
+        : ([...team.byAddress.values()].find((m) => m.id === filters.member)
+            ?.name ?? null)
+    return { with: withName, member: memberName }
+  })
+
+/** The Filter panel's counts and `Jump to`'s months. */
+export type MeetingFacets = {
+  readonly kind: Readonly<Record<MeetingKind, number>>
+  readonly writeUp: Readonly<Record<WriteUpFilter, number>>
+  /** The cancelled meetings the tab holds under the other filters. */
+  readonly cancelled: number
+  /** Every member, for the `Member` picker, by name. */
+  readonly members: ReadonlyArray<{
+    readonly id: string
+    readonly name: string
+  }>
+  /** Past's months with their meetings under the search and filters; empty on Upcoming. */
+  readonly months: ReadonlyArray<MonthCount>
+  /** The foot's `5 of 241`: what the search and filters leave, of the tab. */
+  readonly shown: number
+  readonly total: number
+}
+
+/**
+ * The Filter panel's counts and `Jump to`'s months for one params object.
+ * Each chip is counted under the open tab, whose meetings, the search and
+ * every other facet's filters, with its own facet off: the number it prints
+ * is the rows the list shows once it alone is on in its facet. The
+ * `Cancelled` chip counts the cancelled meetings, which `Show` adds to Past
+ * and `Hide` takes from Upcoming. Read when the panel or the menu opens,
+ * never with the list.
+ */
+export const meetingFacetsProgram = Effect.fn('meetingFacetsProgram')(
+  function* (
+    reader: MeetingReader,
+    params: MeetingsQuery,
+  ): Effect.fn.Return<MeetingFacets, MeetingReadFailed> {
+    const { tz, whoseSql, aheadSql, pastSql, tabSql, narrowedBy } =
+      yield* listScopeProgram(reader, params)
+    const past = params.tab === 'past'
+    const counted = (except: MeetingsFacet | null, extra?: SQL) =>
+      and(tabSql, whoseSql, ...narrowedBy(except), extra)
+    const [kinds, writeUps, cancelled, shown, total, months, members] =
+      yield* Effect.all([
+        past
+          ? query(() =>
+              db
+                .select({
+                  meeting: sql<number>`count(*) filter (where ${interaction.kind} = 'meeting')::int`,
+                  call: sql<number>`count(*) filter (where ${interaction.kind} = 'call')::int`,
+                })
+                .from(interaction)
+                .where(counted('kind')),
+            )
+          : Effect.succeed([]),
+        past
+          ? query(() =>
+              db
+                .select({
+                  written: sql<number>`count(*) filter (where ${writeUpSql('written', reader.id)})::int`,
+                  none: sql<number>`count(*) filter (where ${writeUpSql('none', reader.id)})::int`,
+                  recorder: sql<number>`count(*) filter (where ${writeUpSql('recorder', reader.id)})::int`,
+                })
+                .from(interaction)
+                .where(counted('writeUp')),
+            )
+          : Effect.succeed([]),
+        query(() =>
+          db
+            .select({ n: sql<number>`count(*)::int` })
+            .from(interaction)
+            .where(counted('cancelled', cancelledSql)),
+        ),
+        query(() =>
+          db
+            .select({ n: sql<number>`count(*)::int` })
+            .from(interaction)
+            .where(counted(null)),
+        ),
+        query(() =>
+          db
+            .select({ n: sql<number>`count(*)::int` })
+            .from(interaction)
+            .where(and(past ? pastSql : aheadSql, whoseSql)),
+        ),
+        past
+          ? query(() =>
+              db
+                .select({
+                  month: sql<string>`${monthKeySql(tz)}`,
+                  count: sql<number>`count(*)::int`,
+                })
+                .from(interaction)
+                .where(counted(null))
+                .groupBy(sql`1`)
+                .orderBy(sql`1 desc`),
+            )
+          : Effect.succeed([]),
+        query(() =>
+          db
+            .select({ id: member.id, name: member.name })
+            .from(member)
+            .orderBy(asc(member.name)),
+        ),
+      ])
+    return {
+      kind: kinds.at(0) ?? { meeting: 0, call: 0 },
+      writeUp: writeUps.at(0) ?? { written: 0, none: 0, recorder: 0 },
+      cancelled: cancelled.at(0)?.n ?? 0,
+      members,
+      months,
+      shown: shown.at(0)?.n ?? 0,
+      total: total.at(0)?.n ?? 0,
+    }
+  },
+)
 
 /** How far back Needs you looks for a meeting nobody wrote up. */
 export const UNWRITTEN_DAYS = 14

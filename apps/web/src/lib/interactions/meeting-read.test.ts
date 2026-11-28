@@ -20,10 +20,14 @@ import type { MeetingMeta } from '@spaces/db/schema/interactions'
 import { and, eq } from 'drizzle-orm'
 import { user } from '@spaces/db/schema/auth'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
+import { NO_MEETING_FILTERS } from '#/lib/meetings/filter'
+import type { MeetingsFilters } from '#/lib/meetings/filter'
+import type { MeetingsQuery } from '#/lib/meetings/list'
 import {
   calendarConnectedProgram,
   dayMeetingsProgram,
   meetingDetailProgram,
+  meetingFacetsProgram,
   meetingListProgram,
   pinMeetingRecordProgram,
   unwrittenMeetingsProgram,
@@ -704,6 +708,249 @@ describe('meetingListProgram', () => {
     )
     const seen = [...pageOne.rows, ...pageTwo.rows].map((m) => m.id)
     expect(new Set(seen).size).toBe(seen.length)
+  })
+
+  /** The read under a search, filters or a month, in UTC. */
+  const narrowed = (
+    tab: 'upcoming' | 'past',
+    over: Partial<MeetingsQuery>,
+    who: { id: string; email: string } = reader,
+  ) =>
+    run(
+      meetingListProgram(who, {
+        tab,
+        whose: 'everyone',
+        now,
+        until,
+        tz: 'UTC',
+        ...over,
+      }),
+    )
+  const only = (over: Partial<MeetingsFilters>): MeetingsFilters => ({
+    ...NO_MEETING_FILTERS,
+    ...over,
+  })
+
+  it('filters Past by With, Member, Kind, Write-up and Cancelled, counts the bands, and reads from a month after Jump to', async () => {
+    const flent = await aCompany('Flent')
+    const lattice = await aCompany('Lattice')
+    const partner = await aMember('Priya Nair')
+    const written = (title: string) =>
+      aNote({ title, authorId: FIXTURE_ACTOR.id })
+    const unwritten = await aMeeting({
+      subject: 'Flent — owes a write-up',
+      at: '2027-03-12T10:00:00.000Z',
+      meta: at('2027-03-12T10:00:00.000Z'),
+      records: [flent],
+    })
+    const lastWeek = await aMeeting({
+      subject: 'Flent — follow-up',
+      at: '2027-03-10T10:00:00.000Z',
+      meta: at('2027-03-10T10:00:00.000Z', { organizer: partner.email }),
+      records: [flent],
+      noteId: await written('Follow-up'),
+    })
+    const [call] = await db
+      .insert(interaction)
+      .values({
+        kind: 'call',
+        subject: 'Call with Flent',
+        occurredAt: new Date('2027-03-01T09:00:00.000Z'),
+        noteId: await written('Call'),
+      })
+      .returning({ id: interaction.id })
+    await db
+      .insert(interactionEntity)
+      .values({ interactionId: call.id, entityId: flent })
+    const cancelled = await aMeeting({
+      subject: 'Flent — cancelled',
+      at: '2027-03-11T10:00:00.000Z',
+      meta: at('2027-03-11T10:00:00.000Z', { status: 'cancelled' }),
+      records: [flent],
+    })
+    const february = await aMeeting({
+      subject: 'Flent — intro',
+      at: '2027-02-10T10:00:00.000Z',
+      meta: at('2027-02-10T10:00:00.000Z'),
+      records: [flent],
+      noteId: await written('Intro'),
+    })
+    await aMeeting({
+      subject: 'Lattice — not Flent',
+      at: '2027-03-09T10:00:00.000Z',
+      meta: at('2027-03-09T10:00:00.000Z'),
+      records: [lattice],
+    })
+    const ids = (page: { rows: ReadonlyArray<{ id: string }> }) =>
+      page.rows.map((m) => m.id)
+
+    const withFlent = await narrowed('past', {
+      filters: only({ with: flent }),
+    })
+    expect(ids(withFlent)).toEqual([unwritten, lastWeek, call.id, february])
+    expect(withFlent.shown).toBe(4)
+    expect(withFlent.shown).toBeLessThan(withFlent.counts.past)
+    expect(withFlent.named.with).toBe('Flent')
+    expect(withFlent.bands).toEqual({
+      unwritten: 1,
+      'Last week': 1,
+      '2027-03': 1,
+      '2027-02': 1,
+    })
+    // Nothing narrows it: no band counts.
+    expect((await narrowed('past', {})).bands).toBeNull()
+
+    const show = await narrowed('past', {
+      filters: only({ with: flent, cancelled: true }),
+    })
+    expect(ids(show)).toContain(cancelled)
+    const calls = await narrowed('past', {
+      filters: only({ with: flent, kind: ['call'] }),
+    })
+    expect(ids(calls)).toEqual([call.id])
+    const none = await narrowed('past', {
+      filters: only({ with: flent, writeUp: ['none'] }),
+    })
+    expect(ids(none)).toEqual([unwritten])
+
+    // One colleague's meetings, whatever `Mine` says.
+    const theirs = await run(
+      meetingListProgram(reader, {
+        tab: 'past',
+        whose: 'mine',
+        now,
+        until,
+        tz: 'UTC',
+        filters: only({ with: flent, member: partner.id }),
+      }),
+    )
+    expect(ids(theirs)).toEqual([lastWeek])
+    expect(theirs.named.member).toBe('Priya Nair')
+
+    // `Jump to` February: that month down, newest first, no lead band.
+    const jumped = await narrowed('past', {
+      filters: only({ with: flent }),
+      month: '2027-02',
+    })
+    expect(ids(jumped)).toEqual([february])
+    // The owing row counts in its week once nothing leads.
+    expect(jumped.bands).toEqual({
+      'Last week': 2,
+      '2027-03': 1,
+      '2027-02': 1,
+    })
+
+    // The panel counts each chip with its own facet off.
+    const facets = await run(
+      meetingFacetsProgram(reader, {
+        tab: 'past',
+        whose: 'everyone',
+        now,
+        until,
+        tz: 'UTC',
+        filters: only({ with: flent, kind: ['call'] }),
+      }),
+    )
+    expect(facets.kind).toEqual({ meeting: 3, call: 1 })
+    expect(facets.writeUp).toEqual({ written: 1, none: 0, recorder: 0 })
+    expect(facets.cancelled).toBe(0)
+    expect(facets.shown).toBe(1)
+    const months = await run(
+      meetingFacetsProgram(reader, {
+        tab: 'past',
+        whose: 'everyone',
+        now,
+        until,
+        tz: 'UTC',
+        filters: only({ with: flent }),
+      }),
+    )
+    expect(months.months).toEqual([
+      { month: '2027-03', count: 3 },
+      { month: '2027-02', count: 1 },
+    ])
+    expect(months.cancelled).toBe(1)
+  })
+
+  it('searches titles and people, never the write-up, wildcards taken as text', async () => {
+    const northgate = await aCompany('Northgate')
+    const dana = await aPerson('Dana Moreau', 'dana@northgate.example')
+    const body = await aNote({ title: 'Private', authorId: FIXTURE_ACTOR.id })
+    await db
+      .update(note)
+      .set({ bodyMd: 'The quokka clause is the sticking point.' })
+      .where(eq(note.entityId, body))
+    const titled = await aMeeting({
+      subject: 'Keystay — pilot review',
+      at: '2027-03-11T10:00:00.000Z',
+      meta: at('2027-03-11T10:00:00.000Z'),
+      records: [],
+    })
+    const withDana = await aMeeting({
+      subject: 'AGM prep',
+      at: '2027-03-10T10:00:00.000Z',
+      meta: at('2027-03-10T10:00:00.000Z', { rsvp: {} }),
+      records: [northgate, dana],
+      noteId: body,
+    })
+    const byAddress = await aMeeting({
+      subject: 'Board pack',
+      at: '2027-03-09T10:00:00.000Z',
+      meta: at('2027-03-09T10:00:00.000Z', {
+        organizer: 'zed@harbour.example',
+        rsvp: { 'zed@harbour.example': 'accepted' },
+      }),
+      records: [],
+    })
+    const ids = async (q: string) =>
+      (await narrowed('past', { q })).rows.map((m) => m.id)
+
+    expect(await ids('keystay')).toEqual([titled])
+    expect(await ids('dana mor')).toEqual([withDana])
+    expect(await ids('harbour.example')).toEqual([byAddress])
+    // The write-up's words are not searched: the reader may not read them.
+    expect(await ids('quokka')).toEqual([])
+    // `_` and `%` are text, not wildcards.
+    expect(await ids('Keystay_')).toEqual([])
+    expect(await ids('%')).toEqual([])
+    const page = await narrowed('past', { q: 'keystay' })
+    expect(page.shown).toBe(1)
+  })
+
+  it('splits Upcoming at the two weeks: the agenda’s rows, then the later ones, every one counted', async () => {
+    const exponent = await aCompany('Exponent')
+    const soon = await aMeeting({
+      subject: 'Exponent — this week',
+      at: '2027-03-17T10:00:00.000Z',
+      meta: at('2027-03-17T10:00:00.000Z'),
+      records: [exponent],
+    })
+    const april = await aMeeting({
+      subject: 'Exponent — Q1 board',
+      at: '2027-04-06T10:00:00.000Z',
+      meta: at('2027-04-06T10:00:00.000Z'),
+      records: [exponent],
+    })
+    const may = await aMeeting({
+      subject: 'Exponent — AGM',
+      at: '2027-05-03T10:00:00.000Z',
+      meta: at('2027-05-03T10:00:00.000Z', { status: 'cancelled' }),
+      records: [exponent],
+    })
+    const ahead = await narrowed('upcoming', {
+      filters: only({ with: exponent }),
+    })
+    expect(ahead.rows.map((m) => m.id)).toEqual([soon])
+    expect(ahead.later.map((m) => m.id)).toEqual([april, may])
+    expect(ahead.shown).toBe(3)
+    // The tab counts every meeting ahead, the later ones included.
+    const all = await narrowed('upcoming', {})
+    expect(all.counts.upcoming).toBe(all.rows.length + all.later.length)
+    // `Hide` takes the struck ones out.
+    const hidden = await narrowed('upcoming', {
+      filters: only({ with: exponent, cancelled: true }),
+    })
+    expect(hidden.later.map((m) => m.id)).toEqual([april])
   })
 })
 
