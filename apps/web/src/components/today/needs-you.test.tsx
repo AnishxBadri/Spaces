@@ -234,7 +234,7 @@ describe('the Needs-you lanes', () => {
   it('draws a meeting: Write in the action lane, the first external participant', async () => {
     const html = rowOf(await render([meeting]), 'meeting')
     expect(html).toMatch(/>Flent intro</)
-    expect(html).toMatch(/<button[^>]*>Write<\/button>/)
+    expect(html).toMatch(/<button[^>]*>Write it up<\/button>/)
     expect(html).toMatch(/w-30[^>]*>Priya Raman</)
     expect(html).toMatch(/>2d</)
   })

@@ -337,7 +337,7 @@ describe('the meeting window', () => {
         g.getAttribute('aria-label'),
       ),
     ).toEqual(['Where', 'People', 'Records'])
-    expect(rail?.getAttribute('class')).toContain('@4xl:w-74')
+    expect(rail?.getAttribute('class')).toContain('@2xl:w-74')
     expect(rail?.getAttribute('class')).toContain('bg-bone')
     const where = rail?.querySelector('[data-where]')
     expect(where?.textContent).toBe('Google Meetabc-defg-hij')

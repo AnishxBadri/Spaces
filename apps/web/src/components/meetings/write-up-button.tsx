@@ -5,7 +5,7 @@ import { Button } from '#/components/ui/button'
 import { writeUpInteraction } from '#/lib/server-fns'
 
 /**
- * Write on a past meeting with no write-up: writes one now through the
+ * `Write it up` on a past meeting with no write-up: writes one now through the
  * write-up program and lands in the editor. Idempotent, so a second press
  * opens the same note.
  */
@@ -31,7 +31,7 @@ export function WriteUpButton({ interactionId }: { interactionId: string }) {
       disabled={pending}
       onClick={() => void write()}
     >
-      Write
+      Write it up
     </Button>
   )
 }

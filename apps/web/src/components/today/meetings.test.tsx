@@ -151,7 +151,7 @@ describe('MeetingsSection — the rows', () => {
       day: '2026-10-12',
       meetings: [INTRO],
     })
-    expect(past).toContain('>Write<')
+    expect(past).toContain('>Write it up<')
     expect(past).toContain('data-today-meeting="ended"')
     expect(past).toMatch(/text-graphite[^>]*>Flent intro</)
 
@@ -183,7 +183,7 @@ describe('MeetingsSection — the rows', () => {
     })
     expect(html).toMatch(/line-through[^>]*>Northgate catch-up</)
     expect(html).toContain('>Cancelled<')
-    expect(html).not.toContain('>Write<')
+    expect(html).not.toContain('>Write it up<')
   })
 })
 

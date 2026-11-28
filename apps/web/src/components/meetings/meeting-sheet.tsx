@@ -264,11 +264,11 @@ export function MeetingSheet({
       <div className="@container flex min-h-0 flex-1 flex-col">
         <div
           data-meeting-body
-          className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-bone @4xl:flex-row @4xl:overflow-hidden"
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-bone @2xl:flex-row @2xl:overflow-hidden"
         >
           <div
             data-meeting-main
-            className="flex min-w-0 shrink-0 flex-col gap-2 p-3 @4xl:flex-1 @4xl:shrink @4xl:overflow-y-auto"
+            className="flex min-w-0 shrink-0 flex-col gap-2 p-3 @2xl:flex-1 @2xl:shrink @2xl:overflow-y-auto"
           >
             {ahead ? (
               <BriefCard
@@ -326,7 +326,7 @@ export function MeetingSheet({
           <aside
             data-meeting-rail
             aria-label="Where, people and records"
-            className="flex shrink-0 flex-col gap-6 border-t border-rule bg-bone p-4 @4xl:w-74 @4xl:overflow-y-auto @4xl:border-t-0 @4xl:border-l"
+            className="flex shrink-0 flex-col gap-6 border-t border-rule bg-bone p-4 @2xl:w-74 @2xl:overflow-y-auto @2xl:border-t-0 @2xl:border-l"
           >
             <WhereGroup conferenceUrl={meeting.conferenceUrl} over={over} />
             <PeopleGroup

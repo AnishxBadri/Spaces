@@ -58,7 +58,7 @@ export function ReplyMark({ rsvp }: { rsvp: MeetingRsvp }) {
       )}
       <span
         className={cn(
-          'w-13 shrink-0 mono text-micro text-graphite',
+          'w-15 shrink-0 mono text-micro whitespace-nowrap text-graphite',
           reply.struck && 'line-through',
         )}
       >
