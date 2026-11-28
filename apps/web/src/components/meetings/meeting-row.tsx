@@ -2,7 +2,6 @@ import { formatTime } from '@spaces/core/format'
 import type { ReactNode } from 'react'
 import { Meeting, Phone, Time, Video } from '#/components/icons'
 import { PluginMark } from '#/components/integrations/integration-ledger'
-import { Button } from '#/components/ui/button'
 import { laterDay, pastDay, peopleLine, rowClock } from '#/lib/meetings/list'
 import type { ListedMeeting } from '#/lib/meetings/list'
 import { cn } from '#/lib/utils'
@@ -301,19 +300,5 @@ export function LaterRow({
         )}
       </RowButton>
     </li>
-  )
-}
-
-/** Prep on Today's meeting row: opens the window with Prep already running. */
-export function PrepButton({ onPrep }: { onPrep: () => void }) {
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      title="Brief me on the linked records"
-      onClick={onPrep}
-    >
-      Prep
-    </Button>
   )
 }
