@@ -83,6 +83,7 @@ const arriveBothWays = async (mailDomain: string, meetingDomain: string) => {
       subject: 'Intro',
       organizer: null,
       conferenceUrl: null,
+      location: null,
       recurringInstanceId: null,
       attendees: [
         {

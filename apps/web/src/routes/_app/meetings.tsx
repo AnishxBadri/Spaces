@@ -218,8 +218,17 @@ function MeetingsPage() {
         : { now: last.now, until: last.until, cursor: last.nextCursor },
   })
   const pages = query.data?.pages
-  const rows = useMemo(() => (pages ?? []).flatMap((p) => p.rows), [pages])
+  // Meetings removed from Spaces, kept out of the list while it reads again.
+  const [gone, setGone] = useState<ReadonlySet<string>>(() => new Set())
+  const rows = useMemo(
+    () => (pages ?? []).flatMap((p) => p.rows).filter((m) => !gone.has(m.id)),
+    [pages, gone],
+  )
   const first = pages?.at(0)
+  const later = useMemo(
+    () => (first?.later ?? []).filter((m) => !gone.has(m.id)),
+    [first, gone],
+  )
   const last = pages?.at(-1)
   const named = first?.named ?? { with: null, member: null }
 
@@ -268,12 +277,17 @@ function MeetingsPage() {
   const scope = `${tab}\n${whose}`
   const listed = `${scope}\n${JSON.stringify([q, filters, month])}`
   const opened = useRef<{ listed: string; scope: string } | null>(null)
-  const firstOpen = first === undefined ? null : defaultOpen(tab, first.rows)
+  const firstOpen =
+    first === undefined
+      ? null
+      : defaultOpen(
+          tab,
+          first.rows.filter((m) => !gone.has(m.id)),
+        )
   const held =
     first === undefined || open === null
       ? false
-      : rows.some((m) => m.id === open) ||
-        first.later.some((m) => m.id === open)
+      : rows.some((m) => m.id === open) || later.some((m) => m.id === open)
   useEffect(() => {
     // A window over the page keeps the pane as it is until it closes.
     if (
@@ -290,12 +304,23 @@ function MeetingsPage() {
     } else if (narrowedHere && !held) select(firstOpen, true)
   }, [split, first, firstOpen, listed, scope, open, held, select, windowed])
 
+  // A removed meeting leaves the pane to what the list opens by default.
+  const removed = useCallback(
+    (id: string) => {
+      setGone((prev) => new Set(prev).add(id))
+      opened.current = null
+      select(null, true)
+      reread()
+    },
+    [select, reread],
+  )
+
   const state: LedgerState =
     first !== undefined && last !== undefined
       ? {
           kind: 'loaded',
           rows,
-          later: first.later,
+          later,
           counts: last.counts,
           shown: first.shown,
           bands: first.bands,
@@ -415,6 +440,7 @@ function MeetingsPage() {
                   next={tab === 'upcoming' && nextToday(rows, now) === open}
                   onClose={() => select(null)}
                   onChanged={reread}
+                  onRemoved={() => removed(open)}
                   onOpenNote={openNote}
                 />
               </div>

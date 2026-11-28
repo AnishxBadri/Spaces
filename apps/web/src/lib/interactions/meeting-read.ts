@@ -460,6 +460,26 @@ const memberScopeProgram = (
   })
 
 /**
+ * Whether the reader is in the meeting `id`: by the Meetings page's `Mine`
+ * rule, on their login address and every account they connected.
+ */
+export const attendsMeetingProgram = Effect.fn('attendsMeetingProgram')(
+  function* (
+    reader: MeetingReader,
+    id: string,
+  ): Effect.fn.Return<boolean, MeetingReadFailed> {
+    const { mineSql } = yield* readerScopeProgram(reader, new Date())
+    const rows = yield* query(() =>
+      db
+        .select({ id: interaction.id })
+        .from(interaction)
+        .where(and(eq(interaction.id, id), mineSql)),
+    )
+    return rows.length > 0
+  },
+)
+
+/**
  * What makes a meeting the reader's and whether it owes a write-up, as SQL
  * over `interaction`, so the Meetings page and Today's Write-ups agree.
  * - Mine: `memberScopeProgram` for the reader, their login address
@@ -782,6 +802,7 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
       people,
       record: record === undefined ? null : stripEmails(record),
       callLink: (meta?.conference_url ?? null) !== null,
+      place: meta?.location !== undefined,
       mine: isMine,
       members,
       noteId: r.noteId,
@@ -1118,6 +1139,8 @@ export type MeetingDetail = {
   endsAt: string
   cancelled: boolean
   conferenceUrl: string | null
+  /** Where it happens, as the calendar names it; null when it names nowhere. */
+  location: string | null
   participants: Array<MeetingParticipant>
   /** The edged records, then each edged company's open deals. */
   records: Array<MeetingRecord>
@@ -1323,6 +1346,7 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
       endsAt: endOf(row.occurredAt, meta),
       cancelled: meta?.status === 'cancelled',
       conferenceUrl: meta?.conference_url ?? null,
+      location: meta?.location ?? null,
       participants: participantsOf(meta, linked),
       records: [
         ...linked.map(stripEmails),

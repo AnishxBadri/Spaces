@@ -40,6 +40,8 @@ export type MeetingInput =
       subject: string | null
       organizer: string | null
       conferenceUrl: string | null
+      /** The place, as the calendar names it. */
+      location: string | null
       recurringInstanceId: string | null
       attendees: ReadonlyArray<MeetingAttendeeInput>
     }

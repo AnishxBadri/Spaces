@@ -343,6 +343,11 @@ export type MeetingClaim = {
   /** The organizer's email. */
   readonly organizer?: string
   readonly conferenceUrl?: string
+  /**
+   * Where it happens, as the organiser typed it (SDK 2.1); lines split the
+   * place from its address. Absent when the event names none.
+   */
+  readonly location?: string
   /** The calendar's id for this instance when the event is one of a series. */
   readonly recurringInstanceId?: string
   readonly attendees: ReadonlyArray<MeetingAttendee>

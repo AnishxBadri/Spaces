@@ -1,11 +1,12 @@
 import { Link } from '@tanstack/react-router'
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
-import { Video } from '#/components/icons'
+import { Place, Video } from '#/components/icons'
 import { KindIcon } from '#/components/kind-icon'
 import { LabelHead } from '#/components/ledger-section'
 import { DetailsPickRow } from '#/components/record/details-add'
 import type { PickHit } from '#/components/record/details-add'
+import { mapUrl, placeLines } from '#/lib/meetings/removal'
 import { callPlace } from '#/lib/meetings/sheet'
 import { recordPath } from '#/lib/record-path'
 import type { MeetingRecord, SheetPerson } from '#/lib/server-fns'
@@ -84,38 +85,79 @@ function CopyLink({ url }: { url: string }) {
 
 /**
  * `Where`: the call, by its service and its room's code, with `Copy link`
- * while the meeting is ahead; a past meeting names the service alone. No
- * group when nothing is stored.
+ * while the meeting is ahead (a past meeting names the service alone); and
+ * the place, its first line over the rest of the address, with `Map ↗`,
+ * which sends the address to a map only when pressed.
+ * A meeting with both shows both rows; with neither, no group.
  */
 export function WhereGroup({
   conferenceUrl,
+  location,
   over,
 }: {
   conferenceUrl: string | null
+  location: string | null
   /** The meeting has ended. */
   over: boolean
 }) {
-  if (conferenceUrl === null) return null
-  const place = callPlace(conferenceUrl)
+  if (conferenceUrl === null && location === null) return null
+  const place = conferenceUrl === null ? null : callPlace(conferenceUrl)
+  const lines = location === null ? null : placeLines(location)
+  const copy = conferenceUrl !== null && !over
   return (
     <RailGroup
       label="Where"
-      action={over ? undefined : <CopyLink url={conferenceUrl} />}
+      action={
+        copy || location !== null ? (
+          <>
+            {copy ? <CopyLink url={conferenceUrl} /> : null}
+            {location === null ? null : (
+              <a
+                href={mapUrl(location)}
+                target="_blank"
+                rel="noreferrer"
+                title="Opens the address in a map"
+                className={HEAD_LINK}
+              >
+                Map ↗
+              </a>
+            )}
+          </>
+        ) : undefined
+      }
     >
-      <li
-        data-where
-        className="flex h-9 items-center gap-3 border-b border-rule"
-      >
-        <Video aria-hidden className="size-4 shrink-0 text-graphite" />
-        <span className="min-w-0 flex-1 truncate text-ui text-foreground">
-          {place.name}
-        </span>
-        {over || place.code === null ? null : (
-          <span className="shrink-0 mono text-micro text-graphite">
-            {place.code}
+      {place === null || conferenceUrl === null ? null : (
+        <li
+          data-where
+          className="flex h-9 items-center gap-3 border-b border-rule"
+        >
+          <Video aria-hidden className="size-4 shrink-0 text-graphite" />
+          <span className="min-w-0 flex-1 truncate text-ui text-foreground">
+            {place.name}
           </span>
-        )}
-      </li>
+          {over || place.code === null ? null : (
+            <span className="shrink-0 mono text-micro text-graphite">
+              {place.code}
+            </span>
+          )}
+        </li>
+      )}
+      {lines === null ? null : (
+        <li
+          data-where-place
+          className="flex items-start gap-3 border-b border-rule py-2"
+        >
+          <span className="flex h-5 shrink-0 items-center">
+            <Place aria-hidden className="size-4 text-graphite" />
+          </span>
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="text-ui text-foreground">{lines.first}</span>
+            {lines.rest === null ? null : (
+              <span className="text-label text-graphite">{lines.rest}</span>
+            )}
+          </span>
+        </li>
+      )}
     </RailGroup>
   )
 }

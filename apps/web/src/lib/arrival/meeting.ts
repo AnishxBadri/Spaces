@@ -1,7 +1,13 @@
 import { Effect, Schema } from 'effect'
-import { and, eq, sql } from 'drizzle-orm'
+import { and, eq, isNull, or, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { db } from '@spaces/db'
-import { interaction } from '@spaces/db/schema'
+import {
+  accountConnection,
+  integration,
+  interaction,
+  meetingRemoval,
+} from '@spaces/db/schema'
 import type { MeetingMeta } from '@spaces/db/schema/interactions'
 import {
   updateInteraction,
@@ -15,9 +21,13 @@ import type {
 } from '@spaces/core/writes/interactions/meeting-lane'
 import type { DomainEvent, MeetingResult } from '@spaces/sdk'
 import { webEnqueue } from '#/lib/enqueue-live'
+import { PRODUCTS } from '#/lib/connections/products'
+import { seriesUidOf } from '#/lib/meetings/removal'
 import type { Address } from './forwarded'
 import { matchParticipants } from './file'
 import { meetingRefusal } from './noise'
+import type { MailExclude } from './noise'
+import { syncedMailSettingsOf } from './synced-settings'
 import {
   participantDecisionsProgram,
   resolveParticipantsProgram,
@@ -33,7 +43,9 @@ import type { ParticipantAddresses } from './participant-records'
  *   `decideParticipants` and resolved by the same program the mailbox uses;
  *   the refusals are `meetingRefusal`, beside the mail ones.
  * - **Refusals gate a birth only.** A meeting already held follows its event
- *   whatever it became — moved, cancelled, declined — and is never deleted.
+ *   whatever it became — moved, cancelled, declined — and is never deleted
+ *   by a sync. A meeting a member removed from Spaces, or its whole series,
+ *   is never born again (`meeting_removal`).
  * - **One row across calendars.** Two syncs racing on one event both try the
  *   insert; `interaction_message_id_unique` keeps one and the loser follows it.
  * - **Edges follow the attendees.** Each sync edges what the current list
@@ -118,8 +130,14 @@ const allAddresses = (a: ParticipantAddresses): Array<Address> => [
   ...a.cc,
 ]
 
+/**
+ * The meeting's meta from its event. What only Spaces writes (a recorder's
+ * events, `Nothing to note`) is kept from the held row; the place is the
+ * event's, so one taken off the event goes here too.
+ */
 const metaOf = (meeting: Meeting, held: MeetingMeta | null): MeetingMeta => ({
-  ...held,
+  ...withoutPlace(held),
+  ...(meeting.location === null ? {} : { location: meeting.location }),
   kind: 'meeting',
   ends_at: meeting.endsAt.toISOString(),
   status: meeting.status,
@@ -129,6 +147,65 @@ const metaOf = (meeting: Meeting, held: MeetingMeta | null): MeetingMeta => ({
   rsvp: Object.fromEntries(meeting.attendees.map((a) => [a.email, a.rsvp])),
   calendar_event_id: held?.calendar_event_id ?? meeting.eventId,
 })
+
+const withoutPlace = (held: MeetingMeta | null): Partial<MeetingMeta> => {
+  if (held === null) return {}
+  const { location: _place, ...rest } = held
+  return rest
+}
+
+/** Whether a member removed this meeting, or the series it is one of. */
+const removedFromSpaces = (uid: string) =>
+  write(async () => {
+    const series = seriesUidOf(uid)
+    const rows = await db
+      .select({ uid: meetingRemoval.uid })
+      .from(meetingRemoval)
+      .where(
+        or(
+          eq(meetingRemoval.uid, uid),
+          and(eq(meetingRemoval.uid, series), eq(meetingRemoval.series, true)),
+        ),
+      )
+      .limit(1)
+    return rows.length > 0
+  })
+
+const mailbox = alias(accountConnection, 'mailbox')
+const mailIntegration = alias(integration, 'mail_integration')
+
+/**
+ * The exclude list of the mailbox the calendar's owner connected on the
+ * calendar's own address; null when there is none, so nothing is excluded.
+ */
+const calendarExclude = (integrationId: string) =>
+  write(async (): Promise<MailExclude | null> => {
+    const rows = await db
+      .select({ config: mailIntegration.config })
+      .from(integration)
+      .innerJoin(
+        accountConnection,
+        eq(accountConnection.id, integration.connectionId),
+      )
+      .innerJoin(
+        mailbox,
+        and(
+          eq(mailbox.userId, accountConnection.userId),
+          sql`lower(${mailbox.externalEmail}) = lower(${accountConnection.externalEmail})`,
+        ),
+      )
+      .innerJoin(mailIntegration, eq(mailIntegration.connectionId, mailbox.id))
+      .where(
+        and(
+          eq(integration.id, integrationId),
+          eq(mailIntegration.capabilityId, PRODUCTS.google.gmail.plugin),
+          isNull(mailIntegration.removedAt),
+        ),
+      )
+      .limit(1)
+    const row = rows.at(0)
+    return row === undefined ? null : syncedMailSettingsOf(row.config).exclude
+  })
 
 /** A held meeting rewritten from the event, its edges with it. */
 const follow = (meeting: Meeting, heldId: string, records: Array<string>) =>
@@ -179,10 +256,13 @@ const logFull = Effect.fn('logMeeting.full')(function* (
     ctx.integrationId,
   ).pipe(Effect.mapError((e) => new MeetingWriteFailed({ cause: e.cause })))
   if (held === null) {
+    if (yield* removedFromSpaces(meeting.uid))
+      return { outcome: 'refused', reason: 'removed from Spaces' }
     const refused = meetingRefusal({
       status: meeting.status,
       selfRsvp: meeting.attendees.find((a) => a.self)?.rsvp ?? null,
       decisions,
+      exclude: yield* calendarExclude(ctx.integrationId),
     })
     if (refused !== null) return { outcome: 'refused', reason: refused.detail }
   }

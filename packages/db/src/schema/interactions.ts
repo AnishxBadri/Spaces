@@ -1,4 +1,5 @@
 import {
+  boolean,
   check,
   index,
   integer,
@@ -81,6 +82,11 @@ export type MeetingMeta = {
   ends_at: string
   status: MeetingStatus
   conference_url: string | null
+  /**
+   * Where it happens, as the calendar names it: the place on its first line,
+   * the address after. The sync owns it; absent when the event names none.
+   */
+  location?: string
   /** The organizer's email. */
   organizer: string | null
   recurring_instance_id: string | null
@@ -414,3 +420,25 @@ export const interactionNote = pgTable(
     index('interaction_note_note_idx').on(t.noteId),
   ],
 )
+
+/**
+ * A calendar meeting a member took out of Spaces, remembered so the next
+ * sync does not bring it back. It stays in the calendar.
+ * - `uid` is the meeting's key as the calendar lane stores it in
+ *   `interaction.message_id`: the iCalendar UID, plus `#<instant>` for one
+ *   occurrence of a series.
+ * - `series` marks a whole series: `uid` is then the bare iCalendar UID, and
+ *   every occurrence, held or still to come, is kept out.
+ * - It refuses a birth only; nothing else reads it.
+ */
+export const meetingRemoval = pgTable('meeting_removal', {
+  uid: text('uid').primaryKey(),
+  series: boolean('series').notNull().default(false),
+  /** Who removed it; null once that member's account is gone, the removal kept. */
+  removedBy: text('removed_by').references(() => user.id, {
+    onDelete: 'set null',
+  }),
+  removedAt: timestamp('removed_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+})

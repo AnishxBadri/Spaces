@@ -172,7 +172,9 @@ describe('meetingRefusal — the calendar table', () => {
     status: 'scheduled',
     selfRsvp: 'accepted',
     decisions: decisions('anish@fund.example', 'jane@acme-robotics.io'),
+    exclude: null,
   }
+  const excluding = (...senders: Array<string>) => ({ senders, labels: [] })
 
   const CALENDAR: ReadonlyArray<{
     name: string
@@ -228,6 +230,30 @@ describe('meetingRefusal — the calendar table', () => {
       name: 'cancelled before it was seen',
       input: { status: 'cancelled' },
       verdict: 'cancelled',
+    },
+    {
+      name: 'every outside attendee on the mailbox exclude list',
+      input: {
+        decisions: decisions(
+          'anish@fund.example',
+          'jane@acme-robotics.io',
+          'dr.rao@smiles-dental.example',
+        ),
+        exclude: excluding('acme-robotics.io', 'dr.rao@smiles-dental.example'),
+      },
+      verdict: 'excluded',
+    },
+    {
+      name: 'one outside attendee the list does not name keeps it',
+      input: {
+        decisions: decisions(
+          'anish@fund.example',
+          'jane@acme-robotics.io',
+          'dr.rao@smiles-dental.example',
+        ),
+        exclude: excluding('smiles-dental.example'),
+      },
+      verdict: null,
     },
     {
       name: 'cancelled outranks internal',

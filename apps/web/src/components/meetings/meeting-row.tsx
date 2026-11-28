@@ -1,6 +1,6 @@
 import { formatTime } from '@spaces/core/format'
 import type { ReactNode } from 'react'
-import { Meeting, Phone, Time, Video } from '#/components/icons'
+import { Meeting, Phone, Place, Time, Video } from '#/components/icons'
 import { PluginMark } from '#/components/integrations/integration-ledger'
 import { laterDay, pastDay, peopleLine, rowClock } from '#/lib/meetings/list'
 import type { ListedMeeting } from '#/lib/meetings/list'
@@ -76,7 +76,8 @@ function WhoAndRecord({
 /**
  * An agenda row: the time and title, the length at the end; then the
  * people and the record, our member under `Everyone` when the reader is not
- * in it, and the camera when it has a call link. The next meeting today
+ * in it, and the camera when it has a call link, else the pin when it has
+ * a place. The next meeting today
  * reads `in 8m` by a pine clock, a live one `Now · 12m left` by a pine
  * square; a cancelled one is struck and ends on nothing.
  */
@@ -163,9 +164,14 @@ export function AgendaRow({
               {members}
             </span>
           )}
-          {m.callLink && !m.cancelled ? (
+          {m.cancelled ? null : m.callLink ? (
             <Video
               aria-label="Has a call link"
+              className="shrink-0 text-graphite"
+            />
+          ) : m.place ? (
+            <Place
+              aria-label="Has a place"
               className="shrink-0 text-graphite"
             />
           ) : null}

@@ -592,6 +592,7 @@ describe('Content.logMeeting', () => {
       subject: 'Acme catch-up',
       organizer: 'anish@fund.example',
       conferenceUrl: null,
+      location: null,
       recurringInstanceId: null,
       attendees: [
         {

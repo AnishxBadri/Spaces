@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { Button } from '#/components/ui/button.tsx'
+import { radioClasses } from '#/components/ui/checkbox.tsx'
 import {
   Dialog,
   DialogClose,
@@ -42,6 +43,16 @@ export type ConfirmOptions = {
   drawing?: ReactNode
   /** Under the title: the thing's name, then its one facts line. */
   subject?: { name: string; facts: string }
+  /**
+   * One choice before acting, as radios on a rule border above the ledger
+   * (`This meeting` · `The whole series`). The first is chosen when it opens;
+   * `onChange` hears each pick, so the caller reads it once confirmed.
+   */
+  choices?: {
+    label: string
+    items: ReadonlyArray<{ value: string; label: string }>
+    onChange: (value: string) => void
+  }
 }
 
 /**
@@ -65,7 +76,8 @@ export function ConfirmDialog({
 }) {
   const kind = options.kind ?? 'destructive'
   const rows = options.rows ?? []
-  const hasBody = Boolean(options.body) || rows.length > 0
+  const hasBody =
+    Boolean(options.body) || rows.length > 0 || options.choices !== undefined
   const keep = useRef<HTMLButtonElement>(null)
   const drawn = options.drawing !== undefined
   const foot = (
@@ -132,6 +144,7 @@ export function ConfirmDialog({
               {options.body ? (
                 <p className="text-ui leading-4.75">{options.body}</p>
               ) : null}
+              <ConfirmChoices choices={options.choices} />
               <ConfirmLedger rows={rows} />
             </div>
           </div>
@@ -149,6 +162,7 @@ export function ConfirmDialog({
                     {options.body}
                   </DialogDescription>
                 ) : null}
+                <ConfirmChoices choices={options.choices} />
                 <ConfirmLedger rows={rows} />
               </div>
             ) : null}
@@ -157,6 +171,41 @@ export function ConfirmDialog({
         {foot}
       </DialogContent>
     </Dialog>
+  )
+}
+
+/** The one choice, as radios on a rule border; the first chosen at first. */
+function ConfirmChoices({ choices }: { choices: ConfirmOptions['choices'] }) {
+  const [chosen, setChosen] = useState(choices?.items.at(0)?.value ?? null)
+  if (choices === undefined) return null
+  return (
+    <div
+      role="radiogroup"
+      aria-label={choices.label}
+      className="flex flex-col border border-rule"
+    >
+      {choices.items.map((item) => {
+        const on = item.value === chosen
+        return (
+          <button
+            key={item.value}
+            type="button"
+            role="radio"
+            aria-checked={on}
+            onClick={() => {
+              setChosen(item.value)
+              choices.onChange(item.value)
+            }}
+            className="focus-ring-inset flex h-8 items-center gap-2.5 border-b border-rule px-2.5 text-left text-ui last:border-b-0 hover:bg-bone"
+          >
+            <span aria-hidden className={radioClasses({ checked: on })}>
+              {on ? <span className="size-1.5 bg-primary" /> : null}
+            </span>
+            {item.label}
+          </button>
+        )
+      })}
+    </div>
   )
 }
 

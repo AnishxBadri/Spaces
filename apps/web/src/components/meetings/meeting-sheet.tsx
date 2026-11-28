@@ -25,13 +25,18 @@ import {
   setNothingToNote,
   writeUpInteraction,
 } from '#/lib/server-fns'
-import type { MeetingSheetData, PrepEvent } from '#/lib/server-fns'
+import type {
+  MeetingRemoval,
+  MeetingSheetData,
+  PrepEvent,
+} from '#/lib/server-fns'
 import { ActionItemsCard } from './action-items-card'
 import { applyPrepEvent, BriefCard } from './brief-card'
 import type { PrepState } from './brief-card'
 import { CarriedCard, CarriedList } from './carried'
 import { NoWriteUpCard } from './no-write-up-card'
 import { RecentCard } from './recent-card'
+import { useRemoveMeeting } from './remove-meeting'
 import { SheetHead } from './sheet-head'
 import type { SheetFrame } from './sheet-head'
 import { PeopleGroup, RecordsGroup, WhereGroup } from './sheet-rail'
@@ -74,6 +79,8 @@ function LoadingHead({ frame }: { frame: SheetFrame }) {
  *   Today), `Write it up`, the write-up and the meeting's notes open in it;
  *   elsewhere they open their page.
  * - `Nothing to note` marks the meeting as owing no write-up, with Undo.
+ * - `Remove from Spaces…`, for a reader who may, asks in the drawn confirm;
+ *   once it is gone `onRemoved` runs, else the sheet closes.
  * - `next` is the list's word on whether this is the next meeting today.
  */
 export function MeetingSheet({
@@ -82,6 +89,7 @@ export function MeetingSheet({
   next = null,
   onClose,
   onChanged,
+  onRemoved,
   onOpenNote,
 }: {
   id: string
@@ -91,13 +99,17 @@ export function MeetingSheet({
   onClose: () => void
   /** A write landed: the caller re-reads what it shows. */
   onChanged?: (() => void) | undefined
+  /** The meeting is gone from Spaces: the caller moves off it. */
+  onRemoved?: (() => void) | undefined
   onOpenNote?: ((noteId: string) => void) | undefined
 }) {
   const router = useRouter()
   const { now: loadedAt, today } = useClock()
   const ticking = useNow()
   const now = ticking ?? new Date(loadedAt)
-  const [sheet, setSheet] = useState<MeetingSheetData | null>(null)
+  const [sheet, setSheet] = useState<
+    (MeetingSheetData & { removal: MeetingRemoval | null }) | null
+  >(null)
   const [error, setError] = useState<string | null>(null)
   const [prep, setPrep] = useState<PrepState>({ phase: 'idle' })
   const [saving, setSaving] = useState(false)
@@ -105,6 +117,7 @@ export function MeetingSheet({
   const [writing, setWriting] = useState(false)
   const [asking, setAsking] = useState(false)
   const finding = useRef(false)
+  const { remove, removeDialog } = useRemoveMeeting()
   const reader = useRef<ReadableStreamDefaultReader<PrepEvent> | null>(null)
 
   const load = useCallback(async () => {
@@ -307,6 +320,29 @@ export function MeetingSheet({
   const privateArtifacts = meeting.artifacts.filter((a) => a.private)
   const note = meeting.note
   const owesWriteUp = over && note === null && !meeting.cancelled
+  const removal = sheet.removal
+
+  async function removeFromSpaces(r: MeetingRemoval) {
+    if (meeting === null) return
+    const gone = await remove(
+      {
+        id,
+        title: meeting.title,
+        startsAt: meeting.startsAt,
+        endsAt: meeting.endsAt,
+        // The people are in it, not filed on it: the list names the records.
+        records: meeting.records.filter((rec) => rec.kind !== 'person'),
+        over,
+        writeUp: note !== null,
+        removal: r,
+      },
+      today,
+    )
+    if (!gone) return
+    onChanged?.()
+    if (onRemoved === undefined) onClose()
+    else onRemoved()
+  }
 
   return (
     <>
@@ -316,7 +352,11 @@ export function MeetingSheet({
         now={now}
         today={today}
         next={next}
+        onRemove={
+          removal === null ? null : () => void removeFromSpaces(removal)
+        }
       />
+      {removeDialog}
 
       {/* Two columns from about 900px, the cards then a bone rail of where,
           who and what it is filed on; stacked below that. */}
@@ -395,7 +435,11 @@ export function MeetingSheet({
             aria-label="Where, people and records"
             className="flex shrink-0 flex-col gap-6 border-t border-rule bg-bone p-4 @2xl:w-74 @2xl:overflow-y-auto @2xl:border-t-0 @2xl:border-l"
           >
-            <WhereGroup conferenceUrl={meeting.conferenceUrl} over={over} />
+            <WhereGroup
+              conferenceUrl={meeting.conferenceUrl}
+              location={meeting.location}
+              over={over}
+            />
             <PeopleGroup
               people={sheet.people}
               over={over}

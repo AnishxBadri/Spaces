@@ -687,6 +687,13 @@
       "when": 1795403418421,
       "tag": "0097_user_email_signature",
       "breakpoints": true
+    },
+    {
+      "idx": 98,
+      "version": "7",
+      "when": 1795890029215,
+      "tag": "0098_meeting-removal",
+      "breakpoints": true
     }
   ]
 }

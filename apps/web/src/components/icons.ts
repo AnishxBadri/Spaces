@@ -74,6 +74,7 @@ import {
   Layers as CarbonLayers,
   Link as CarbonLink,
   List as CarbonList,
+  Location,
   Locked as CarbonLocked,
   Logout,
   MagicWand,
@@ -284,6 +285,11 @@ export const Page = carbon(CarbonDocument, 'document')
 export const Paragraph = carbon(CarbonParagraph, 'paragraph')
 export const Partnership = carbon(CarbonPartnership, 'partnership')
 export const Phone = carbon(CarbonPhone, 'phone')
+/**
+ * Carbon's `Location`, a meeting's place: the map pin in `Where` and on an
+ * agenda row. The global `Location` is taken.
+ */
+export const Place = carbon(Location, 'location')
 /** A plugin with no mark of its own, where its action leads a menu item. */
 export const Plug = carbon(CarbonPlug, 'plug')
 export const Portfolio = carbon(CarbonPortfolio, 'portfolio')

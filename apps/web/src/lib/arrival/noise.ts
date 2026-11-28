@@ -145,16 +145,23 @@ const noneOutside = (
  * - **internal** — no attendee from outside: every one is a member, at an
  *   own domain, or a machine. The participants module decides who is
  *   outside, so this rule and the mail lane cannot disagree about a person.
+ * - **excluded** — every attendee from outside is on the exclude list of the
+ *   mailbox connected on the calendar's own address: whoever the owner keeps
+ *   out of their mail is kept out of their meetings. Each address is read
+ *   as a sender, so `noreply@` entries count too.
  */
 
-export type MeetingNoiseReason = 'cancelled' | 'declined' | 'internal'
+export type MeetingNoiseReason =
+  'cancelled' | 'declined' | 'internal' | 'excluded'
 
 export type MeetingNoiseInput = {
   status: 'scheduled' | 'cancelled'
   /** The owner's own answer; null when the owner is not on the list. */
   selfRsvp: 'accepted' | 'declined' | 'tentative' | 'needs_action' | null
   /** `decideParticipants` over the organizer and every attendee. */
-  decisions: ReadonlyArray<Pick<ParticipantDecision, 'action'>>
+  decisions: ReadonlyArray<Pick<ParticipantDecision, 'action' | 'address'>>
+  /** The mailbox's exclude list on the calendar's address; null when none is connected. */
+  exclude: MailExclude | null
 }
 
 export type MeetingRefusal = { reason: MeetingNoiseReason; detail: string }
@@ -169,6 +176,23 @@ export function meetingRefusal(
     return { reason: 'declined', detail: 'declined by the calendar owner' }
   if (noneOutside(input.decisions))
     return { reason: 'internal', detail: 'no attendee from outside' }
+  const exclude = input.exclude
+  if (
+    exclude !== null &&
+    input.decisions
+      .filter((d) => d.action === 'create')
+      .every(
+        (d) =>
+          mailExclusion(
+            { sender: d.address, participants: [], labels: [] },
+            exclude,
+          ) !== null,
+      )
+  )
+    return {
+      reason: 'excluded',
+      detail: 'every attendee from outside is on the mail exclude list',
+    }
   return null
 }
 

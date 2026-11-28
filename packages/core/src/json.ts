@@ -167,6 +167,7 @@ const meetingMeta = Schema.Struct({
   ends_at: Schema.String,
   status: Schema.Literals(['scheduled', 'cancelled']),
   conference_url: Schema.NullOr(Schema.String),
+  location: Schema.optionalKey(Schema.String),
   organizer: Schema.NullOr(Schema.String),
   recurring_instance_id: Schema.NullOr(Schema.String),
   rsvp: Schema.Record(Schema.String, Schema.mutableKey(rsvp)),

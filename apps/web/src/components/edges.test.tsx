@@ -681,6 +681,7 @@ describe('E7 · one icon list, one brand mark', () => {
       Page: 'document',
       Meeting: 'event',
       Square: 'checkbox',
+      Place: 'location',
     }
     // Each glyph's display name is its Carbon name in kebab case.
     const nouns = Object.entries(icons).flatMap(([name, v]) =>

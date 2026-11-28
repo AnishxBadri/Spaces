@@ -285,6 +285,7 @@ const meetingClaim = Schema.Union([
     subject: Schema.optional(maxLength(2000)),
     organizer: Schema.optional(text),
     conferenceUrl: Schema.optional(text),
+    location: Schema.optional(maxLength(2000)),
     recurringInstanceId: Schema.optional(text),
     attendees: Schema.Array(
       Schema.Struct({
@@ -367,6 +368,7 @@ export const readMeetingClaim = (
       subject: blankToNull(c.subject),
       organizer: c.organizer?.toLowerCase() ?? null,
       conferenceUrl: c.conferenceUrl ?? null,
+      location: blankToNull(c.location),
       recurringInstanceId: c.recurringInstanceId ?? null,
       attendees: c.attendees.map((a) => ({
         email: a.email.toLowerCase(),

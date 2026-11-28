@@ -29,6 +29,7 @@ const aMeeting = (over: Partial<ListedMeeting> = {}): ListedMeeting => ({
   people: [],
   record: null,
   callLink: false,
+  place: false,
   mine: true,
   members: [],
   noteId: null,

@@ -49,6 +49,12 @@ export const calendarEvent = Schema.Struct({
   ),
   recurringEventId: Schema.optional(Schema.String),
   originalStartTime: Schema.optional(time),
+  /** `default`, or Google's `outOfOffice`, `focusTime`, `workingLocation`, `birthday`… */
+  eventType: Schema.optional(Schema.String),
+  /** `default`, `public`, `private` or `confidential`. */
+  visibility: Schema.optional(Schema.String),
+  /** The place as the organiser typed it; the description is never read. */
+  location: Schema.optional(Schema.String),
 })
 
 export type CalendarEvent = typeof calendarEvent.Type
@@ -147,8 +153,32 @@ export type Mapped =
     }
   | {
       readonly _tag: 'skip'
-      readonly reason: 'before-connection' | 'unreadable'
+      readonly reason: SkipReason
     }
+
+/**
+ * Why an event is not sent: an all-day block, a non-meeting event type, an
+ * event its owner made private, one older than the connection, or one that
+ * cannot be read.
+ */
+export type SkipReason =
+  'before-connection' | 'unreadable' | 'all-day' | 'event-type' | 'private'
+
+/**
+ * Whether a live event is one this plugin never sends: an all-day block
+ * (dated, not timed), any of Google's special types (out of office, focus
+ * time, working location, birthday), or one marked private. A cancellation
+ * is never refused here: it can only mark a meeting the host already holds.
+ */
+const refusedKind = (event: CalendarEvent): SkipReason | null => {
+  if (event.start?.dateTime === undefined && event.start?.date !== undefined)
+    return 'all-day'
+  if ((event.eventType ?? 'default') !== 'default') return 'event-type'
+  // `confidential` is Google's older word for the same switch.
+  if (event.visibility === 'private' || event.visibility === 'confidential')
+    return 'private'
+  return null
+}
 
 /**
  * One event → what the job sends.
@@ -157,6 +187,7 @@ export type Mapped =
  * - An event that ended before the connection is skipped, cancelled or not:
  *   the change feed reports edits to old events too, and nothing older than
  *   the connection is ever written.
+ * - A live all-day, special-typed or private event is skipped (`refusedKind`).
  */
 export const mapEvent = (event: CalendarEvent, connectedAt: string): Mapped => {
   const cancelled = event.status === 'cancelled'
@@ -176,7 +207,10 @@ export const mapEvent = (event: CalendarEvent, connectedAt: string): Mapped => {
   }
   if (Date.parse(endsAt) < Date.parse(connectedAt))
     return { _tag: 'skip', reason: 'before-connection' }
+  const refused = cancelled ? null : refusedKind(event)
+  if (refused !== null) return { _tag: 'skip', reason: refused }
   const conferenceUrl = conferenceUrlOf(event)
+  const location = event.location?.trim() ?? ''
   return {
     _tag: 'claim',
     claim: {
@@ -191,6 +225,7 @@ export const mapEvent = (event: CalendarEvent, connectedAt: string): Mapped => {
         ? {}
         : { organizer: event.organizer.email }),
       ...(conferenceUrl === undefined ? {} : { conferenceUrl }),
+      ...(location === '' ? {} : { location }),
       ...(event.recurringEventId === undefined
         ? {}
         : { recurringInstanceId: event.id }),

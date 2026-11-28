@@ -32,12 +32,14 @@ export type HeadMeeting = Pick<
 }
 
 /**
- * The head's `···`: `Join call ↗` while there is a call to join, and
- * `Open in Google Calendar ↗` for a meeting the calendar holds.
+ * The head's `···`: `Join call ↗` while there is a call to join,
+ * `Open in Google Calendar ↗` for a meeting the calendar holds, and last,
+ * for a reader who may, `Remove from Spaces…`.
  */
 export function sheetMenuItems(
   m: HeadMeeting,
   now: Date,
+  onRemove: (() => void) | null = null,
 ): Array<MoreMenuEntry> {
   const items: Array<MoreMenuEntry> = []
   if (m.conferenceUrl !== null && !m.cancelled && !isOver(m, now))
@@ -53,6 +55,15 @@ export function sheetMenuItems(
       icon: <ProviderMark brand="googleCalendar" />,
       href: googleDayUrl(m.startsAt),
       title: 'Opens the day in Google Calendar',
+    })
+  if (onRemove !== null)
+    items.push({
+      label: 'Remove from Spaces…',
+      icon: <icon.delete />,
+      onSelect: onRemove,
+      opens: true,
+      destructive: true,
+      title: 'Takes it out of Spaces; it stays in Google Calendar',
     })
   return items
 }
@@ -89,6 +100,7 @@ export function SheetHead({
   now,
   today,
   next,
+  onRemove = null,
 }: {
   m: HeadMeeting
   frame: SheetFrame
@@ -96,6 +108,8 @@ export function SheetHead({
   today: string
   /** Whether it is the next meeting today; null when the sheet cannot tell. */
   next: boolean | null
+  /** `Remove from Spaces…`; null when it is not the reader's to remove. */
+  onRemove?: (() => void) | null | undefined
 }) {
   const Title = frame === 'window' ? DialogTitle : 'h2'
   const Description = frame === 'window' ? DialogDescription : 'p'
@@ -160,7 +174,7 @@ export function SheetHead({
           variant="head"
           label={title}
           forceMenu
-          items={sheetMenuItems(m, now)}
+          items={sheetMenuItems(m, now, onRemove)}
         />
         {m.conferenceUrl !== null && joinStands(m, now) ? (
           <Button asChild>

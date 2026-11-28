@@ -176,6 +176,7 @@ const meetingOut = {
   subject: 'Intro',
   organizer: 'bob@acme.example',
   conferenceUrl: 'https://meet.example/x',
+  location: null,
   recurringInstanceId: 'r-1',
   attendees: [
     { email: 'ann@acme.example', name: 'Ann', rsvp: 'accepted', self: true },
@@ -243,7 +244,7 @@ table('readMeetingClaim', (input) => read(call(readMeetingClaim, input)))([
   ],
   ['an unreadable start', { ...meeting, startsAt: 'soon' }, REFUSED],
   ['a numeric start', { ...meeting, startsAt: 1_760_000_000_000 }, REFUSED],
-  ['a stray key', { ...meeting, location: 'HQ' }, REFUSED],
+  ['a stray key', { ...meeting, description: 'Door code 4471' }, REFUSED],
   [
     'a stray attendee key',
     { ...meeting, attendees: [{ ...attendee, role: 'chair' }] },

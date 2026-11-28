@@ -71,6 +71,8 @@ export type ListedMeeting = {
   record: MeetingRecord | null
   /** It has a call link (the camera glyph). */
   callLink: boolean
+  /** It names a place (the pin glyph, where there is no call link). */
+  place: boolean
   /** The reader organised it, was invited, or logged it. */
   mine: boolean
   /** Our members in it other than the reader, by name. */

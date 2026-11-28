@@ -5,6 +5,7 @@ import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   MeetingDetail,
+  MeetingRemoval,
   MeetingSheetData,
   PrepEvent,
 } from '#/lib/server-fns'
@@ -115,6 +116,7 @@ const DETAIL: MeetingDetail = {
   endsAt: fromNow(2.5),
   cancelled: false,
   conferenceUrl: 'https://meet.google.com/abc-defg-hij',
+  location: null,
   participants: [
     { email: 'ana@flent.io', name: 'Ana Reyes', rsvp: 'accepted' },
     { email: 'ben@flent.io', name: null, rsvp: 'tentative' },
@@ -142,11 +144,14 @@ const DETAIL: MeetingDetail = {
   nothingToNote: false,
 }
 
+/** The sheet's read, as `getMeetingSheet` answers it. */
+type SheetRead = MeetingSheetData & { removal: MeetingRemoval | null }
+
 /** The sheet's read around a window's read. */
 const sheetOf = (
   meeting: MeetingDetail,
-  over: Partial<Omit<MeetingSheetData, 'meeting'>> = {},
-): MeetingSheetData => ({
+  over: Partial<Omit<SheetRead, 'meeting'>> = {},
+): SheetRead => ({
   meeting,
   kind: 'meeting',
   firstMeeting: false,
@@ -160,6 +165,7 @@ const sheetOf = (
     line: i === 0 ? 'Flent · CEO' : null,
   })),
   recent: { record: null, rows: [] },
+  removal: null,
   ...over,
 })
 
