@@ -61,6 +61,7 @@ Plus Email (project 35: the thread as message cards with the reply as its last c
 - `SPA-472` `errors-1` — a failed query shows its area's plain line and logs the cause; every failure class carries a message; one query failure per area; unknown `/api` paths answer 404 (D117). Project 40; `afk`.
 - `SPA-490` `toasts-1` — an error toast closes after 10 seconds; only one whose failure shows nowhere else stays until dismissed. Project 40; `afk`.
 - `SPA-501` `files-phone` — the file window and the file's page at 390px: a head that clips, the rail over the body, a page that scrolls sideways. Project 40; `hitl` (where the rail goes on a phone).
+- `SPA-504` — a citation's label is resolved without asking whether the reader may read its source, in Ask and in the brief's `Ask about this`. Project 40; `afk`.
 - `SPA-486` `mcp-schema` — an MCP tool's JSON Schema is generated from its Effect decoder; a live MCP client check. Project 40; `afk`.
 - `SPA-487` `schema-tidy` — one plain-record guard, the registry's error wording, no exports kept only for tests. Project 40; `afk`.
 - `SPA-488` `auth-links` — `/join` and `/reset` require their token; a link without one says so. Project 40; `afk`.
