@@ -44,12 +44,14 @@ Plus Email (project 35: the thread as message cards with the reply as its last c
 
 - `SPA-389` `ai-b` — the mandate in every judging lane, and cached tokens on the ledger. Project 31; `migration`, `hitl`: the owner confirms AI column answers may change under the mandate.
 - `SPA-439` — a note's preview strips its markdown on the notes list, a record's notes and Ask. Project 41; `afk`.
-- `SPA-440` `meetings-1` — the Meetings page: Upcoming and Past tabs, a person chip (`Mine` by default), thread rows, a `No write-up` band with a recorder's grace hour, `Log interaction` in the head, a fixed pane (D112). Project 34; `afk`.
-- `SPA-441` `meetings-2` — Prep lives only in an upcoming meeting's window: a cited brief where the write-up will go, `Ask about this`, `Save as note` (D112). Project 34; `afk`, after SPA-429.
-- `SPA-442` `meetings-3` — `Write it up` opens the note window on any page; action items are read from every shared write-up and decided in the meeting window and on Today under Tasks (D112). Project 34; `afk`, after SPA-429.
-- `SPA-443` `meetings-4` — calendar sync keeps only timed, ordinary, non-private events with an outside attendee off the exclude list; `Remove from Spaces…` is remembered (D112). Project 34; `migration`, `afk`, google-calendar bump.
+- `SPA-440` `meetings-1` — the Meetings page as two panes: an agenda with date leaves and a Past list beside the open meeting, `Mine · Everyone`, the grace hour, `Log interaction` in the head; Email's pane line turns ink (D112, D121). Project 34; `afk`.
+- `SPA-441` `meetings-2` — the brief: a `Brief` star-cell button, four cited parts, `Ask about this` and `Save as note`; no other surface starts it (D112). Project 34; `afk`, after SPA-502.
+- `SPA-442` `meetings-3` — `Write it up` opens the note window on any page; `Nothing to note`; action items are read from every shared write-up and decided in the meeting and on Today under Tasks (D112). Project 34; `afk`, after SPA-502.
+- `SPA-443` `meetings-4` — calendar sync keeps only timed, ordinary, non-private events with an outside attendee off the exclude list and reads the place; `Remove from Spaces…` is a drawn confirm and is remembered (D112). Project 34; `migration`, `afk`, google-calendar bump, after SPA-502.
 - `SPA-444` `meetings-5` — Today's Write-ups are yours with the grace hour; the day strip's head names the next meeting and shows `Join ↗` near a call (D112). Project 34; `afk`, after SPA-440.
 - `SPA-445` `meetings-6` — a record's Interactions tab opens with an `Upcoming` band; `This week` holds only the past; the `Next meeting` readout opens the meeting (D112). Project 34; `afk`.
+- `SPA-502` `meetings-7` — a meeting reads as one sheet in the pane and in the window: the head with its leaf and stamps, the rail (`Where`, `People` with host, new and replies, `Records`), the write-up, action items and `Recent` cards (D112). Project 34; `afk`, after SPA-440.
+- `SPA-503` `meetings-8` — `Filter`, `Jump to`, the `Later` fold and search on the Meetings page (D112). Project 34; `afk`, after SPA-440.
 - `SPA-446` — a multi-value field's rows: clicking a value copies it, remove is its own action with Undo, rows lead with the value's own icon. Project 42; `afk`.
 - `SPA-447` — Add to Team lists likely people before you type (this company's interaction participants first) and no rail picker opens empty. Project 42; `afk`.
 - `SPA-452` `record-tabs` — the many side of a paired relationship is a record tab with a table (Team, Associated deals, People, Companies, custom objects'); the rail keeps a three-row preview with `All n ›` (D115). Project 42; `afk`.
