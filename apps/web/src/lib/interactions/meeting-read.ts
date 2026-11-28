@@ -56,9 +56,9 @@ import {
   MONTH,
   NO_MEETING_FILTERS,
   filtersFor,
-  knownTimeZone,
   meetingFiltersOn,
 } from '#/lib/meetings/filter'
+import { knownTimeZone } from '#/lib/time-zone'
 import type {
   MeetingKind,
   MeetingsFilters,

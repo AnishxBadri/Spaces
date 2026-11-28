@@ -171,15 +171,16 @@ const WEB_NEVER_PLUGINS_NEVER_WORKER = {
 //     · lib/server/env
 // and, from tests only:
 //   lib/ai/{embed-chunks, embedding-pin, propose, route, providers/embed/ids,
-//     providers/embed/settings}
+//     providers/embed/settings, write-up-action-items}
 //   lib/arrival/{fixtures, noise, settings}
 //   lib/documents/{attach-link, clip, read-deck-gate, shelf, space-sources}
 //     · lib/feeds/fixtures · lib/import/{mapping, plan, stage} · lib/inbox/queue
 //     · lib/integrations/{job-status, ledger, status}
-//     · lib/interactions/{email-drafts, email-send}
+//     · lib/interactions/{email-drafts, email-send, write-up}
 //   lib/rpc/{api, versions} · lib/search/{query, query-embedding}
 //   lib/server/shared · lib/tokens/store
-//   test/{fake-imap, fake-ollama, minimal-pdf, queue-stub, reseed}
+//   test/{fake-imap, fake-ollama, minimal-pdf, queue-stub, recorded-note,
+//     reseed}
 const WORKER_NEVER_WEB_NEVER_PLUGINS = {
   regex: [
     internal(['web', PLUGIN_PKG]),

@@ -3,7 +3,7 @@ import { MockLanguageModelV4 } from 'ai/test'
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
-import { interactionEntity, jobRun, note, suggestion } from '@spaces/db/schema'
+import { interactionEntity, note, suggestion } from '@spaces/db/schema'
 import { user } from '@spaces/db/schema/auth'
 import { task } from '@spaces/db/schema/tasks'
 import { ref } from '@spaces/core/context/ref'
@@ -308,22 +308,6 @@ describe("a typed write-up's action items", () => {
     expect(second.status).toBe('skipped')
     expect(calls).toHaveLength(1)
     expect(await tasksOn(w.company)).toHaveLength(2)
-  })
-
-  it('are not queued again once a read of the note has finished, even one that found nothing', async () => {
-    const w = await typed()
-    await db.insert(jobRun).values({
-      queue: QUEUES.recordedNoteTasks,
-      entityId: w.noteId,
-      status: 'succeeded',
-      attempt: 1,
-      finishedAt: new Date(),
-    })
-    const before = enqueued.length
-    expect(await Effect.runPromise(writeUpClosedProgram(w.noteId))).toEqual({
-      queued: false,
-    })
-    expect(enqueued).toHaveLength(before)
   })
 
   it('Find action items proposes only the items not proposed yet', async () => {

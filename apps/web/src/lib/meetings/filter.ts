@@ -160,26 +160,3 @@ export function toggledValue<T extends string>(
   else next.add(value)
   return order.filter((v) => next.has(v))
 }
-
-/**
- * The reader's time zone, which `Jump to`'s months and Past's band counts
- * are read in; `UTC` when the name is not one the runtime knows.
- */
-export function knownTimeZone(tz: string | undefined): string {
-  if (tz === undefined || tz === '') return 'UTC'
-  try {
-    new Intl.DateTimeFormat('en-US', { timeZone: tz })
-    return tz
-  } catch {
-    return 'UTC'
-  }
-}
-
-/** The browser's time zone, by its IANA name; `UTC` where it cannot say. */
-export function browserTimeZone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-  } catch {
-    return 'UTC'
-  }
-}

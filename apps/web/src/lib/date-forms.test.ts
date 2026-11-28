@@ -54,8 +54,10 @@ describe('printed dates', () => {
 
   it('formats no date through Intl in apps/web/src or packages/core', () => {
     const intl = /Intl\.DateTimeFormat|toLocale(?:Date|Time)String/
-    const hits = [...sourceFiles(web), ...sourceFiles(core)].filter((f) =>
-      intl.test(readFileSync(f, 'utf8')),
+    // The one module that asks `Intl` a zone's name and prints nothing.
+    const zoneName = join(web, 'lib/time-zone.ts')
+    const hits = [...sourceFiles(web), ...sourceFiles(core)].filter(
+      (f) => f !== zoneName && intl.test(readFileSync(f, 'utf8')),
     )
     expect(hits.map((f) => relative(web, f))).toEqual([])
   })

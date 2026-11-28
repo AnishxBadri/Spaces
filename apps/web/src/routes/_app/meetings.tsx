@@ -31,12 +31,12 @@ import { Button } from '#/components/ui/button'
 import { FolderBody } from '#/components/ui/tabs'
 import {
   NO_MEETING_FILTERS,
-  browserTimeZone,
   filtersFor,
   meetingAddressOf,
   meetingFiltersOf,
   meetingFiltersOn,
 } from '#/lib/meetings/filter'
+import { browserTimeZone } from '#/lib/time-zone'
 import type { MeetingsFilters } from '#/lib/meetings/filter'
 import { defaultOpen, nextToday, upcomingHorizon } from '#/lib/meetings/list'
 import type { MeetingsTab, Whose } from '#/lib/meetings/list'
