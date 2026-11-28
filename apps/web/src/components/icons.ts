@@ -128,6 +128,7 @@ import {
   UserFollow,
   UserMultiple as CarbonUserMultiple,
   Version,
+  Video as CarbonVideo,
   View,
   ViewOff,
   WarningAlt as CarbonWarningAlt,
@@ -298,6 +299,8 @@ export const TagGroup = carbon(CarbonTagGroup, 'tag--group')
 export const TextFont = carbon(CarbonTextFont, 'text--font')
 export const Time = carbon(CarbonTime, 'time')
 export const User = carbon(CarbonUser, 'user')
+/** A meeting's call link: the camera on an agenda row. */
+export const Video = carbon(CarbonVideo, 'video')
 export const UserMultiple = carbon(CarbonUserMultiple, 'user--multiple')
 export const WarningAlt = carbon(CarbonWarningAlt, 'warning--alt')
 

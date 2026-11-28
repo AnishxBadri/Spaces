@@ -2,7 +2,7 @@ import { Option, Schema } from 'effect'
 import { uuidString } from '@spaces/core/attributes/registry'
 import { PROVIDER_TABS } from '#/lib/connections/provider-view'
 import { EMAIL_TABS, THREAD_FILTERS } from '#/lib/email/threads'
-import { MEETING_FILTERS } from '#/lib/meetings/list'
+import { MEETINGS_TABS, WHOSE } from '#/lib/meetings/list'
 import { composeSearchShape, modalSearchShape } from '#/lib/modal-search'
 import { caught, fallback, searchValidator } from '#/lib/search-validator'
 
@@ -54,11 +54,16 @@ export const importBatchSearch = searchValidator(
   }),
 )
 
-/** `/meetings`: the list's filter and the window it opens. */
+/**
+ * `/meetings`: the tab, whose meetings, and the open meeting by `id` (a
+ * copied `modal=meeting&id=` link opens the same one); a file's window over
+ * the page takes `modal=file&id=`.
+ */
 export const meetingsSearch = searchValidator(
   Schema.Struct({
     ...modalSearchShape,
-    show: caught(Schema.Literals(MEETING_FILTERS)),
+    tab: caught(Schema.Literals(MEETINGS_TABS)),
+    whose: caught(Schema.Literals(WHOSE)),
   }),
 )
 

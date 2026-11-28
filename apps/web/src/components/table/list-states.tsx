@@ -24,16 +24,20 @@ export function ListLoadingRow({ plural }: { plural: string }) {
 /** The list query failed: say so, and offer it again. */
 export function ListErrorRow({
   plural,
+  line,
   onRetry,
 }: {
   plural: string
+  /** The sentence in place of `Could not load <plural> · …`. */
+  line?: string | undefined
   onRetry: () => void
 }) {
   return (
     <div data-list-state="error" role="alert" className={ROW}>
       <span aria-hidden className="size-2 shrink-0 bg-destructive" />
       <span className="min-w-0 flex-1 truncate">
-        Could not load {plural.toLowerCase()} · the database did not answer
+        {line ??
+          `Could not load ${plural.toLowerCase()} · the database did not answer`}
       </span>
       <Button size="sm" variant="outline" onClick={onRetry}>
         Retry

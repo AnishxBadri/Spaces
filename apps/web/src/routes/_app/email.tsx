@@ -102,9 +102,13 @@ function useSplit(): boolean | null {
   )
 }
 
-/** The left pane: the whole folder below the split, 480px beside the right one from it. */
+/**
+ * The left pane: the whole folder below the split, 480px beside the right
+ * one from it, an ink line between them: the list and the open item are two
+ * things.
+ */
 const LIST_PANE =
-  'flex min-h-0 w-full min-w-0 flex-col min-[1100px]:w-120 min-[1100px]:shrink-0 min-[1100px]:border-r min-[1100px]:border-rule'
+  'flex min-h-0 w-full min-w-0 flex-col min-[1100px]:w-120 min-[1100px]:shrink-0 min-[1100px]:border-r min-[1100px]:border-hairline'
 
 /** The right pane: bone until something is open, and absent below the split. */
 const OPEN_PANE = 'hidden min-h-0 min-w-0 flex-1 bg-bone min-[1100px]:flex'

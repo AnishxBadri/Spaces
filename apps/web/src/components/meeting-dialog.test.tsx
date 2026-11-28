@@ -4,7 +4,8 @@ import { createRoot } from 'react-dom/client'
 import type { Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { MeetingDetail, PrepEvent } from '#/lib/server-fns'
-import { MeetingDialog, applyPrepEvent } from './meeting-dialog'
+import { MeetingDialog } from './meeting-dialog'
+import { applyPrepEvent } from './meetings/meeting-sheet'
 
 /**
  * The meeting window: RSVPs shown and never editable with "Open in

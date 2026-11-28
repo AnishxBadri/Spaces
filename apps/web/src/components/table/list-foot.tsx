@@ -25,17 +25,22 @@ export type ListFootPage = {
  * while the rows scroll above it.
  * - `count` absent, the left lane is empty: the list is drawing a state
  *   (loading, failed, nothing matched) in place of its rows.
+ * - `words` stands in for `shown of total` where the tab's own count is
+ *   the news (`241 meetings`); Load more follows it the same way.
  * - `folder` rules it in hairline, as the folder body it closes; otherwise
  *   in rule, as a card.
  */
 export function ListFoot({
   count,
+  words,
   page,
   end,
   folder = false,
   className,
 }: {
   count?: { shown: number; total: number } | undefined
+  /** Mono words in the count's place: `241 meetings`. */
+  words?: string | undefined
   page?: ListFootPage | undefined
   end?: ReactNode
   folder?: boolean | undefined
@@ -56,7 +61,11 @@ export function ListFoot({
             {grouped(count.shown)} of {grouped(count.total)}
           </span>
         )}
-        {count !== undefined && page?.hasMore === true ? (
+        {words === undefined ? null : (
+          <span className="tabular field-label text-graphite">{words}</span>
+        )}
+        {(count !== undefined || words !== undefined) &&
+        page?.hasMore === true ? (
           <>
             <span aria-hidden className="field-label text-graphite">
               ·

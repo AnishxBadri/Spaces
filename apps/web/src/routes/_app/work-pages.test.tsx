@@ -11,6 +11,7 @@ import {
   it,
   vi,
 } from 'vitest'
+import type * as QueryModule from '@tanstack/react-query'
 import type * as RouterModule from '@tanstack/react-router'
 import type { AnyRoute } from '@tanstack/react-router'
 import { ClockProvider } from '#/components/clock'
@@ -59,6 +60,7 @@ vi.setConfig({ hookTimeout: 90_000 })
 const win = new Window({ url: 'http://localhost/' })
 let createRoot: typeof CreateRoot
 let router: typeof RouterModule
+let query: typeof QueryModule
 const routes = new Map<string, { Route: AnyRoute }>()
 
 beforeAll(async () => {
@@ -97,6 +99,7 @@ beforeAll(async () => {
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true)
   ;({ createRoot } = await import('react-dom/client'))
   router = await import('@tanstack/react-router')
+  query = await import('@tanstack/react-query')
   routes.set('tasks', await import('#/routes/_app/tasks'))
   routes.set('notes', await import('#/routes/_app/notes'))
   routes.set('meetings', await import('#/routes/_app/meetings'))
@@ -170,12 +173,18 @@ async function mount(path: string, url: string, loader?: () => unknown) {
     routeTree: rootRoute.addChildren([app.addChildren([route])]),
     history: createMemoryHistory({ initialEntries: [url] }),
   })
+  // Meetings reads its list through the query cache.
+  const client = new query.QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  })
   await act(async () => {
     await r.load()
     root.render(
-      <ClockProvider now={NOW}>
-        <RouterProvider router={r} />
-      </ClockProvider>,
+      <query.QueryClientProvider client={client}>
+        <ClockProvider now={NOW}>
+          <RouterProvider router={r} />
+        </ClockProvider>
+      </query.QueryClientProvider>,
     )
   })
 }
@@ -431,23 +440,17 @@ describe('Meetings', () => {
     fns.listMeetings.mockResolvedValue({
       calendar: true,
       audience: { isAdmin: true, admins: [] },
-      upcoming: [],
-      past: [],
-      earlier: 0,
+      team: true,
+      rows: [],
+      nextCursor: null,
       // What the server counted, over more meetings than it sent.
-      counts: { all: 16, upcoming: 4, past: 12, unwritten: 3, mine: 9 },
+      counts: { upcoming: 4, past: 12, unwritten: 3 },
     })
     await mount('meetings', '/meetings', () => null)
     await until('the counts', () =>
-      text('[role="tab"]').some((t) => t === 'All16'),
+      text('[role="tab"]').some((t) => t === 'Upcoming4'),
     )
-    expect(text('[role="tab"]')).toEqual([
-      'All16',
-      'Upcoming4',
-      'Past12',
-      'No write-up3',
-      'Mine9',
-    ])
+    expect(text('[role="tab"]')).toEqual(['Upcoming4', 'Past12'])
   })
 })
 

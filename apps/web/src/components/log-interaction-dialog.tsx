@@ -63,6 +63,7 @@ export function LogInteractionDialog({
   trigger,
   hotkey,
   defaultKind = null,
+  onLogged,
 }: {
   /**
    * The record the dialog was opened from — pre-added as an attendee.
@@ -78,6 +79,8 @@ export function LogInteractionDialog({
   hotkey?: string
   /** The kind it opens on: the Interactions tab's Calls or Meetings. */
   defaultKind?: LoggableKind | null | undefined
+  /** The row is written: a list that holds it reads again. */
+  onLogged?: ((id: string) => void) | undefined
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -159,6 +162,7 @@ export function LogInteractionDialog({
           : {}),
       })
       void router.invalidate()
+      onLogged?.(logged.id)
       if (noteId !== null) openNote(noteId)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Could not log it')

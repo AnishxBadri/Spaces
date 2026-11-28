@@ -784,8 +784,18 @@ table('meetings', [
   [
     'listMeetings',
     'instants',
-    { now: '2026-11-19T09:30:15.5Z', until: '2026-12-19T00:00:00Z' },
-    { now: '2026-11-19T09:30:15.5Z', until: '2026-12-19T00:00:00Z' },
+    {
+      tab: 'upcoming',
+      whose: 'mine',
+      now: '2026-11-19T09:30:15.5Z',
+      until: '2026-12-19T00:00:00Z',
+    },
+    {
+      tab: 'upcoming',
+      whose: 'mine',
+      now: '2026-11-19T09:30:15.5Z',
+      until: '2026-12-19T00:00:00Z',
+    },
   ],
   ['getMeeting', 'an id', { id: ID }, { id: ID }],
   [

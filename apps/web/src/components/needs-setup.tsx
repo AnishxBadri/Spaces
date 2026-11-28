@@ -14,6 +14,7 @@ export function NeedsSetup({
   action,
   to,
   thing,
+  ask = 'set up',
   audience,
 }: {
   /** What is missing, said plainly: "No calendar connected". */
@@ -23,12 +24,14 @@ export function NeedsSetup({
   to: SetupPath
   /** What a member asks for: "Google", "more enrichment sources". */
   thing: string
+  /** The member's verb: `Ask Anika Rao to connect Google`. */
+  ask?: string | undefined
   audience: SetupAudience
 }) {
   if (!audience.isAdmin)
     return (
       <p data-needs-setup="member" className="text-label text-graphite">
-        Ask {adminNames(audience.admins)} to set up {thing}
+        Ask {adminNames(audience.admins)} to {ask} {thing}
       </p>
     )
   return (

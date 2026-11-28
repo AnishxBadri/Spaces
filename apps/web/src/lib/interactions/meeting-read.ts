@@ -4,12 +4,10 @@ import {
   asc,
   desc,
   eq,
-  gt,
   gte,
   inArray,
   isNull,
   lt,
-  lte,
   ne,
   sql,
 } from 'drizzle-orm'
@@ -30,6 +28,7 @@ import {
   objectDef,
   suggestion,
 } from '@spaces/db/schema'
+import { activity } from '@spaces/db/schema/activity'
 import { user as member } from '@spaces/db/schema/auth'
 import type {
   InteractionMeta,
@@ -38,6 +37,7 @@ import type {
 import { readNotePayload } from '@spaces/core/ai/note'
 import { jsonRecord, jsonString } from '@spaces/core/json'
 import { sinceRemoved } from '@spaces/core/plugins/registry'
+import { KEYED_PROVIDER_IDS } from '@spaces/core/providers/keyed'
 import { readTaskPayload } from '@spaces/core/ai/task'
 import { ref } from '@spaces/core/context/ref'
 import { canRead } from '@spaces/core/read-policy'
@@ -51,8 +51,15 @@ import type {
   MeetingRecord,
   TodayMeeting,
 } from '#/lib/meetings/day'
-import { PAST_LIMIT } from '#/lib/meetings/list'
-import type { ListedMeeting, MeetingsList } from '#/lib/meetings/list'
+import { PAST_STEP } from '#/lib/meetings/list'
+import type {
+  ListedMeeting,
+  MeetingsPage,
+  MeetingsQuery,
+  WriteUpState,
+} from '#/lib/meetings/list'
+import { GRACE_MS, isUnwritten } from '#/lib/meetings/unwritten'
+import { noteExcerpt } from '#/lib/notes/excerpt'
 import { recorderLinksProgram } from './recorder-links'
 import { notesViaProgram } from '../notes/via'
 import type { NoteVia } from '../notes/via-mark'
@@ -303,104 +310,218 @@ export type MeetingReader = { id: string; email: string }
 /** The write-up's entity, aliased `e` because `canReadNoteSql` reads `e`. */
 const writeUp = alias(entity, 'e')
 
+/** A list of lowercased addresses as a Postgres `text[]`. */
+const addressArray = (emails: ReadonlySet<string>) =>
+  emails.size === 0
+    ? sql`array[]::text[]`
+    : sql`array[${sql.join(
+        [...emails].map((e) => sql`${e}`),
+        sql`, `,
+      )}]::text[]`
+
+/** The meeting's organiser or an invitee is one of `emails`, case-blind. */
+const attendedBySql = (emails: ReadonlySet<string>) =>
+  emails.size === 0
+    ? sql`false`
+    : sql`(lower(coalesce(${interaction.meta} ->> 'organizer', '')) = any(${addressArray(emails)}) or exists (select 1 from jsonb_object_keys(case when jsonb_typeof(${interaction.meta} -> 'rsvp') = 'object' then ${interaction.meta} -> 'rsvp' else '{}'::jsonb end) k where lower(k) = any(${addressArray(emails)})))`
+
+/** When a row ended: a meeting's `ends_at`, else (a call) its start. */
+const endSql = sql`coalesce(case when ${interaction.meta} ->> 'kind' = 'meeting' then (${interaction.meta} ->> 'ends_at')::timestamptz end, ${interaction.occurredAt})`
+
+const cancelledSql = sql`(coalesce(${interaction.meta} ->> 'status', '') = 'cancelled')`
+
 /**
- * The Meetings page's read: what starts in `(now, until)`, earliest first,
- * and what started by `now`, the ones still needing a write-up first, then
- * newest first, cut at `PAST_LIMIT`.
- * - Every meeting row is visible to every member; canRead decides only
- *   whether the reader may read the write-up, which reads `private`.
- * - `mine` matches the participants against the reader's login address and
- *   every connected account's, case-blind; the counts match the same way.
- * - The filter counts and `earlier` are counted over every meeting, so a
- *   tab reads true past the cut.
- * - A row's `tasks` counts the task suggestions citing it, open or
- *   accepted.
+ * Past's cursor: whether the last row owed a write-up, its start as
+ * Postgres printed it (so no precision is lost on the way back) and its id.
+ */
+type PastCursor = { unwritten: boolean; at: string; id: string }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const PG_INSTANT =
+  /^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d(\.\d{1,6})?[+-]\d\d(:\d\d)?$/
+
+const encodeCursor = (c: PastCursor): string =>
+  Buffer.from(`${c.unwritten ? '1' : '0'}|${c.at}|${c.id}`).toString(
+    'base64url',
+  )
+
+/** The cursor, or null when it is not one this read wrote. */
+const decodeCursor = (raw: string): PastCursor | null => {
+  const [u, at, id] = Buffer.from(raw, 'base64url').toString().split('|')
+  if ((u !== '0' && u !== '1') || !PG_INSTANT.test(at) || !UUID.test(id))
+    return null
+  return { unwritten: u === '1', at, id }
+}
+
+/** Every member by id and every address that is theirs, lowercased. */
+const membersProgram = () =>
+  Effect.gen(function* () {
+    const [members, accounts] = yield* Effect.all([
+      query(() =>
+        db
+          .select({ id: member.id, name: member.name, email: member.email })
+          .from(member),
+      ),
+      query(() =>
+        db
+          .select({
+            userId: accountConnection.userId,
+            email: accountConnection.externalEmail,
+            provider: accountConnection.provider,
+            status: accountConnection.status,
+          })
+          .from(accountConnection),
+      ),
+    ])
+    const byAddress = new Map<string, { id: string; name: string }>()
+    for (const m of members)
+      byAddress.set(m.email.toLowerCase(), { id: m.id, name: m.name })
+    const nameOf = new Map(members.map((m) => [m.id, m.name]))
+    for (const a of accounts)
+      byAddress.set(a.email.toLowerCase(), {
+        id: a.userId,
+        name: nameOf.get(a.userId) ?? a.email,
+      })
+    const keyed: ReadonlyArray<string> = KEYED_PROVIDER_IDS
+    const recording = new Set(
+      accounts
+        .filter((a) => keyed.includes(a.provider) && a.status !== 'revoked')
+        .map((a) => a.userId),
+    )
+    const addressesOf = (ids: ReadonlySet<string>) =>
+      new Set(
+        [...byAddress].flatMap(([email, m]) => (ids.has(m.id) ? [email] : [])),
+      )
+    return { count: members.length, byAddress, addressesOf, recording }
+  })
+
+/**
+ * The Meetings page's read: one tab of the list for one params object.
+ * - Upcoming: the meetings not yet ended that start before `until`,
+ *   earliest first, cancelled ones kept and marked.
+ * - Past: the meetings and calls that ended by `now`, cancelled ones left
+ *   out; those owing a write-up first, then newest first, a page at a time.
+ * - `whose: 'mine'` keeps the meetings the reader organised or was invited
+ *   to, matched on their login address and every connected account's; a
+ *   row with no invite list (a logged call) is theirs when they logged it
+ *   or wrote it up. The counts follow the same choice.
+ * - A row owes a write-up by `isUnwritten`; the SQL that sorts and counts
+ *   mirrors it, recorder and grace hour included.
+ * - Every row is visible to every member; canRead decides only whether
+ *   the reader may read the write-up and its summary.
  */
 export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
   reader: MeetingReader,
-  now: Date,
-  until: Date,
-): Effect.fn.Return<MeetingsList, MeetingReadFailed> {
+  params: MeetingsQuery,
+): Effect.fn.Return<MeetingsPage & { members: number }, MeetingReadFailed> {
+  const now = new Date(params.now)
+  const until = new Date(params.until)
+  const team = yield* membersProgram()
+  const mine = team.addressesOf(new Set([reader.id]))
+  // The reader's login address is theirs even before a member row says so.
+  mine.add(reader.email.toLowerCase())
+  const recorders = team.addressesOf(team.recording)
+  const logged = yield* query(() =>
+    db
+      .select({ id: sql<string>`${activity.meta} ->> 'interactionId'` })
+      .from(activity)
+      .where(
+        and(
+          eq(activity.actorId, reader.id),
+          inArray(activity.verb, ['interaction.meeting', 'interaction.call']),
+        ),
+      ),
+  )
+  const loggedIds = logged.flatMap((l) => (UUID.test(l.id) ? [l.id] : []))
+
+  const graceEnd = new Date(now.getTime() - GRACE_MS)
+  const unwrittenSql = sql<boolean>`(${interaction.noteId} is null and not ${cancelledSql} and (not ${attendedBySql(recorders)} or ${endSql} <= ${graceEnd}))`
+  const noInvites = sql`coalesce(${interaction.meta} ->> 'kind', '') <> 'meeting'`
+  const mineSql = sql`(${attendedBySql(mine)} or (${noInvites} and (${
+    loggedIds.length === 0
+      ? sql`false`
+      : sql`${interaction.id} = any(array[${sql.join(
+          loggedIds.map((id) => sql`${id}`),
+          sql`, `,
+        )}]::uuid[])`
+  } or exists (select 1 from note wn where wn.entity_id = ${interaction.noteId} and wn.author_id = ${reader.id}))))`
+  const whoseSql = params.whose === 'mine' ? mineSql : sql`true`
+  const upcomingSql = sql`(${interaction.kind} = 'meeting' and ${endSql} > ${now} and ${interaction.occurredAt} < ${until})`
+  const pastSql = sql`(${interaction.kind} in ('meeting', 'call') and ${endSql} <= ${now} and not ${cancelledSql})`
+
   const columns = {
     id: interaction.id,
+    kind: interaction.kind,
     subject: interaction.subject,
     occurredAt: interaction.occurredAt,
     meta: interaction.meta,
     noteId: interaction.noteId,
+    at: sql<string>`${interaction.occurredAt}::text`,
     bodyReadable: sql<boolean>`${canReadNoteSql(reader.id)}`,
     bodySource: writeUp.sourceRef,
+    owes: sql<boolean>`${unwrittenSql}`,
+    author: sql<
+      string | null
+    >`(select wa.author_id from note wa where wa.entity_id = ${interaction.noteId})`,
+    body: sql<
+      string | null
+    >`case when ${canReadNoteSql(reader.id)} then (select left(wb.body_md, 2000) from note wb where wb.entity_id = ${interaction.noteId}) end`,
   }
-  const needsWriteUpSql = sql`(${interaction.noteId} is null and coalesce(${interaction.meta} ->> 'status', '') <> 'cancelled')`
-  const accounts = yield* query(() =>
-    db
-      .select({ email: accountConnection.externalEmail })
-      .from(accountConnection)
-      .where(eq(accountConnection.userId, reader.id)),
-  )
-  const mineSet = new Set(
-    [reader.email, ...accounts.map((a) => a.email)].map((e) => e.toLowerCase()),
-  )
-  const mineEmails = sql`array[${sql.join(
-    [...mineSet].map((e) => sql`${e}`),
-    sql`, `,
-  )}]::text[]`
-  const mineSql = sql`(lower(coalesce(${interaction.meta} ->> 'organizer', '')) = any(${mineEmails}) or exists (select 1 from jsonb_object_keys(case when jsonb_typeof(${interaction.meta} -> 'rsvp') = 'object' then ${interaction.meta} -> 'rsvp' else '{}'::jsonb end) k where lower(k) = any(${mineEmails})))`
-  const upcomingSql = sql`(${interaction.occurredAt} > ${now} and ${interaction.occurredAt} < ${until})`
-  const pastSql = sql`(${interaction.occurredAt} <= ${now})`
-  const [upcoming, past, tally] = yield* Effect.all([
-    query(() =>
-      db
-        .select(columns)
-        .from(interaction)
-        .leftJoin(writeUp, eq(writeUp.id, interaction.noteId))
-        .where(
-          and(
-            eq(interaction.kind, 'meeting'),
-            gt(interaction.occurredAt, now),
-            lt(interaction.occurredAt, until),
-          ),
+  const cursor =
+    params.cursor === undefined ? null : decodeCursor(params.cursor)
+  // A cursor this read did not write reads nothing rather than page one again.
+  const after =
+    params.cursor === undefined
+      ? undefined
+      : cursor === null
+        ? sql`false`
+        : sql`(${unwrittenSql}::int, ${interaction.occurredAt}, ${interaction.id}) < (${cursor.unwritten ? 1 : 0}, ${cursor.at}::timestamptz, ${cursor.id}::uuid)`
+  const rowsRead =
+    params.tab === 'upcoming'
+      ? query(() =>
+          db
+            .select(columns)
+            .from(interaction)
+            .leftJoin(writeUp, eq(writeUp.id, interaction.noteId))
+            .where(and(upcomingSql, whoseSql))
+            .orderBy(asc(interaction.occurredAt), asc(interaction.id)),
         )
-        .orderBy(asc(interaction.occurredAt), asc(interaction.id)),
-    ),
-    query(() =>
-      db
-        .select(columns)
-        .from(interaction)
-        .leftJoin(writeUp, eq(writeUp.id, interaction.noteId))
-        .where(
-          and(
-            eq(interaction.kind, 'meeting'),
-            lte(interaction.occurredAt, now),
-          ),
+      : query(() =>
+          db
+            .select(columns)
+            .from(interaction)
+            .leftJoin(writeUp, eq(writeUp.id, interaction.noteId))
+            .where(and(pastSql, whoseSql, after))
+            .orderBy(
+              desc(unwrittenSql),
+              desc(interaction.occurredAt),
+              desc(interaction.id),
+            )
+            .limit(PAST_STEP + 1),
         )
-        .orderBy(
-          desc(needsWriteUpSql),
-          desc(interaction.occurredAt),
-          desc(interaction.id),
-        )
-        .limit(PAST_LIMIT),
-    ),
+  const [read, tally] = yield* Effect.all([
+    rowsRead,
     query(() =>
       db
         .select({
           upcoming: sql<number>`count(*) filter (where ${upcomingSql})::int`,
           past: sql<number>`count(*) filter (where ${pastSql})::int`,
-          unwritten: sql<number>`count(*) filter (where ${pastSql} and ${needsWriteUpSql})::int`,
-          mine: sql<number>`count(*) filter (where (${upcomingSql} or ${pastSql}) and ${mineSql})::int`,
+          unwritten: sql<number>`count(*) filter (where ${pastSql} and ${unwrittenSql})::int`,
         })
         .from(interaction)
-        .where(eq(interaction.kind, 'meeting')),
+        .where(and(inArray(interaction.kind, ['meeting', 'call']), whoseSql)),
     ),
   ])
-  const counts = tally.at(0) ?? { upcoming: 0, past: 0, unwritten: 0, mine: 0 }
-  const rows = [...upcoming, ...past]
+  const more = params.tab === 'past' && read.length > PAST_STEP
+  const rows = more ? read.slice(0, PAST_STEP) : read
+  const ids = rows.map((r) => r.id)
   const sources = [
     ...new Set(
       rows.flatMap((r) => (r.bodySource === null ? [] : [r.bodySource])),
     ),
   ]
-  const [hydrated, names] = yield* Effect.all([
-    hydrate(rows),
+  const [records, names, summaries] = yield* Effect.all([
+    recordsOf(ids),
     sources.length === 0
       ? Effect.succeed([])
       : query(() =>
@@ -414,25 +535,27 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
             .from(integration)
             .where(inArray(integration.id, sources)),
         ),
+    // The line its logger typed, kept on the log's activity row.
+    ids.length === 0
+      ? Effect.succeed([])
+      : query(() =>
+          db
+            .select({
+              id: sql<string>`${activity.meta} ->> 'interactionId'`,
+              summary: sql<string | null>`${activity.meta} ->> 'summary'`,
+            })
+            .from(activity)
+            .where(
+              and(
+                inArray(activity.verb, [
+                  'interaction.meeting',
+                  'interaction.call',
+                ]),
+                inArray(sql<string>`${activity.meta} ->> 'interactionId'`, ids),
+              ),
+            ),
+        ),
   ])
-  // The write-ups' action items, by the meeting they cite.
-  const citing = rows.map((r) => ref.interaction(r.id))
-  const taskRows =
-    citing.length === 0
-      ? []
-      : yield* query(() =>
-          db.execute<{ ref: string; n: number }>(
-            sql`select r.ref, count(*)::int as n
-              from ${suggestion} cross join lateral unnest(${suggestion.refs}) as r(ref)
-              where ${suggestion.kind} = 'task' and ${suggestion.status} <> 'rejected'
-                and r.ref in (${sql.join(
-                  citing.map((c) => sql`${c}`),
-                  sql`, `,
-                )})
-              group by r.ref`,
-          ),
-        ).pipe(Effect.map((r) => r.rows))
-  const tasksOf = new Map(taskRows.map((t) => [t.ref, t.n]))
   const nameOf = new Map(
     names.map((i) => [
       i.id,
@@ -442,40 +565,96 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
       ),
     ]),
   )
-  const listed = rows.map((r, i): ListedMeeting => {
+  const typed = new Map(
+    summaries.flatMap((s) =>
+      s.summary === null || s.summary.trim() === ''
+        ? []
+        : [[s.id, s.summary.trim()] as const],
+    ),
+  )
+  const listed = rows.map((r): ListedMeeting => {
     const meta = meetingMeta(r.meta)
-    const own = Object.entries(meta?.rsvp ?? {}).find(([email]) =>
-      mineSet.has(email.toLowerCase()),
-    )
-    const organizer = meta?.organizer?.toLowerCase() ?? null
-    return {
-      ...hydrated[i],
-      // The reader is never among a row's people.
-      participants: hydrated[i].participants.filter(
-        (p) => !mineSet.has(p.email.toLowerCase()),
+    const linked = records.get(r.id) ?? []
+    const invited = participantsOf(meta, linked)
+    const ours = (email: string) => team.byAddress.get(email.toLowerCase())
+    const people =
+      meta === null
+        ? linked.filter((l) => l.kind === 'person').map((l) => l.name)
+        : invited
+            .filter(
+              (p) =>
+                ours(p.email) === undefined && !mine.has(p.email.toLowerCase()),
+            )
+            .map(participantName)
+    // The organiser and every invitee, by address.
+    const attendees = [
+      ...(meta === null || meta.organizer === null ? [] : [meta.organizer]),
+      ...Object.keys(meta?.rsvp ?? {}),
+    ].map((email) => email.toLowerCase())
+    const members = [
+      ...new Set(
+        attendees.flatMap((email) => {
+          const m = ours(email)
+          return m === undefined || m.id === reader.id ? [] : [m.name]
+        }),
       ),
-      mine: own !== undefined || (organizer !== null && mineSet.has(organizer)),
-      myRsvp: own?.[1] ?? null,
-      writeUp:
-        r.noteId === null ? 'none' : r.bodyReadable ? 'written' : 'private',
+    ]
+    const state: WriteUpState =
+      r.noteId === null ? 'none' : r.bodyReadable ? 'written' : 'private'
+    const endsAt = endOf(r.occurredAt, meta)
+    const cancelled = meta?.status === 'cancelled'
+    const record = linked.find((l) => l.kind !== 'person')
+    const isMine =
+      meta === null
+        ? loggedIds.includes(r.id) || r.author === reader.id
+        : attendees.some((email) => mine.has(email))
+    return {
+      id: r.id,
+      kind: r.kind === 'call' ? 'call' : 'meeting',
+      title: r.subject,
+      startsAt: r.occurredAt.toISOString(),
+      endsAt,
+      cancelled,
+      people,
+      record: record === undefined ? null : stripEmails(record),
+      callLink: (meta?.conference_url ?? null) !== null,
+      mine: isMine,
+      members,
+      noteId: r.noteId,
+      writeUp: state,
+      summary:
+        state === 'written'
+          ? (typed.get(r.id) ?? (r.body === null ? null : noteExcerpt(r.body)))
+          : null,
       via:
-        r.noteId !== null && r.bodyReadable && r.bodySource !== null
+        state === 'written' && r.bodySource !== null
           ? (nameOf.get(r.bodySource) ?? null)
           : null,
-      tasks: tasksOf.get(ref.interaction(r.id)) ?? 0,
+      unwritten: isUnwritten(
+        {
+          noteId: r.noteId,
+          cancelled,
+          endsAt,
+          recorded: attendees.some((email) => recorders.has(email)),
+        },
+        now,
+      ),
     }
   })
+  const last = rows.at(-1)
+  const counts = tally.at(0) ?? { upcoming: 0, past: 0, unwritten: 0 }
   return {
-    upcoming: listed.slice(0, upcoming.length),
-    past: listed.slice(upcoming.length),
-    earlier: Math.max(0, counts.past - past.length),
-    counts: {
-      all: counts.upcoming + counts.past,
-      upcoming: counts.upcoming,
-      past: counts.past,
-      unwritten: counts.unwritten,
-      mine: counts.mine,
-    },
+    rows: listed,
+    nextCursor:
+      more && last !== undefined
+        ? encodeCursor({
+            unwritten: last.owes,
+            at: last.at,
+            id: last.id,
+          })
+        : null,
+    counts,
+    members: team.count,
   }
 })
 
@@ -716,7 +895,12 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
           noteId: interaction.noteId,
         })
         .from(interaction)
-        .where(and(eq(interaction.id, id), eq(interaction.kind, 'meeting'))),
+        .where(
+          and(
+            eq(interaction.id, id),
+            inArray(interaction.kind, ['meeting', 'call']),
+          ),
+        ),
     )).at(0)
     if (!row) return yield* new MeetingNotFound({ id })
     const meta = meetingMeta(row.meta)

@@ -226,12 +226,15 @@ describe('ImportBatchRoute', () => {
 describe('MeetingsRoute', () => {
   const ROWS: Rows = [
     ['{}', {}, {}],
-    ["{ show: 'all' }", { show: 'all' }, { show: 'all' }],
-    ["{ show: 'upcoming' }", { show: 'upcoming' }, { show: 'upcoming' }],
-    ["{ show: 'past' }", { show: 'past' }, { show: 'past' }],
-    ["{ show: 'bogus' }", { show: 'bogus' }, { show: undefined }],
-    ['{ show: 2 }', { show: 2 }, { show: undefined }],
-    ['{ show: undefined }', { show: undefined }, { show: undefined }],
+    ["{ tab: 'upcoming' }", { tab: 'upcoming' }, { tab: 'upcoming' }],
+    ["{ tab: 'past' }", { tab: 'past' }, { tab: 'past' }],
+    ["{ tab: 'bogus' }", { tab: 'bogus' }, { tab: undefined }],
+    ['{ tab: 2 }', { tab: 2 }, { tab: undefined }],
+    ["{ whose: 'mine' }", { whose: 'mine' }, { whose: 'mine' }],
+    ["{ whose: 'everyone' }", { whose: 'everyone' }, { whose: 'everyone' }],
+    ["{ whose: 'all' }", { whose: 'all' }, { whose: undefined }],
+    // The filter tabs are gone: an old link's `show` is dropped.
+    ["{ show: 'past' }", { show: 'past' }, {}],
     [
       "{ modal: 'meeting', id: ID }",
       { modal: 'meeting', id: ID },
@@ -270,9 +273,9 @@ describe('MeetingsRoute', () => {
       { modal: undefined, id: undefined },
     ],
     [
-      "{ show: 'past', modal: 'meeting', id: ID, stray: 1 }",
-      { show: 'past', modal: 'meeting', id: ID, stray: 1 },
-      { modal: 'meeting', id: ID, show: 'past' },
+      "{ tab: 'past', modal: 'meeting', id: ID, stray: 1 }",
+      { tab: 'past', modal: 'meeting', id: ID, stray: 1 },
+      { modal: 'meeting', id: ID, tab: 'past' },
     ],
   ]
   it.each(ROWS)('%s', (_, input, out) => {

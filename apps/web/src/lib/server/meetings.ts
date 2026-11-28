@@ -19,12 +19,6 @@ export type {
   UnwrittenMeeting,
 } from '../interactions/meeting-read'
 export type { RecorderLink } from '../interactions/recorder-links'
-export type {
-  ListedMeeting,
-  MeetingFilter,
-  MeetingsList,
-  WriteUpState,
-} from '../meetings/list'
 
 const uuid = Schema.String.check(Schema.isUUID())
 
@@ -77,12 +71,25 @@ export const getTodayMeetings = createServerFn().handler(async () => {
 })
 
 /**
- * The Meetings page: what starts in `(now, until)` and the past, with
- * whether a calendar is connected and who a member asks. The browser sends
- * both instants, so "this week and next" is the reader's.
+ * The Meetings page: one tab of the list for one params object, with
+ * whether a calendar is connected, who a member asks, and whether the
+ * workspace has more than one member (the `Mine · Everyone` control). The
+ * browser sends both instants, so "this week and next" is the reader's.
  */
 export const listMeetings = createServerFn()
-  .validator(input(Schema.Struct({ now: isoInstant, until: isoInstant })))
+  .validator(
+    input(
+      Schema.Struct({
+        tab: Schema.Literals(['upcoming', 'past']),
+        whose: Schema.Literals(['mine', 'everyone']),
+        now: isoInstant,
+        until: isoInstant,
+        cursor: Schema.optional(
+          Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_-]{1,400}$/)),
+        ),
+      }),
+    ),
+  )
   .handler(async ({ data }) => {
     const user = await requireUser()
     const { calendarConnectedProgram, meetingListProgram } =
@@ -93,13 +100,10 @@ export const listMeetings = createServerFn()
     const [calendar, audience, list] = await Promise.all([
       effectFn(calendarConnectedProgram)(),
       effectFn(setupAudienceProgram)(user.role ?? 'member'),
-      effectFn(meetingListProgram)(
-        { id: user.id, email: user.email },
-        new Date(data.now),
-        new Date(data.until),
-      ),
+      effectFn(meetingListProgram)({ id: user.id, email: user.email }, data),
     ])
-    return { calendar, audience, ...list }
+    const { members, ...page } = list
+    return { calendar, audience, team: members > 1, ...page }
   })
 
 const byId = Schema.Struct({ id: uuid })
