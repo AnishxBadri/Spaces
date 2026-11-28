@@ -213,6 +213,7 @@ function CompanyRecordPage() {
     {
       label: 'Next meeting',
       value: readoutDay(company.readouts.nextMeeting, company.readouts.today),
+      meetingId: company.readouts.nextMeetingId,
     },
     {
       label: 'Moving, 30 days',

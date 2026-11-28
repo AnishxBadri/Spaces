@@ -20,7 +20,7 @@ import { useComposeHere } from '#/lib/email/compose'
 import { NoteKindIcon } from './note-kind-icon'
 import { Band, Day, FoldRow } from './ledger-section'
 import { PickPopover } from './record/details-add'
-import { ThreadRow, useThreadHighlight } from './record/thread-row'
+import { ThreadRow, UpcomingRow, useThreadHighlight } from './record/thread-row'
 import { Button } from './ui/button'
 import { useConfirm } from './ui/confirm-dialog'
 import { MENU_RULE, MoreMenu } from './ui/more-menu'
@@ -30,6 +30,8 @@ import { Switch } from './ui/switch'
 import type { RegistryEntry, RefNames } from './attributes/value-editor'
 import { fmtMoney } from '@spaces/core/portfolio/format'
 import { formatDay } from '@spaces/core/format'
+import { googleDayUrl } from '#/lib/meetings/day'
+import { ProviderMark } from './provider-mark'
 import { useClock } from '#/components/clock'
 import {
   fileInteractionOnEntity,
@@ -48,14 +50,15 @@ import {
 } from '#/lib/timeline/threads'
 import type { Thread, ThreadKind } from '#/lib/timeline/threads'
 import { setInteractionsFilter } from '#/lib/timeline/log-state'
-import { byWeek } from '#/lib/timeline/weeks'
+import { byWeek, upcomingSplit } from '#/lib/timeline/weeks'
 import { cn } from '#/lib/utils'
 
 /**
  * A record's Interactions and History tabs.
  * - Interactions: a toolbar (the kinds as a `Segmented`, `With files` as a
- *   switch), then one `ThreadRow` per thread under week bands, each ending
- *   on its `···`. The head's `Log interaction` is the composer.
+ *   switch), an `Upcoming` band of what is still ahead, then one `ThreadRow`
+ *   per thread under week bands, each ending on its `···`. The head's
+ *   `Log interaction` is the composer.
  * - History: 40px rows under week bands — a glyph, a sentence, a mono figure
  *   and the day — paged at 25. An attribute burst opens in place.
  */
@@ -324,10 +327,11 @@ export function RecordInteractions({
   logInteraction?: ((trigger: ReactElement) => ReactNode) | undefined
 }) {
   const { interactions } = splitLedger(items)
-  const { today } = useClock()
+  const { now, today } = useClock()
   const [kind, setKind] = useState<ThreadKind>('all')
   const [withFiles, setWithFiles] = useState(false)
   const [unfolded, setUnfolded] = useState(false)
+  const [aheadUnfolded, setAheadUnfolded] = useState(false)
   const highlighted = useThreadHighlight()
   const recordId = record?.id
   useEffect(() => {
@@ -360,15 +364,24 @@ export function RecordInteractions({
 
   const counts = threadCounts(threads)
   const listed = threads.filter((t) => threadShown(t, kind, withFiles))
-  const openedAt = listed.findIndex((t) => highlighted(t.row))
+  // What is still ahead leaves the week bands, which hold only what has
+  // happened. `now` is the shell loader's, so the server and the browser
+  // split alike.
+  const ahead = upcomingSplit(
+    listed.map((t) => ({ ...t, at: t.row.at })),
+    now,
+  )
+  const aheadShown =
+    aheadUnfolded || ahead.folded.some((t) => highlighted(t.row))
+      ? [...ahead.shown, ...ahead.folded]
+      : ahead.shown
+  const happened = ahead.past
+  const openedAt = happened.findIndex((t) => highlighted(t.row))
   const shown =
     unfolded || openedAt >= INTERACTIONS_FOLD
-      ? listed
-      : listed.slice(0, INTERACTIONS_FOLD)
-  const bands = byWeek(
-    shown.map((t) => ({ ...t, at: t.row.at })),
-    today,
-  )
+      ? happened
+      : happened.slice(0, INTERACTIONS_FOLD)
+  const bands = byWeek(shown, today)
   return (
     <div className="flex flex-col">
       <div data-interactions-toolbar className={TOOLBAR}>
@@ -398,6 +411,31 @@ export function RecordInteractions({
           {newEmail}
         </div>
       </div>
+      {aheadShown.length > 0 ? (
+        <section aria-label="Upcoming" className="flex flex-col">
+          <Band label="Upcoming" />
+          <ul>
+            {aheadShown.map((t) => (
+              <UpcomingRow
+                key={t.row.id}
+                item={t.row}
+                tab="interactions"
+                highlighted={highlighted(t.row)}
+                cancelled={t.row.answer === 'cancelled'}
+                menu={<UpcomingMenu item={t.row} />}
+              />
+            ))}
+          </ul>
+          {aheadShown.length < ahead.shown.length + ahead.folded.length ? (
+            <FoldRow
+              hidden={ahead.folded.length}
+              onShow={() => setAheadUnfolded(true)}
+              // Under the rows' last rule, its words on the title's line.
+              className="border-t-0 border-b pl-[calc(var(--inset)+1.75rem)]"
+            />
+          ) : null}
+        </section>
+      ) : null}
       {bands.map((b) => (
         <section key={b.band} aria-label={b.band} className="flex flex-col">
           <Band label={b.band} />
@@ -430,6 +468,40 @@ export function RecordInteractions({
       <EmailModal recordId={record?.id ?? null} />
       {composer}
     </div>
+  )
+}
+
+/**
+ * A row still ahead ends on `Join call` and `Open in Google Calendar`, each
+ * only where the meeting stores what it needs: a call link, or having come
+ * from the calendar. With neither the lane stays empty.
+ */
+function UpcomingMenu({ item }: { item: InteractionItem }) {
+  const cancelled = item.answer === 'cancelled'
+  const items: Array<MoreMenuEntry> = [
+    ...(item.conferenceUrl !== null && !cancelled
+      ? [
+          {
+            label: 'Join call',
+            icon: <icon.openOutside />,
+            href: item.conferenceUrl,
+          },
+        ]
+      : []),
+    ...(item.fromCalendar
+      ? [
+          {
+            label: 'Open in Google Calendar',
+            icon: <ProviderMark brand="googleCalendar" />,
+            href: googleDayUrl(item.at),
+            title: 'Opens the day in Google Calendar',
+          },
+        ]
+      : []),
+  ]
+  if (items.length === 0) return null
+  return (
+    <MoreMenu variant="row" label={item.subject || 'meeting'} items={items} />
   )
 }
 

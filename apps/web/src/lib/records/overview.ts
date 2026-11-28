@@ -10,6 +10,8 @@ export type OverviewReadout = {
   value: string | number | null
   /** Crimson: a value past its threshold (a close day gone by). */
   tone?: 'bad' | undefined
+  /** The meeting the readout opens when pressed (`Next meeting`). */
+  meetingId?: string | null | undefined
 }
 
 /** A readout with a value, the value as printed. */
@@ -17,6 +19,7 @@ export type ShownReadout = {
   label: string
   value: string
   tone?: 'bad' | undefined
+  meetingId?: string | undefined
 }
 
 /** The readouts that have a value, in order, each value as printed. */
@@ -27,7 +30,10 @@ export function shownReadouts(
     if (r.value === null || r.value === 0) return []
     const value = String(r.value).trim()
     if (value === '' || value === DASH || value === '0') return []
-    return [r.tone === undefined ? { label: r.label, value } : { ...r, value }]
+    const shown: ShownReadout = { label: r.label, value }
+    if (r.tone !== undefined) shown.tone = r.tone
+    if (typeof r.meetingId === 'string') shown.meetingId = r.meetingId
+    return [shown]
   })
 }
 

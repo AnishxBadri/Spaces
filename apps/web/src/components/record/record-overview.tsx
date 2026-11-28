@@ -1,4 +1,5 @@
 import type { ReactElement, ReactNode } from 'react'
+import { Link } from '@tanstack/react-router'
 import { EmailModal } from '#/components/email-dialog'
 import { FileGlyph } from '#/components/files/file-glyph'
 import { openFile } from '#/components/files/file-row'
@@ -77,28 +78,49 @@ export function RecordOverview({
           data-overview-readouts
           className="flex h-19 shrink-0 overflow-x-auto border-b border-rule px-(--inset)"
         >
-          {readouts.map((r, i) => (
-            <div
-              key={r.label}
-              data-readout
-              className={cn(
-                'flex shrink-0 flex-col justify-center gap-0.5',
-                i === 0 ? 'w-55 border-r border-rule' : 'w-45 pl-4',
-              )}
-            >
-              <span
-                className={cn(
-                  'truncate mono text-page leading-6.5',
-                  r.tone === 'bad' ? 'text-destructive' : 'text-foreground',
-                )}
+          {readouts.map((r, i) => {
+            const cell = cn(
+              'flex shrink-0 flex-col justify-center gap-0.5',
+              i === 0 ? 'w-55 border-r border-rule' : 'w-45 pl-4',
+            )
+            const face = (
+              <>
+                <span
+                  className={cn(
+                    'truncate mono text-page leading-6.5',
+                    r.tone === 'bad' ? 'text-destructive' : 'text-foreground',
+                  )}
+                >
+                  {r.value}
+                </span>
+                <span className="truncate text-label text-graphite">
+                  {r.label}
+                </span>
+              </>
+            )
+            const meetingId = r.meetingId
+            return meetingId === undefined ? (
+              <div key={r.label} data-readout className={cell}>
+                {face}
+              </div>
+            ) : (
+              // The readout names a meeting, so pressing it opens that one.
+              <Link
+                key={r.label}
+                data-readout
+                to="."
+                search={(prev) => ({
+                  ...prev,
+                  modal: 'meeting',
+                  id: meetingId,
+                })}
+                resetScroll={false}
+                className={cn(cell, 'focus-ring-inset hover:underline')}
               >
-                {r.value}
-              </span>
-              <span className="truncate text-label text-graphite">
-                {r.label}
-              </span>
-            </div>
-          ))}
+                {face}
+              </Link>
+            )
+          })}
         </div>
       ) : null}
 

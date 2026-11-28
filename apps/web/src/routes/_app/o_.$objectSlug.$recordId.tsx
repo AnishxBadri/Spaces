@@ -201,6 +201,7 @@ function ObjectRecordPage() {
     {
       label: 'Next meeting',
       value: readoutDay(record.readouts.nextMeeting, record.readouts.today),
+      meetingId: record.readouts.nextMeetingId,
     },
     {
       label: 'Moving, 30 days',

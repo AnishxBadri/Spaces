@@ -1,5 +1,5 @@
 import type { ComponentProps, ReactNode } from 'react'
-import { formatDay, formatWhen } from '@spaces/core/format'
+import { dayKey, formatDay, formatTime, formatWhen } from '@spaces/core/format'
 import { useClock } from '#/components/clock'
 import { cn } from '#/lib/utils'
 
@@ -316,18 +316,45 @@ export function LedgerFigure({
 }
 
 /**
+ * When a scheduled row starts, as its lane prints it: `14:00` today,
+ * `20 Oct 14:00` this year, `4 Jan 2027` in another, whose day alone fills
+ * the 88px lane.
+ */
+export function formatScheduled(at: string, today: string): string {
+  const time = formatTime(at)
+  if (time === '') return formatDay(at, today)
+  const day = dayKey(at)
+  if (day === dayKey(today)) return time
+  if (day.slice(0, 4) !== dayKey(today).slice(0, 4)) return formatDay(at, today)
+  return `${formatDay(at, today)} ${time}`
+}
+
+/**
  * The day lane a row ends on: `13 Oct`, or `4 Oct 2024` on one line — wide
  * enough for a day from another year. `when` prints today's rows at their
- * time (`10:42`).
+ * time (`10:42`); `scheduled` prints a row still ahead with its start
+ * (`20 Oct 14:00`).
  */
-export function Day({ at, when = false }: { at: string; when?: boolean }) {
+export function Day({
+  at,
+  when = false,
+  scheduled = false,
+}: {
+  at: string
+  when?: boolean
+  scheduled?: boolean
+}) {
   const { now, today } = useClock()
   return (
     <time
       dateTime={at}
       className="w-22 shrink-0 text-right mono text-micro whitespace-nowrap text-graphite"
     >
-      {when ? formatWhen(at, now) : formatDay(at, today)}
+      {scheduled
+        ? formatScheduled(at, today)
+        : when
+          ? formatWhen(at, now)
+          : formatDay(at, today)}
     </time>
   )
 }

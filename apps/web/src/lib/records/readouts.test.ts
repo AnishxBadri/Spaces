@@ -130,6 +130,7 @@ describe('person readouts', () => {
       lastContact: localDay(daysAgo(1)),
       lastEmail: localDay(daysAgo(10)),
       nextMeeting: null,
+      nextMeetingId: null,
       firstContact: localDay(daysAgo(400)),
     })
   })
@@ -198,6 +199,7 @@ describe('person readouts', () => {
       lastContact: null,
       lastEmail: null,
       nextMeeting: null,
+      nextMeetingId: null,
       firstContact: null,
     })
   })
@@ -320,6 +322,7 @@ describe('company readouts', () => {
       today: '2026-10-05',
       lastContact: null,
       nextMeeting: null,
+      nextMeetingId: null,
       moving30: 0,
       ownership: null,
     })
@@ -434,6 +437,7 @@ describe('custom record readouts', () => {
       today: '2026-10-05',
       lastContact: localDay(daysAgo(13)),
       nextMeeting: null,
+      nextMeetingId: null,
       moving30: 1,
     })
   })

@@ -209,6 +209,8 @@ const interaction = (
   attachmentNames: [],
   hasAttachments: false,
   answer: null,
+  conferenceUrl: null,
+  fromCalendar: false,
   summary: null,
   snippet: null,
   categories: [],

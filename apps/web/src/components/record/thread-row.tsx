@@ -347,3 +347,81 @@ export function ThreadRow({
     </li>
   )
 }
+
+/**
+ * A row still ahead, in a record's `Upcoming` band: one 40px line of the
+ * kind glyph, the title, the people and the start in the day lane
+ * (`20 Oct 14:00`), then its `···`. A meeting's title opens its window
+ * (`?modal=meeting&id=`); a cancelled one is struck.
+ */
+export function UpcomingRow({
+  item,
+  tab,
+  highlighted = false,
+  cancelled = false,
+  menu = null,
+}: {
+  item: ThreadItem
+  /** The tab the window opens over. */
+  tab?: RecordTab | undefined
+  highlighted?: boolean | undefined
+  cancelled?: boolean | undefined
+  menu?: ReactNode
+}) {
+  const people = threadPeople(item)
+  const row = useRef<HTMLLIElement>(null)
+  useEffect(() => {
+    if (highlighted) row.current?.scrollIntoView({ block: 'nearest' })
+  }, [highlighted])
+  const struck = cancelled && 'line-through'
+  return (
+    <li
+      ref={row}
+      data-thread={item.id}
+      data-upcoming
+      data-row
+      data-highlighted={highlighted ? '' : undefined}
+      className={cn(
+        'flex h-ledger-row min-w-0 items-center gap-3 border-b border-rule px-(--inset)',
+        highlighted && 'bg-bone',
+      )}
+    >
+      <KindMark kind={item.kind} />
+      <span className="flex min-w-0 flex-1 items-baseline">
+        {item.kind === 'meeting' ? (
+          <Link
+            to="."
+            search={(prev) => ({
+              ...prev,
+              ...(tab === undefined ? {} : { tab }),
+              modal: 'meeting',
+              id: item.id,
+            })}
+            resetScroll={false}
+            className={cn(
+              'focus-ring min-w-0 shrink truncate text-ui hover:underline',
+              item.subject === '' ? 'text-graphite' : 'text-foreground',
+              struck,
+            )}
+          >
+            {item.subject || 'Untitled'}
+          </Link>
+        ) : (
+          <ThreadSubject
+            item={item}
+            tab={tab}
+            className={struck || undefined}
+          />
+        )}
+      </span>
+      <span
+        data-people
+        className="w-60 shrink-0 truncate text-label text-graphite"
+      >
+        {people}
+      </span>
+      <Day at={item.at} scheduled />
+      <span className="flex w-6 shrink-0 justify-end">{menu}</span>
+    </li>
+  )
+}

@@ -39,6 +39,8 @@ export type PersonReadouts = {
   lastContact: ReadoutDay
   lastEmail: ReadoutDay
   nextMeeting: ReadoutDay
+  /** The next meeting itself, which the readout opens. */
+  nextMeetingId: string | null
   firstContact: ReadoutDay
 }
 
@@ -46,6 +48,8 @@ export type CompanyReadouts = {
   today: string
   lastContact: ReadoutDay
   nextMeeting: ReadoutDay
+  /** The next meeting itself, which the readout opens. */
+  nextMeetingId: string | null
   moving30: number
   /** Fully diluted (`actual`) or locked by a post-money SAFE (`implied`). */
   ownership: { kind: 'actual' | 'implied'; pct: number } | null
@@ -71,6 +75,8 @@ export type RecordReadouts = {
   today: string
   lastContact: ReadoutDay
   nextMeeting: ReadoutDay
+  /** The next meeting itself, which the readout opens. */
+  nextMeetingId: string | null
   moving30: number
 }
 
@@ -112,6 +118,10 @@ const interactionDays = Effect.fn('interactionDays')(function* (
           next: sql<
             string | null
           >`min(${interactionStat.nextAt}) filter (where ${any})`,
+          // The earliest across the ids, so the id and the day agree.
+          nextId: sql<
+            string | null
+          >`(array_agg(${interactionStat.nextId} order by ${interactionStat.nextAt}, ${interactionStat.nextId}) filter (where ${any} and ${interactionStat.nextId} is not null))[1]`,
           first: sql<
             string | null
           >`min(${interactionStat.firstAt}) filter (where ${any})`,
@@ -124,6 +134,7 @@ const interactionDays = Effect.fn('interactionDays')(function* (
     last: dayOf(row?.last ?? null),
     lastEmail: dayOf(row?.lastEmail ?? null),
     next: dayOf(row?.next ?? null),
+    nextId: row?.nextId ?? null,
     first: dayOf(row?.first ?? null),
   }
 })
@@ -210,6 +221,7 @@ export const personReadoutsProgram = Effect.fn('personReadoutsProgram')(
       lastContact: days.last,
       lastEmail: days.lastEmail,
       nextMeeting: days.next,
+      nextMeetingId: days.nextId,
       firstContact: days.first,
     }
     return out
@@ -225,6 +237,7 @@ export const companyReadoutsProgram = Effect.fn('companyReadoutsProgram')(
       today: localDay(now),
       lastContact: days.last,
       nextMeeting: days.next,
+      nextMeetingId: days.nextId,
       moving30: yield* movingCount(companyId, now),
       ownership: yield* companyOwnership(companyId),
     }
@@ -315,6 +328,7 @@ export const recordReadoutsProgram = Effect.fn('recordReadoutsProgram')(
       today: localDay(now),
       lastContact: days.last,
       nextMeeting: days.next,
+      nextMeetingId: days.nextId,
       moving30: yield* movingCount(recordId, now),
     }
     return out

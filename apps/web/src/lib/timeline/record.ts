@@ -453,6 +453,13 @@ export const recordTimelineProgram = Effect.fn('recordTimelineProgram')(
           attachmentNames: privateBody ? [] : (attachmentsBy.get(i.id) ?? []),
           hasAttachments: !privateBody && i.hasAttachments,
           answer: meetingAnswer(i.meta, ownEmails),
+          /** A meeting's call link, for the row's `Join call`. */
+          conferenceUrl:
+            i.meta?.kind === 'meeting' ? i.meta.conference_url : null,
+          /** A meeting calendar sync brought in, so Google holds it. */
+          fromCalendar:
+            i.meta?.kind === 'meeting' &&
+            i.meta.calendar_event_id !== undefined,
           /**
            * The email's cached summary, else the one typed when it was
            * logged; null until either exists, and private with the body.

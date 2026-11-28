@@ -236,6 +236,7 @@ function PersonRecordPage() {
     {
       label: 'Next meeting',
       value: readoutDay(person.readouts.nextMeeting, person.readouts.today),
+      meetingId: person.readouts.nextMeetingId,
     },
     {
       label: 'First contact',
