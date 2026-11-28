@@ -1,15 +1,19 @@
 import { Effect, Schema } from 'effect'
-import { and, asc, eq, isNull } from 'drizzle-orm'
+import { and, asc, eq, inArray, isNull } from 'drizzle-orm'
 import type { LanguageModel } from 'ai'
 import { db } from '@spaces/db'
 import {
+  askThread,
+  askTurn,
   entity,
   interaction,
   interactionEntity,
   link,
   note,
+  objectDef,
 } from '@spaces/db/schema'
 import { activity } from '@spaces/db/schema/activity'
+import { parseRef, ref } from '@spaces/core/context/ref'
 import type { ContextItem } from '@spaces/core/context/types'
 import { noteSource } from '@spaces/core/writes/ai/chunk-sources'
 import { assembleProgram } from '@spaces/core/writes/context/assemble'
@@ -25,14 +29,21 @@ import { openStreamProgram } from '#/lib/ai/stream'
 import type { OpenedStream } from '#/lib/ai/stream'
 import { citationLabels, sharedOnly } from '#/lib/ai/summarize'
 import { writeUpTitle } from '#/lib/interactions/write-up'
+import { meetingSheetProgram } from '#/lib/interactions/meeting-sheet-read'
 import { noteBodyFromMarkdown } from '@spaces/core/notes/markdown-blocks'
+import { citedRefs } from '#/lib/ask/answer'
+import type { AskRef, AskScopeChip } from '#/lib/ask/types'
+import { recordPath } from '#/lib/record-path'
 import type { PrepEvent } from '#/lib/meetings/day'
+import type { SheetPerson } from '#/lib/meetings/sheet'
 
 /**
- * Prep: the assembler over a meeting's linked records, through the
- * synthesize lane, streamed into the meeting window on demand.
+ * The brief: the assembler over a meeting's linked records and the meeting's
+ * own guest list, through the synthesize lane, streamed into the meeting's
+ * brief card on demand, in four cited parts (`parseBrief`).
  * - Never stored. "Save as note" is a separate write of the text the reader
- *   was shown, filed `tagged_in` on the same records, the reader as author.
+ *   was shown, filed `tagged_in` on the same records, the reader as author;
+ *   "Ask about this" opens it as a thread of the reader's.
  * - The sensitivity gate is per call: any linked record that resolves
  *   sensitive makes the call sensitive, which routes local or refuses.
  * - Private notes stay out of the context: a saved brief is shared.
@@ -109,9 +120,13 @@ const meetingProgram = Effect.fn('prep.meeting')(function* (
 const INSTRUCTIONS = [
   'Brief the reader for the meeting the last line names.',
   'Use only what the context states; never add a fact from elsewhere, and say plainly where the material is silent on something that matters.',
-  'Write markdown: two lines on what the meeting is for, then `## ` sections with `- ` bullets — who they are, where things stand, what changed recently, and the questions worth asking.',
+  'Write exactly four parts, in this order, each on its own line that starts with its label and a colon, and nothing else:',
+  'Who: who is coming, and who is new to us.',
+  'Deal: where the deal stands.',
+  'Last time: the last write-up’s point, and the tasks still open.',
+  'Since: what has moved since then — emails, files, signals.',
+  'Each part is one to three short plain sentences: no headings, bullets or bold.',
   'Cite every claim inline, right after it, with the bracketed ref of the context item it came from, exactly as written — for example [note:<id>].',
-  'Do not write a title line, and do not wrap the answer in a code fence.',
 ].join('\n')
 
 const SUBJECT = (m: Meeting) =>
@@ -132,6 +147,55 @@ type Prepared = {
   items: Array<ContextItem>
   sensitive: boolean
   via: SensitivityVia | null
+  /** The meeting's own ref and title: the guest list's citation. */
+  self: { ref: string; title: string }
+}
+
+const RSVP_WORD: Record<SheetPerson['rsvp'], string | null> = {
+  accepted: null,
+  tentative: 'maybe',
+  declined: 'declined',
+  needs_action: 'no reply',
+}
+
+/** The guest list as an item, so `Who` cites the meeting it came from. */
+function guestItem(
+  meeting: Meeting,
+  people: ReadonlyArray<SheetPerson>,
+): ContextItem {
+  const who = people.map((p) => {
+    const marks = [
+      p.you ? 'the reader' : null,
+      p.host ? 'host' : null,
+      p.new ? 'new to us' : null,
+      RSVP_WORD[p.rsvp],
+    ].filter((m) => m !== null)
+    const line = p.line === null ? '' : ` (${p.line})`
+    return `${p.name}${line}${marks.length === 0 ? '' : ` — ${marks.join(', ')}`}`
+  })
+  return {
+    ref: ref.interaction(meeting.id),
+    kind: 'interaction',
+    text: `The meeting "${meeting.title}". Invited: ${who.length === 0 ? 'nobody is listed' : who.join('; ')}.`,
+    entityIds: meeting.records.map((r) => r.id),
+    at: meeting.startsAt.toISOString(),
+  }
+}
+
+/**
+ * The sources a run reads, as a person counts them: a record's attribute
+ * values are one source, a document's pages are one, anything else is one.
+ */
+export function sourceCount(items: ReadonlyArray<ContextItem>): number {
+  const keys = new Set(
+    items.map((i) => {
+      const p = parseRef(i.ref)
+      return p?.kind === 'attr' || p?.kind === 'doc'
+        ? `${p.kind}:${p.entityId}`
+        : i.ref
+    }),
+  )
+  return keys.size
 }
 
 /** Everything before the first token: records, context, gate, route. */
@@ -185,6 +249,11 @@ export const preparePrepProgram = Effect.fn('preparePrep')(function* (
   const shared = yield* sharedOnly(items).pipe(
     Effect.mapError((cause) => new PrepQueryFailed({ cause })),
   )
+  const sheet = yield* meetingSheetProgram(
+    { id: input.userId },
+    input.interactionId,
+  ).pipe(Effect.mapError((cause) => new PrepQueryFailed({ cause })))
+  shared.unshift(guestItem(meeting, sheet.people))
 
   const opened = yield* openStreamProgram('synthesize', shared, {
     caller: { type: 'user', id: input.userId },
@@ -198,11 +267,75 @@ export const preparePrepProgram = Effect.fn('preparePrep')(function* (
       ? {}
       : { abortSignal: input.abortSignal }),
   })
-  const prepared: Prepared = { opened, items: shared, sensitive, via }
+  const prepared: Prepared = {
+    opened,
+    items: shared,
+    sensitive,
+    via,
+    self: { ref: ref.interaction(meeting.id), title: meeting.title },
+  }
   return prepared
 })
 
-/** A Prep run as events: route, text deltas, then the finished brief. */
+/**
+ * The sources a brief cites, labelled and linked as Ask's are. `given` keeps
+ * only what the model was handed; a ref with no label is dropped. The
+ * meeting's own ref reads as its title.
+ */
+export const briefRefsProgram = Effect.fn('briefRefs')(function* (
+  body: string,
+  given: ReadonlySet<string> | null,
+  self: { ref: string; title: string },
+): Effect.fn.Return<Array<AskRef>, PrepQueryFailed> {
+  const cited = citedRefs(body).filter(
+    (r) => parseRef(r) !== null && (given === null || given.has(r)),
+  )
+  if (cited.length === 0) return []
+  const labels = yield* citationLabels(cited).pipe(
+    Effect.orElseSucceed(() => new Map<string, string>()),
+  )
+  labels.set(self.ref, self.title)
+  const ids = [
+    ...new Set(
+      cited.flatMap((r) => {
+        const p = parseRef(r)
+        return p !== null && 'entityId' in p ? [p.entityId] : []
+      }),
+    ),
+  ]
+  const rows =
+    ids.length === 0
+      ? []
+      : yield* query(() =>
+          db
+            .select({
+              id: entity.id,
+              kind: entity.kind,
+              objectSlug: objectDef.slug,
+            })
+            .from(entity)
+            .leftJoin(objectDef, eq(objectDef.id, entity.objectId))
+            .where(inArray(entity.id, ids)),
+        )
+  const byId = new Map(rows.map((r) => [r.id, r]))
+  return cited.flatMap((r): Array<AskRef> => {
+    const label = labels.get(r)
+    if (label === undefined) return []
+    const p = parseRef(r)
+    const row = p !== null && 'entityId' in p ? byId.get(p.entityId) : undefined
+    return [
+      {
+        ref: r,
+        label,
+        // A document chunk previews on hover; it has no page of its own.
+        href: row === undefined || p?.kind === 'doc' ? null : recordPath(row),
+        entityId: row?.id ?? null,
+      },
+    ]
+  })
+})
+
+/** A brief run as events: route, text deltas, then the finished brief. */
 export async function* prepEvents(input: PrepInput): AsyncGenerator<PrepEvent> {
   const ready = await Effect.runPromise(
     Effect.result(preparePrepProgram(input)),
@@ -229,7 +362,7 @@ export async function* prepEvents(input: PrepInput): AsyncGenerator<PrepEvent> {
         return
     }
   }
-  const { opened, items, sensitive, via } = ready.success
+  const { opened, items, sensitive, via, self } = ready.success
   let text = ''
   // However this generator ends — drained, or returned by a cancelled
   // reader at any yield — the call's usage is recorded.
@@ -238,6 +371,7 @@ export async function* prepEvents(input: PrepInput): AsyncGenerator<PrepEvent> {
       type: 'route',
       sensitive,
       line: routeLine(opened.target, via, sensitive),
+      sources: sourceCount(items),
     }
     try {
       for await (const part of opened.parts) {
@@ -255,14 +389,18 @@ export async function* prepEvents(input: PrepInput): AsyncGenerator<PrepEvent> {
   } finally {
     await opened.close()
   }
-  const labels = await Effect.runPromise(
-    citationLabels([...new Set(items.map((i) => i.ref))]).pipe(
-      Effect.orElseSucceed(() => new Map<string, string>()),
+  const body = text.trim()
+  const refs = await Effect.runPromise(
+    briefRefsProgram(body, new Set(items.map((i) => i.ref)), self).pipe(
+      Effect.orElseSucceed((): Array<AskRef> => []),
     ),
   )
   yield {
     type: 'done',
-    markdown: inlineCitations(text.trim(), labels).markdown,
+    body,
+    refs,
+    markdown: inlineCitations(body, new Map(refs.map((r) => [r.ref, r.label])))
+      .markdown,
   }
 }
 
@@ -342,4 +480,62 @@ export const savePrepNoteProgram = Effect.fn('savePrepNote')(function* (
   )
   yield* Effect.promise(() => enqueueSourceEmbed(noteSource(noteId)))
   return { noteId }
+})
+
+/** The scope a brief's thread asks in: the meeting's records, as chips. */
+const recordChip = (r: Meeting['records'][number]): AskScopeChip => ({
+  kind: r.kind === 'person' ? 'person' : 'record',
+  id: r.id,
+  name: r.name,
+  href: recordPath(r),
+})
+
+/**
+ * "Ask about this": a new thread of the reader's that opens on the brief,
+ * the reader's ask and the brief as its answer, both scoped to the
+ * meeting's records, so the next question reads the brief as history and
+ * passes the same sensitivity gate. The refs are read again from the body:
+ * only sources that still resolve are kept.
+ */
+export const briefThreadProgram = Effect.fn('briefThread')(function* (
+  userId: string,
+  interactionId: string,
+  body: string,
+  route: string | null,
+): Effect.fn.Return<
+  { threadId: string; scope: ReadonlyArray<AskScopeChip> },
+  PrepRefused | PrepQueryFailed
+> {
+  const meeting = yield* meetingProgram(interactionId)
+  const refs = yield* briefRefsProgram(body, null, {
+    ref: ref.interaction(meeting.id),
+    title: meeting.title,
+  })
+  const scope = meeting.records.map(recordChip)
+  const question = `Brief me for ${meeting.title}`
+  const threadId = yield* query(() =>
+    db.transaction(async (tx) => {
+      const thread = (
+        await tx
+          .insert(askThread)
+          .values({ userId, title: `Brief: ${meeting.title}`.slice(0, 200) })
+          .returning({ id: askThread.id })
+      ).at(0)
+      if (!thread) throw new Error('ask_thread insert returned no row')
+      await tx.insert(askTurn).values([
+        { threadId: thread.id, role: 'user', bodyMd: question, scope },
+        {
+          threadId: thread.id,
+          role: 'assistant',
+          bodyMd: body,
+          refs,
+          scope,
+          state: 'answered',
+          route,
+        },
+      ])
+      return thread.id
+    }),
+  )
+  return { threadId, scope }
 })

@@ -86,7 +86,7 @@ function StateRow({ children }: { children: ReactNode }) {
 
 /**
  * Today's Meetings: the day the strip's head picked, a now-rule on today,
- * Write after a meeting and Prep before one. With no calendar connected it
+ * Write after a meeting. With no calendar connected it
  * is the one line that says so.
  * - External meetings only: internal ones are never stored.
  * - The day's count, its nav and `All meetings ›` are the strip's head
@@ -98,7 +98,6 @@ export function MeetingsSection({
   today,
   day,
   meetings,
-  preparing,
   onOpen,
   onRetry,
 }: {
@@ -107,10 +106,8 @@ export function MeetingsSection({
   today: string
   day: string
   meetings: DayMeetings
-  /** The meeting whose Prep is running in its window; null when none. */
-  preparing: string | null
-  /** Opens the meeting window; `prep` starts Prep in it. */
-  onOpen: (id: string, prep: boolean) => void
+  /** Opens the meeting window. */
+  onOpen: (id: string) => void
   /** Reads the day again after a failed read. */
   onRetry: () => void
 }) {
@@ -193,7 +190,6 @@ export function MeetingsSection({
                 meeting={m}
                 tense={tense}
                 now={now}
-                preparing={preparing === m.id}
                 onOpen={onOpen}
               />
             </Fragment>

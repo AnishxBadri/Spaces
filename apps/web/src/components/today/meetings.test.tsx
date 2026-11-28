@@ -15,7 +15,7 @@ import { MeetingsSection } from './meetings'
  * Today's Meetings: the strip's head carries the day's count once,
  * `‹ Today ›` and `All meetings ›`, with `Back to today` and the day away
  * from today, and the section's head is its title alone; a row is the start time, the title, the action (Write after,
- * Prep before, Preparing… while it runs), who outside the workspace, and
+ * nothing before: a brief starts only in the meeting), who outside the workspace, and
  * `···`; every state is one line — cancelled, read failed, no calendar for
  * an admin and for a member, nothing that day.
  */
@@ -58,7 +58,6 @@ async function render(props: {
   audience?: SetupAudience
   meetings?: ReadonlyArray<TodayMeeting> | 'failed' | null
   day?: string
-  preparing?: string
 }) {
   const router = createRouter({
     routeTree: createRootRoute({
@@ -71,7 +70,6 @@ async function render(props: {
           meetings={
             props.meetings === undefined ? [INTRO, MOVED] : props.meetings
           }
-          preparing={props.preparing ?? null}
           onOpen={() => {}}
           onRetry={() => {}}
         />
@@ -145,7 +143,7 @@ describe('MeetingsSection — the rows', () => {
     expect(html).not.toContain('title="accepted"')
   })
 
-  it('offers Write on a past day and Prep on a day ahead', async () => {
+  it('offers Write on a past day and nothing on a day ahead', async () => {
     const past = await render({
       calendar: true,
       day: '2026-10-12',
@@ -160,19 +158,11 @@ describe('MeetingsSection — the rows', () => {
       day: '2026-10-14',
       meetings: [INTRO],
     })
-    expect(ahead).toContain('>Prep<')
+    // No Prep: the brief starts only from the meeting's own card.
+    expect(ahead).not.toContain('>Prep<')
+    expect(ahead).not.toContain('>Brief<')
+    expect(ahead).not.toContain('>Write it up<')
     expect(ahead).toMatch(/text-foreground[^>]*>Flent intro</)
-  })
-
-  it('says Preparing… while Prep runs for the meeting', async () => {
-    const html = await render({
-      calendar: true,
-      day: '2026-10-14',
-      meetings: [INTRO],
-      preparing: INTRO.id,
-    })
-    expect(html).toContain('Preparing…')
-    expect(html).not.toContain('>Prep<')
   })
 
   it('keeps a cancelled meeting, struck and marked Cancelled, with no action', async () => {

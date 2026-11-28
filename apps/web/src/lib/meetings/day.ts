@@ -1,3 +1,4 @@
+import type { AskRef } from '@spaces/db/schema/ask'
 import type { MeetingRsvp } from '@spaces/db/schema/interactions'
 import { formatTime, formatWeekday } from '@spaces/core/format'
 
@@ -184,7 +185,7 @@ export function participantName(p: MeetingParticipant): string {
   return p.name ?? p.email
 }
 
-/** Whether a meeting is still ahead of `now`: what earns it Prep. */
+/** Whether a meeting is still ahead of `now`: what earns it a brief. */
 export function isUpcoming(m: { startsAt: string }, now: Date): boolean {
   return Date.parse(m.startsAt) > now.getTime()
 }
@@ -208,14 +209,21 @@ export function googleDayUrl(startsAt: string): string {
 }
 
 /**
- * One event of a Prep stream. `route` comes first when the call runs and
- * says how it was routed; `refused` and `failed` end a stream that never
- * reached a model. Prep is never stored.
+ * One event of a brief's stream. `route` comes first when the call runs,
+ * says how it was routed and counts the sources the model reads; `refused`
+ * and `failed` end a stream that never reached a model. Nothing is stored.
  */
 export type PrepEvent =
-  | { type: 'route'; sensitive: boolean; line: string }
+  | { type: 'route'; sensitive: boolean; line: string; sources: number }
   | { type: 'text'; text: string }
-  /** The whole brief with its citations written as words. */
-  | { type: 'done'; markdown: string }
+  | {
+      type: 'done'
+      /** The brief with `[ref]` citations as written, for the card and Ask. */
+      body: string
+      /** The cited sources the model was given, labelled. */
+      refs: ReadonlyArray<AskRef>
+      /** The same brief with its citations written as words: the note. */
+      markdown: string
+    }
   | { type: 'refused'; line: string }
   | { type: 'failed'; message: string }

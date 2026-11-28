@@ -11,9 +11,11 @@ import {
   DialogTitle,
 } from '#/components/ui/dialog'
 import { WindowControls } from '#/components/ui/window-controls'
+import { addMention, openAsk } from '#/lib/ask/dock-store'
 import { googleDayUrl } from '#/lib/meetings/day'
 import { isOver } from '#/lib/meetings/sheet'
 import {
+  askAboutBrief,
   getMeetingSheet,
   pinMeetingRecord,
   prepMeeting,
@@ -74,23 +76,17 @@ export function MeetingSheet({
   id,
   frame,
   next = null,
-  prepOnOpen = false,
   onClose,
   onChanged,
-  onPrepRunning,
   onOpenNote,
 }: {
   id: string
   frame: SheetFrame
   next?: boolean | null | undefined
-  /** Start Prep once the meeting is read. */
-  prepOnOpen?: boolean | undefined
   /** The sheet asked to close: on the way to the write-up's page. */
   onClose: () => void
   /** A write landed: the caller re-reads what it shows. */
   onChanged?: (() => void) | undefined
-  /** Prep started or stopped, so the row behind can say it is running. */
-  onPrepRunning?: ((running: boolean) => void) | undefined
   onOpenNote?: ((noteId: string) => void) | undefined
 }) {
   const router = useRouter()
@@ -103,8 +99,8 @@ export function MeetingSheet({
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [writing, setWriting] = useState(false)
+  const [asking, setAsking] = useState(false)
   const reader = useRef<ReadableStreamDefaultReader<PrepEvent> | null>(null)
-  const started = useRef(false)
 
   const load = useCallback(async () => {
     try {
@@ -116,14 +112,14 @@ export function MeetingSheet({
     }
   }, [id])
 
-  // Whether the sheet is still open: a Prep whose stream arrives after it
+  // Whether the sheet is still open: a brief whose stream arrives after it
   // closed is cancelled the moment it is obtained.
   const alive = useRef(true)
   useEffect(() => {
     alive.current = true
     return () => {
       alive.current = false
-      // Closing the sheet stops a running Prep; nothing of it is kept.
+      // Closing the sheet stops a running brief; nothing of it is kept.
       void reader.current?.cancel()
     }
   }, [])
@@ -132,14 +128,6 @@ export function MeetingSheet({
     void load()
   }, [load])
 
-  // Closing the sheet stops Prep, so it reports stopped as it unmounts.
-  const running = prep.phase === 'running'
-  useEffect(() => {
-    if (!running) return
-    onPrepRunning?.(true)
-    return () => onPrepRunning?.(false)
-  }, [running, onPrepRunning])
-
   const changed = () => {
     void load()
     onChanged?.()
@@ -147,7 +135,13 @@ export function MeetingSheet({
 
   const runPrep = useCallback(async () => {
     setSaved(false)
-    setPrep({ phase: 'running', line: null, sensitive: false, text: '' })
+    setPrep({
+      phase: 'running',
+      line: null,
+      sensitive: false,
+      sources: null,
+      text: '',
+    })
     try {
       const stream = await prepMeeting({ data: { interactionId: id } })
       const r = stream.getReader()
@@ -164,21 +158,18 @@ export function MeetingSheet({
       }
     } catch {
       if (alive.current)
-        setPrep({ phase: 'failed', message: 'Prep stopped before it finished' })
+        setPrep({
+          phase: 'failed',
+          message: 'The brief stopped before it finished',
+        })
     } finally {
       reader.current = null
     }
   }, [id])
 
-  // Prep is for a meeting still ahead: once it has started there is none.
+  // The brief is for a meeting still ahead: once it has started there is none.
   const meeting = sheet?.meeting ?? null
   const ahead = meeting !== null && now.getTime() < Date.parse(meeting.startsAt)
-  useEffect(() => {
-    if (prepOnOpen && ahead && !started.current) {
-      started.current = true
-      void runPrep()
-    }
-  }, [prepOnOpen, ahead, runPrep])
 
   async function saveAsNote(markdown: string) {
     setSaving(true)
@@ -190,6 +181,22 @@ export function MeetingSheet({
       toast.error(err instanceof Error ? err.message : 'Could not save it')
     } finally {
       setSaving(false)
+    }
+  }
+
+  // Ask opens on the brief, its question already in the dock's scope.
+  async function askAboutThis(body: string, route: string | null) {
+    setAsking(true)
+    try {
+      const { threadId, scope } = await askAboutBrief({
+        data: { interactionId: id, body, route },
+      })
+      for (const chip of scope) addMention(chip)
+      openAsk({ threadId })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not open Ask')
+    } finally {
+      setAsking(false)
     }
   }
 
@@ -276,8 +283,10 @@ export function MeetingSheet({
                 canPrep={meeting.records.length > 0}
                 saving={saving}
                 saved={saved}
+                asking={asking}
                 onPrep={() => void runPrep()}
                 onSave={(markdown) => void saveAsNote(markdown)}
+                onAsk={(body, route) => void askAboutThis(body, route)}
               />
             ) : null}
             {over ? null : (

@@ -8,14 +8,16 @@ import type {
   MeetingSheetData,
   PrepEvent,
 } from '#/lib/server-fns'
+import { readDock } from '#/lib/ask/dock-store'
 import { MeetingDialog } from './meeting-dialog'
 import { applyPrepEvent } from './meetings/meeting-sheet'
 
 /**
  * The meeting window: replies shown and never editable, Google Calendar the
  * way to change one; artifacts by role; one close in the head and no `esc`
- * or `↵` printed; Prep streamed on demand in the brief, never kept, and
- * "Save as note" sending the brief that was shown; a refusal said in place.
+ * or `↵` printed; the brief run on demand from its card, never kept,
+ * "Save as note" sending the brief that was shown and "Ask about this"
+ * opening it in Ask; a refusal said in place.
  * - A happy-dom window's DOM globals are installed by hand before React
  *   loads.
  */
@@ -63,6 +65,8 @@ const fns = vi.hoisted(() => ({
   getMeetingSheet: vi.fn(),
   prepMeeting: vi.fn(),
   savePrepAsNote: vi.fn(),
+  askAboutBrief: vi.fn(),
+  previewAskRef: vi.fn(),
   acceptSuggestion: vi.fn(),
   rejectSuggestion: vi.fn(),
   pinMeetingRecord: vi.fn(),
@@ -97,7 +101,7 @@ vi.mock('@tanstack/react-router', () => ({
 }))
 
 const HOUR = 3_600_000
-/** An instant `hours` from now: Prep is only for a meeting still ahead. */
+/** An instant `hours` from now: a brief is only for a meeting still ahead. */
 const fromNow = (hours: number) =>
   new Date(Date.now() + hours * HOUR).toISOString()
 
@@ -484,17 +488,14 @@ describe('the meeting window', () => {
     expect(fns.acceptSuggestion).toHaveBeenCalledWith({ data: { id: 's1' } })
   })
 
-  it('offers no Prep once the meeting has started, not even from the row', async () => {
+  it('offers no brief once the meeting has started', async () => {
     reads({
       ...DETAIL,
       startsAt: fromNow(-1),
       endsAt: fromNow(-0.5),
     })
-    act(() =>
-      root.render(<MeetingDialog id={ID} prepOnOpen onOpenChange={() => {}} />),
-    )
-    await settle()
-    expect(buttons('Prep')).toHaveLength(0)
+    await open()
+    expect(buttons('Brief')).toHaveLength(0)
     expect(fns.prepMeeting).not.toHaveBeenCalled()
     // Over, there is no call to join either.
     expect(
@@ -504,48 +505,98 @@ describe('the meeting window', () => {
     ).toBe(false)
   })
 
-  it('streams Prep on demand, keeps nothing, and saves the brief it showed as a note', async () => {
+  it('runs the brief on demand saying what it reads, keeps nothing, saves what it showed and opens it in Ask', async () => {
     await open()
-    expect(dialog()?.querySelector('[aria-label="Prep"]')).toBeNull()
+    // At rest the card is the one button.
+    const card = () => dialog()?.querySelector('[aria-label="Brief"]')
+    expect(card()?.textContent).toBe('Brief')
+    const feed: { at: ReadableStreamDefaultController<PrepEvent> | null } = {
+      at: null,
+    }
     fns.prepMeeting.mockResolvedValue(
-      streamOf([
-        { type: 'route', sensitive: false, line: 'Anthropic · claude-opus-5' },
-        { type: 'text', text: 'Flent is ' },
-        { type: 'text', text: 'raising [note:x].' },
-        { type: 'done', markdown: 'Flent is raising (Call notes).' },
-      ]),
+      new ReadableStream<PrepEvent>({
+        start(controller) {
+          feed.at = controller
+        },
+      }),
     )
-    await act(async () => buttons('Prep')[0].click())
+    await act(async () => buttons('Brief')[0].click())
     await settle()
     expect(fns.prepMeeting).toHaveBeenCalledWith({
       data: { interactionId: ID },
     })
-    const prep = dialog()?.querySelector('[aria-label="Prep"]')
-    expect(prep?.textContent).toContain('Anthropic · claude-opus-5')
-    expect(prep?.textContent).toContain('Flent is raising (Call notes).')
+    const send = (e: PrepEvent) => {
+      if (feed.at === null) throw new Error('no stream')
+      feed.at.enqueue(e)
+    }
+    send({
+      type: 'route',
+      sensitive: false,
+      line: 'Anthropic · claude-opus-5',
+      sources: 6,
+    })
+    await settle()
+    expect(buttons('Reading 6 sources')).toHaveLength(1)
+    expect(buttons('Reading 6 sources')[0].disabled).toBe(true)
 
-    expect(
-      dialog()?.querySelector('[aria-label="Brief"]')?.textContent,
-    ).toContain('Not kept unless saved')
+    const body = 'Who: Ana Reyes [note:x].\nDeal: In diligence [note:x].'
+    send({ type: 'text', text: body })
+    send({
+      type: 'done',
+      body,
+      refs: [
+        { ref: 'note:x', label: 'Call notes', href: '/notes/x', entityId: 'x' },
+      ],
+      markdown:
+        'Who: Ana Reyes (Call notes).\nDeal: In diligence (Call notes).',
+    })
+    await act(async () => feed.at?.close())
+    await settle()
+    expect(card()?.textContent).toContain('Written ')
+    expect(card()?.textContent).toContain('Ana Reyes')
+    // The route is said only when the gate sent it somewhere unusual.
+    expect(card()?.textContent).not.toContain('claude-opus-5')
+
     fns.savePrepAsNote.mockResolvedValue({ noteId: NOTE })
     await act(async () => buttons('Save as note')[0].click())
     await settle()
     expect(fns.savePrepAsNote).toHaveBeenCalledWith({
-      data: { interactionId: ID, markdown: 'Flent is raising (Call notes).' },
+      data: {
+        interactionId: ID,
+        markdown:
+          'Who: Ana Reyes (Call notes).\nDeal: In diligence (Call notes).',
+      },
     })
     // It stays put: the label says it is saved, and nothing navigates.
     expect(navigate).not.toHaveBeenCalled()
     expect(buttons('Saved as note')).toHaveLength(1)
     expect(buttons('Saved as note')[0].disabled).toBe(true)
 
-    // Opened again, the window shows no Prep until asked.
+    const chip = {
+      kind: 'record' as const,
+      id: 'c1',
+      name: 'Flent',
+      href: '/companies/c1',
+    }
+    fns.askAboutBrief.mockResolvedValue({ threadId: 't1', scope: [chip] })
+    await act(async () => buttons('Ask about this')[0].click())
+    await settle()
+    expect(fns.askAboutBrief).toHaveBeenCalledWith({
+      data: { interactionId: ID, body, route: 'Anthropic · claude-opus-5' },
+    })
+    expect(readDock()).toMatchObject({
+      open: true,
+      threadId: 't1',
+      mentioned: [chip],
+    })
+
+    // Opened again, the card is back at rest until asked.
     await open(null)
     await open()
-    expect(dialog()?.querySelector('[aria-label="Prep"]')).toBeNull()
-    expect(buttons('Prep')).toHaveLength(1)
+    expect(card()?.textContent).toBe('Brief')
   })
 
-  it('cancels a Prep whose stream arrives after the window closed', async () => {
+  it('cancels a brief whose stream arrives after the window closed', async () => {
     await open()
     let resolve: (s: ReadableStream<PrepEvent>) => void = () => {}
     fns.prepMeeting.mockReturnValue(
@@ -553,7 +604,7 @@ describe('the meeting window', () => {
         resolve = r
       }),
     )
-    await act(async () => buttons('Prep')[0].click())
+    await act(async () => buttons('Brief')[0].click())
     await open(null)
     const cancel = vi.fn()
     resolve(
@@ -578,7 +629,7 @@ describe('the meeting window', () => {
         },
       ]),
     )
-    await act(async () => buttons('Prep')[0].click())
+    await act(async () => buttons('Brief')[0].click())
     await settle()
     const refused = dialog()?.querySelector('[data-prep-refused]')
     expect(refused?.textContent).toContain('inherited from Fund II')
@@ -587,17 +638,26 @@ describe('the meeting window', () => {
 })
 
 describe('applyPrepEvent', () => {
-  it('keeps text only while running, and the route line into done', () => {
+  it('keeps text only while running, and the route line and the time into done', () => {
     const running = applyPrepEvent(
       { phase: 'idle' },
-      { type: 'route', sensitive: true, line: 'Sensitive · local' },
+      { type: 'route', sensitive: true, line: 'Sensitive · local', sources: 2 },
     )
     const more = applyPrepEvent(running, { type: 'text', text: 'a' })
-    expect(applyPrepEvent(more, { type: 'done', markdown: 'A' })).toEqual({
+    expect(
+      applyPrepEvent(
+        more,
+        { type: 'done', body: 'A', refs: [], markdown: 'A' },
+        new Date(2026, 10, 28, 9, 12),
+      ),
+    ).toEqual({
       phase: 'done',
       line: 'Sensitive · local',
       sensitive: true,
+      body: 'A',
+      refs: [],
       markdown: 'A',
+      writtenAt: '09:12',
     })
   })
 })

@@ -160,18 +160,29 @@ describe('Prep', () => {
       type: 'route',
       sensitive: false,
       line: 'Anthropic · claude-opus-5',
+      sources: expect.any(Number),
     })
     expect(events.filter((e) => e.type === 'text').map((e) => e.text)).toEqual([
       'Flent is raising ',
       `a Series A [note:${callNote}].`,
     ])
-    // The prompt carried the linked record's note.
-    expect(JSON.stringify(model.doStreamCalls[0].prompt)).toContain(
-      'Raising a Series A in Q4.',
-    )
-    // The finished brief cites in words, not refs.
+    // The prompt carried the linked record's note and the guest list.
+    const prompt = JSON.stringify(model.doStreamCalls[0].prompt)
+    expect(prompt).toContain('Raising a Series A in Q4.')
+    expect(prompt).toContain(`interaction:${id}`)
+    // The finished brief keeps its refs for the card, labelled and linked,
+    // and cites in words for the note.
     expect(events.at(-1)).toEqual({
       type: 'done',
+      body: `Flent is raising a Series A [note:${callNote}].`,
+      refs: [
+        {
+          ref: `note:${callNote}`,
+          label: 'Call notes',
+          href: `/notes/${callNote}`,
+          entityId: callNote,
+        },
+      ],
       markdown: 'Flent is raising a Series A (Call notes).',
     })
     // Never stored: no note, one usage row for the call.
@@ -312,7 +323,13 @@ describe('Prep', () => {
       type: 'route',
       sensitive: true,
       line: 'Sensitive (inherited from Fund II) · answered locally by Ollama · llama3.2',
+      sources: expect.any(Number),
     })
-    expect(ran.at(-1)).toEqual({ type: 'done', markdown: 'A quiet brief.' })
+    expect(ran.at(-1)).toEqual({
+      type: 'done',
+      body: 'A quiet brief.',
+      refs: [],
+      markdown: 'A quiet brief.',
+    })
   })
 })

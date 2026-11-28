@@ -20,23 +20,30 @@ export type AnswerVariant = 'dock' | 'page'
 /**
  * One source chip: the label it was cited as, linked when it has a page; a
  * passage's chip previews it on hover.
+ * - `n` prints it as a bare `[n]` instead, for a card too tight for labels;
+ *   the label is then its accessible name and its preview's head.
  */
-export function RefChip({ source }: { source: AskRef }) {
+export function RefChip({ source, n }: { source: AskRef; n?: number }) {
   const cls =
-    'mx-0.5 inline-flex h-4.5 max-w-48 items-center truncate rounded-md border border-rule bg-bone px-1 align-baseline mono text-micro text-graphite'
+    n === undefined
+      ? 'mx-0.5 inline-flex h-4.5 max-w-48 items-center truncate rounded-md border border-rule bg-bone px-1 align-baseline mono text-micro text-graphite'
+      : 'mono text-micro text-graphite'
+  const shown = n === undefined ? source.label : `[${String(n)}]`
+  const name = n === undefined ? undefined : source.label
   return (
     <RefPreview refId={source.ref} label={source.label}>
       {source.href === null ? (
-        <span className={cls} data-ref={source.ref}>
-          {source.label}
+        <span className={cls} data-ref={source.ref} aria-label={name}>
+          {shown}
         </span>
       ) : (
         <Link
           to={source.href}
           className={cn(cls, 'focus-ring hover:text-foreground')}
           data-ref={source.ref}
+          aria-label={name}
         >
-          {source.label}
+          {shown}
         </Link>
       )}
     </RefPreview>

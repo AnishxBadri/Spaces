@@ -1,5 +1,4 @@
 import { formatTime } from '@spaces/core/format'
-import { PrepButton } from '#/components/meetings/meeting-row'
 import { WriteUpButton } from '#/components/meetings/write-up-button'
 import { icon } from '#/components/icons'
 import { ProviderMark } from '#/components/provider-mark'
@@ -20,27 +19,13 @@ function whenOf(m: TodayMeeting, tense: DayTense, now: Date | null): When {
   return Date.parse(m.startsAt) > now.getTime() ? 'ahead' : 'running'
 }
 
-/** The row's action: Write after it, Prep before it, a word while Prep runs. */
-function Action({
-  meeting,
-  when,
-  preparing,
-  onPrep,
-}: {
-  meeting: TodayMeeting
-  when: When
-  preparing: boolean
-  onPrep: () => void
-}) {
+/**
+ * The row's action: Write after it. A meeting ahead has none here; its brief
+ * starts from the meeting's own card.
+ */
+function Action({ meeting, when }: { meeting: TodayMeeting; when: When }) {
   if (meeting.cancelled)
     return <span className="text-label text-graphite">Cancelled</span>
-  if (preparing)
-    return (
-      <span data-preparing className="text-label text-graphite">
-        Preparing…
-      </span>
-    )
-  if (when === 'ahead') return <PrepButton onPrep={onPrep} />
   if (when === 'ended' && meeting.noteId === null)
     return <WriteUpButton interactionId={meeting.id} />
   return null
@@ -55,7 +40,6 @@ export function TodayMeetingRow({
   meeting,
   tense,
   now,
-  preparing,
   onOpen,
 }: {
   meeting: TodayMeeting
@@ -63,10 +47,8 @@ export function TodayMeetingRow({
   tense: DayTense
   /** The browser's clock; null before it is read. */
   now: Date | null
-  /** Prep is running for this meeting in its window. */
-  preparing: boolean
-  /** Opens the meeting window; `prep` starts Prep in it. */
-  onOpen: (id: string, prep: boolean) => void
+  /** Opens the meeting window. */
+  onOpen: (id: string) => void
 }) {
   const when = whenOf(meeting, tense, now)
   const title = meeting.title ?? 'Meeting'
@@ -91,7 +73,7 @@ export function TodayMeetingRow({
     >
       <button
         type="button"
-        onClick={() => onOpen(meeting.id, false)}
+        onClick={() => onOpen(meeting.id)}
         className="focus-ring-inset flex min-w-0 flex-1 items-center gap-3 self-stretch text-left"
       >
         <span
@@ -115,12 +97,7 @@ export function TodayMeetingRow({
         </span>
       </button>
       <span className="flex w-30 shrink-0 items-center">
-        <Action
-          meeting={meeting}
-          when={when}
-          preparing={preparing}
-          onPrep={() => onOpen(meeting.id, true)}
-        />
+        <Action meeting={meeting} when={when} />
       </span>
       <span className="w-30 shrink-0 truncate text-label text-graphite">
         {whoLine(meeting.external)}

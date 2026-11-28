@@ -3,7 +3,7 @@ import {
   useRouteContext,
   useRouter,
 } from '@tanstack/react-router'
-import { useCallback, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { MeetingDialog } from '#/components/meeting-dialog'
@@ -186,16 +186,13 @@ function TodayLedger({
   const search = Route.useSearch()
   const go = Route.useNavigate()
   const meetingId = openModalId(search, 'meeting')
-  const [prepFor, setPrepFor] = useState<string | null>(null)
-  const openMeeting = (id: string, prep = false) => {
-    setPrepFor(prep ? id : null)
+  const openMeeting = (id: string) => {
     void go({
       search: (prev) => ({ ...prev, modal: 'meeting', id }),
       resetScroll: false,
     })
   }
   const closeMeeting = () => {
-    setPrepFor(null)
     void go({
       search: (prev) => ({ ...prev, modal: undefined, id: undefined }),
       resetScroll: false,
@@ -226,12 +223,6 @@ function TodayLedger({
   const [day, setDay] = useState(today)
   const [version, setVersion] = useState(0)
   const shown = useDayMeetings(meetings.calendar ? day : null, version)
-  // The meeting whose Prep runs in its window, for its row's action lane.
-  const [preparing, setPreparing] = useState<string | null>(null)
-  const onPrepRunning = useCallback(
-    (running: boolean) => setPreparing(running ? meetingId : null),
-    [meetingId],
-  )
   // A meeting's day is the reader's, so its figure waits for the browser clock.
   const now = useNow()
   // So does the headline count; a reload of the page's data counts again.
@@ -486,7 +477,6 @@ function TodayLedger({
                 today={today}
                 day={day}
                 meetings={shown}
-                preparing={preparing}
                 onOpen={openMeeting}
                 onRetry={() => setVersion((v) => v + 1)}
               />
@@ -533,8 +523,6 @@ function TodayLedger({
       )}
       <MeetingDialog
         id={meetingId}
-        prepOnOpen={prepFor !== null && prepFor === meetingId}
-        onPrepRunning={onPrepRunning}
         onOpenChange={(open) => {
           if (!open) closeMeeting()
         }}
