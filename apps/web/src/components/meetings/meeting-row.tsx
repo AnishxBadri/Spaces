@@ -57,10 +57,16 @@ function WhoAndRecord({
   const people = peopleLine(m.people)
   const record = m.record?.name ?? null
   return (
-    <span className="min-w-0 flex-1 truncate text-label text-graphite">
-      {people}
+    // The people give way first: a long invite list never hides the record.
+    <span className="flex min-w-0 flex-1 text-label text-graphite">
+      <span className="min-w-0 truncate">{people}</span>
       {record === null ? null : (
-        <span className={struck ? undefined : 'text-foreground'}>
+        <span
+          className={cn(
+            'max-w-1/2 shrink-0 truncate whitespace-pre',
+            !struck && 'text-foreground',
+          )}
+        >
           {people === '' ? record : ` · ${record}`}
         </span>
       )}
