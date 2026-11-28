@@ -21,13 +21,18 @@ import {
   DropdownMenuContent,
   DropdownMenuTrigger,
 } from '#/components/ui/dropdown-menu'
-import { getNoteWindow, listTermsForNote } from '#/lib/server-fns'
+import {
+  getNoteWindow,
+  listTermsForNote,
+  noteWindowClosed,
+} from '#/lib/server-fns'
 import { openModalId } from '#/lib/modal-search'
 import { cn } from '#/lib/utils'
 import { SaveWord } from './note-head'
 import type { SaveState } from './note-head'
 import { noteKindEntries, useNoteKind } from './note-menu'
 import { NoteMark } from './note-mark'
+import { useCloseNoteWindow } from './note-window-nav'
 import { useNoteFileDrop } from './use-note-files'
 import { useNoteLeaveGuard, useNoteSave } from './use-note-save'
 
@@ -80,22 +85,20 @@ export function windowSaveState(state: SaveState): SaveState {
 }
 
 /**
- * The window a record page opens from its URL. Closing drops `modal` and
- * `id`, keeps the tab, and reloads the record so its rows read the edit.
+ * The window a page opens from its URL. Closing steps back when
+ * `useOpenNoteWindow` pushed it (Meetings, Today), else drops `modal` and
+ * `id` and keeps the tab (a record); either way the page reloads so its
+ * rows read the edit.
  */
 export function NoteModal() {
   const search = useSearch({ strict: false })
   const navigate = useNavigate()
   const router = useRouter()
+  const closeWindow = useCloseNoteWindow()
   const onClose = useCallback(() => {
-    void navigate({
-      to: '.',
-      search: (prev) => ({ ...prev, modal: undefined, id: undefined }),
-      replace: true,
-      resetScroll: false,
-    })
+    closeWindow()
     void router.invalidate()
-  }, [navigate, router])
+  }, [closeWindow, router])
   const onOpenPage = useCallback(
     (noteId: string) =>
       void navigate({ to: '/notes/$noteId', params: { noteId } }),
@@ -142,7 +145,17 @@ export function NoteWindow({
       leaving.current = false
     }
   }, [])
-  const close = useCallback(() => void leave(onClose), [leave, onClose])
+  const close = useCallback(
+    () =>
+      void leave(() => {
+        // A meeting's write-up is read for action items when its window
+        // first closes; the server decides whether this note is one.
+        if (id !== null)
+          void noteWindowClosed({ data: { id } }).catch(() => undefined)
+        onClose()
+      }),
+    [leave, onClose, id],
+  )
 
   return (
     <Dialog

@@ -77,6 +77,7 @@ import { noteExcerpt } from '#/lib/notes/excerpt'
 import {
   beforeMonthEndSql,
   cancelledSql,
+  nothingToNoteSql,
   meetingFilterConditions,
   monthKeySql,
   pastBandKeySql,
@@ -463,7 +464,8 @@ const memberScopeProgram = (
  * over `interaction`, so the Meetings page and Today's Write-ups agree.
  * - Mine: `memberScopeProgram` for the reader, their login address
  *   theirs even before a member row says so.
- * - Unwritten mirrors `isUnwritten`, recorder and grace hour included.
+ * - Unwritten mirrors `isUnwritten`, recorder, grace hour and `Nothing to
+ *   note` included.
  */
 const readerScopeProgram = (reader: MeetingReader, now: Date) =>
   Effect.gen(function* () {
@@ -475,7 +477,7 @@ const readerScopeProgram = (reader: MeetingReader, now: Date) =>
     } = yield* memberScopeProgram(team, reader.id, reader.email)
     const recorders = team.addressesOf(team.recording)
     const graceEnd = new Date(now.getTime() - GRACE_MS)
-    const unwrittenSql = sql<boolean>`(${interaction.noteId} is null and not ${cancelledSql} and (not ${attendedBySql(recorders)} or ${endSql} <= ${graceEnd}))`
+    const unwrittenSql = sql<boolean>`(${interaction.noteId} is null and not ${cancelledSql} and not ${nothingToNoteSql} and (not ${attendedBySql(recorders)} or ${endSql} <= ${graceEnd}))`
     return { team, mine, recorders, loggedIds, unwrittenSql, mineSql }
   })
 
@@ -798,6 +800,7 @@ export const meetingListProgram = Effect.fn('meetingListProgram')(function* (
           cancelled,
           endsAt,
           recorded: attendees.some((email) => recorders.has(email)),
+          nothingToNote: meta?.nothing_to_note === true,
         },
         now,
       ),
@@ -1133,6 +1136,11 @@ export type MeetingDetail = {
   notes: Array<MeetingCarriedNote>
   artifacts: Array<MeetingArtifact>
   suggestions: Array<MeetingSuggestion>
+  /**
+   * Marked `Nothing to note`; null when the row cannot hold the mark (a
+   * logged call or meeting carries no calendar metadata).
+   */
+  nothingToNote: boolean | null
 }
 
 /**
@@ -1265,6 +1273,7 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
             id: suggestion.id,
             kind: suggestion.kind,
             payload: suggestion.payload,
+            refs: suggestion.refs,
           })
           .from(suggestion)
           .where(
@@ -1348,13 +1357,24 @@ export const meetingDetailProgram = Effect.fn('meetingDetailProgram')(
           url: a.url ?? a.externalUrl,
           private: a.visibility === 'private',
         })),
-      suggestions: open.map((s) => ({
-        id: s.id,
-        kind: s.kind,
-        summary: suggestionSummary(s.kind, s.payload),
-        due:
-          s.kind === 'task' ? (readTaskPayload(s.payload)?.due ?? null) : null,
-      })),
+      // What a write-up proposed shows only to a reader of the write-up.
+      suggestions: open
+        .filter(
+          (s) =>
+            noteId === null ||
+            readableBody ||
+            !s.refs.includes(ref.note(noteId)),
+        )
+        .map((s) => ({
+          id: s.id,
+          kind: s.kind,
+          summary: suggestionSummary(s.kind, s.payload),
+          due:
+            s.kind === 'task'
+              ? (readTaskPayload(s.payload)?.due ?? null)
+              : null,
+        })),
+      nothingToNote: meta === null ? null : meta.nothing_to_note === true,
     }
   },
 )

@@ -66,7 +66,13 @@ const listInboxProgram = Effect.fn('listInboxProgram')(function* (
   const queue = yield* Effect.promise(() => import('../inbox/queue'))
   const [rows, scope, filter] = yield* Effect.all(
     [
-      queue.listInboxProgram({ record, source, space, viewer }),
+      queue.listInboxProgram({
+        record,
+        source,
+        space,
+        viewer,
+        actionItems: false,
+      }),
       record === null
         ? Effect.succeed(null)
         : queue.inboxScopeRecordProgram(record),

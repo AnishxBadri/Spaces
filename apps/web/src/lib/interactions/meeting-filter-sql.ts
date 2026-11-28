@@ -16,6 +16,9 @@ export type MeetingsFacet = 'with' | 'member' | 'kind' | 'writeUp' | 'cancelled'
 
 export const cancelledSql = sql`(coalesce(${interaction.meta} ->> 'status', '') = 'cancelled')`
 
+/** A member marked the meeting `Nothing to note` (`MeetingMeta.nothing_to_note`). */
+export const nothingToNoteSql = sql`(coalesce(${interaction.meta} ->> 'nothing_to_note', '') = 'true')`
+
 /** `text` as a case-blind `ilike` pattern that matches it anywhere, wildcards escaped. */
 const containing = (text: string) =>
   `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`

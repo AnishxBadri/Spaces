@@ -1,4 +1,4 @@
-import { useRouter } from '@tanstack/react-router'
+import { useRouter, useRouterState } from '@tanstack/react-router'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useClock } from '#/components/clock'
@@ -16,11 +16,13 @@ import { googleDayUrl } from '#/lib/meetings/day'
 import { isOver } from '#/lib/meetings/sheet'
 import {
   askAboutBrief,
+  findActionItems,
   getMeetingSheet,
   pinMeetingRecord,
   prepMeeting,
   savePrepAsNote,
   searchEntities,
+  setNothingToNote,
   writeUpInteraction,
 } from '#/lib/server-fns'
 import type { MeetingSheetData, PrepEvent } from '#/lib/server-fns'
@@ -68,8 +70,10 @@ function LoadingHead({ frame }: { frame: SheetFrame }) {
  * `Recent`; after, the write-up and its action items, or `No write-up`.
  * - `frame` is what holds it. A `window` closes from its head; a `pane`
  *   stands in the page.
- * - Over a record (`onOpenNote`), the write-up and the meeting's notes open
- *   in the note window; elsewhere they open their page.
+ * - Where the page mounts the note window (`onOpenNote`: a record, Meetings,
+ *   Today), `Write it up`, the write-up and the meeting's notes open in it;
+ *   elsewhere they open their page.
+ * - `Nothing to note` marks the meeting as owing no write-up, with Undo.
  * - `next` is the list's word on whether this is the next meeting today.
  */
 export function MeetingSheet({
@@ -100,6 +104,7 @@ export function MeetingSheet({
   const [saved, setSaved] = useState(false)
   const [writing, setWriting] = useState(false)
   const [asking, setAsking] = useState(false)
+  const finding = useRef(false)
   const reader = useRef<ReadableStreamDefaultReader<PrepEvent> | null>(null)
 
   const load = useCallback(async () => {
@@ -124,9 +129,12 @@ export function MeetingSheet({
     }
   }, [])
 
+  // Read again whenever the router reloads: a note window closing over the
+  // sheet invalidates it, so the write-up it wrote shows here.
+  const routerLoadedAt = useRouterState({ select: (s) => s.loadedAt })
   useEffect(() => {
     void load()
-  }, [load])
+  }, [load, routerLoadedAt])
 
   const changed = () => {
     void load()
@@ -212,6 +220,7 @@ export function MeetingSheet({
       // behind by the page change itself.
       if (onOpenNote !== undefined) {
         onOpenNote(noteId)
+        setWriting(false)
         return
       }
       if (frame === 'window') onClose()
@@ -219,6 +228,49 @@ export function MeetingSheet({
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not write it up')
       setWriting(false)
+    }
+  }
+
+  // Undo puts back exactly what the mark replaced.
+  async function markNothingToNote() {
+    try {
+      const { was } = await setNothingToNote({
+        data: { interactionId: id, on: true },
+      })
+      changed()
+      toast('Marked as nothing to note', {
+        action: {
+          label: 'Undo',
+          onClick: () =>
+            void setNothingToNote({ data: { interactionId: id, on: was } })
+              .then(changed)
+              .catch((err: unknown) => {
+                toast.error(
+                  err instanceof Error ? err.message : 'Could not undo it',
+                )
+              }),
+        },
+      })
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not mark it')
+    }
+  }
+
+  async function findItems(noteId: string) {
+    if (finding.current) return
+    finding.current = true
+    try {
+      const { found, message } = await findActionItems({
+        data: { id: noteId },
+      })
+      toast(message)
+      if (found > 0) changed()
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : 'Could not read the write-up',
+      )
+    } finally {
+      finding.current = false
     }
   }
 
@@ -300,6 +352,7 @@ export function MeetingSheet({
               <WriteUpCard
                 note={note}
                 onOpenNote={onOpenNote}
+                onFindActionItems={() => void findItems(note.id)}
                 carried={
                   <CarriedList
                     notes={sharedNotes}
@@ -313,6 +366,11 @@ export function MeetingSheet({
               <NoWriteUpCard
                 writing={writing}
                 onWriteUp={() => void writeUp()}
+                onNothingToNote={
+                  meeting.nothingToNote === false
+                    ? () => void markNothingToNote()
+                    : null
+                }
               />
             ) : null}
             {note === null ? (

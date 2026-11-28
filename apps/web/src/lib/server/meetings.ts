@@ -212,3 +212,54 @@ export const savePrepAsNote = createServerFn({ method: 'POST' })
       )
     }
   })
+
+/**
+ * `Nothing to note` on a past meeting, or Undo putting back `was`. Answers
+ * the value it replaced.
+ */
+export const setNothingToNote = createServerFn({ method: 'POST' })
+  .validator(input(Schema.Struct({ interactionId: uuid, on: Schema.Boolean })))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { nothingToNoteMessage, setNothingToNoteProgram } =
+      await import('../interactions/nothing-to-note')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(setNothingToNoteProgram)(
+        data.interactionId,
+        data.on,
+      )
+    } catch (failure) {
+      throw new Error(nothingToNoteMessage(failure))
+    }
+  })
+
+/**
+ * A note window closed: a meeting's shared write-up is read for action
+ * items in the background, once. Never fails the close.
+ */
+export const noteWindowClosed = createServerFn({ method: 'POST' })
+  .validator(input(byId))
+  .handler(async ({ data }) => {
+    await requireUser()
+    const { writeUpClosedProgram } = await import('../ai/write-up-action-items')
+    const { effectFn } = await import('./effect')
+    try {
+      return await effectFn(writeUpClosedProgram)(data.id)
+    } catch {
+      return { queued: false }
+    }
+  })
+
+/** `Find action items` on a write-up: read again for what is new. */
+export const findActionItems = createServerFn({ method: 'POST' })
+  .validator(input(byId))
+  .handler(async ({ data }) => {
+    const user = await requireUser()
+    const { findActionItemsAnswer } =
+      await import('../ai/write-up-action-items')
+    const { effectFn } = await import('./effect')
+    const answer = await effectFn(findActionItemsAnswer)(user.id, data.id)
+    if (answer.failed) throw new Error(answer.message)
+    return { found: answer.found, message: answer.message }
+  })

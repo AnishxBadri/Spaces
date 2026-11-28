@@ -2,15 +2,20 @@ import { DitherNoun } from '#/components/dither-noun'
 import { Button } from '#/components/ui/button'
 
 /**
- * A meeting that is over and owes a write-up: the note drawing on bone,
- * `No write-up` in serif and `Write it up` in pine.
+ * A meeting that is over with no write-up: the note drawing on bone,
+ * `No write-up` in serif, `Write it up` in pine and, while the meeting
+ * still owes one, `Nothing to note` beside it. Once marked, `Write it up`
+ * stands alone, so one can still be written later.
  */
 export function NoWriteUpCard({
   writing,
   onWriteUp,
+  onNothingToNote,
 }: {
   writing: boolean
   onWriteUp: () => void
+  /** Null when the meeting is marked already, or cannot hold the mark. */
+  onNothingToNote: (() => void) | null
 }) {
   return (
     <section
@@ -32,6 +37,15 @@ export function NoWriteUpCard({
           <Button pending={writing} disabled={writing} onClick={onWriteUp}>
             Write it up
           </Button>
+          {onNothingToNote === null ? null : (
+            <Button
+              variant="outline"
+              disabled={writing}
+              onClick={onNothingToNote}
+            >
+              Nothing to note
+            </Button>
+          )}
         </div>
       </div>
     </section>

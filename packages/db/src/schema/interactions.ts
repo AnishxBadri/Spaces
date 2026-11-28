@@ -93,6 +93,11 @@ export type MeetingMeta = {
   calendar_event_id?: string
   /** Recorder payloads attached to this meeting, one per provider event. */
   recorder_events?: Array<RecorderEvent>
+  /**
+   * A member said the meeting needs no write-up: it no longer counts as
+   * unwritten. Absent until then; a calendar rewrite keeps it.
+   */
+  nothing_to_note?: true
 }
 
 /** A recorder payload on a row: the provider's id for it and its receipt. */

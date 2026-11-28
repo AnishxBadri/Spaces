@@ -17,7 +17,7 @@ import { identityPayloadSchema } from '../../ai/identity'
 import { documentKindPayloadSchema } from '../../ai/document-kind'
 import { notePayloadSchema } from '../../ai/note'
 import { spaceTagPayloadSchema } from '../../ai/space-tag'
-import { taskPayloadSchema } from '../../ai/task'
+import { taskPayloadOf, taskPayloadSchema } from '../../ai/task'
 import { supersedesPayloadSchema } from '../../ai/supersedes'
 import type { SupersedesPayload } from '../../ai/supersedes'
 import type { TaskPayload } from '../../ai/task'
@@ -274,7 +274,7 @@ export function fileRecordOf(payload: Json): FileRecordPayload {
 /** A task payload, decoded — or the validator's refusal, by field. */
 export function taskOf(payload: Json): TaskPayload {
   const parsed = readPayload(taskPayloadSchema, payload)
-  if (parsed.success) return parsed.data
+  if (parsed.success) return taskPayloadOf(parsed.data)
   throw invalid(
     parsed.issues.map((i) => {
       const slug = i.path || 'task'

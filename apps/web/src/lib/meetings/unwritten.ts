@@ -19,14 +19,17 @@ export type WriteUpOwed = {
   endsAt: string
   /** Someone attending has a recorder connected (`meeting-notes`). */
   recorded: boolean
+  /** A member marked it `Nothing to note`. */
+  nothingToNote: boolean
 }
 
 /**
- * Unwritten: nothing written, not cancelled, and either no recorder is
- * expected or the grace hour since its end has passed.
+ * Unwritten: nothing written, not cancelled, not marked as nothing to note,
+ * and either no recorder is expected or the grace hour since its end has
+ * passed.
  */
 export function isUnwritten(m: WriteUpOwed, now: Date): boolean {
-  if (m.noteId !== null || m.cancelled) return false
+  if (m.noteId !== null || m.cancelled || m.nothingToNote) return false
   if (!m.recorded) return true
   return now.getTime() - Date.parse(m.endsAt) >= GRACE_MS
 }

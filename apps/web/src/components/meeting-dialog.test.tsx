@@ -72,6 +72,8 @@ const fns = vi.hoisted(() => ({
   pinMeetingRecord: vi.fn(),
   searchEntities: vi.fn(),
   writeUpInteraction: vi.fn(),
+  setNothingToNote: vi.fn(),
+  findActionItems: vi.fn(),
   getDocumentDownloadUrl: vi.fn(),
   getDocumentText: vi.fn(),
 }))
@@ -85,6 +87,7 @@ vi.mock('@tanstack/react-router', () => ({
     state: { location: { state: { __TSR_index: 1 } } },
   }),
   useNavigate: () => navigate,
+  useRouterState: () => 0,
   Link: ({
     to,
     children,
@@ -136,6 +139,7 @@ const DETAIL: MeetingDetail = {
     },
   ],
   suggestions: [],
+  nothingToNote: false,
 }
 
 /** The sheet's read around a window's read. */

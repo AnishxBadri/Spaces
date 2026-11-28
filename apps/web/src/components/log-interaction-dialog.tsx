@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import { formatDay, formatTime } from '@spaces/core/format'
 import { EMAIL_SUMMARY_MAX } from '@spaces/core/interactions/email-listing'
 import { useClock } from '#/components/clock'
+import { useOpenNoteWindow } from '#/components/notes/note-window-nav'
 import { Button } from '#/components/ui/button'
 import { Checkbox } from '#/components/ui/checkbox'
 import {
@@ -52,9 +53,10 @@ function localNow(): string {
 
 /**
  * The log window.
- * - Opened over a record (`seed`), a write-up opens in the note window over
- *   it (`?modal=note&id=`); with no record underneath (Today) it is the
- *   note's page.
+ * - A write-up opens in the note window over the page it was logged from
+ *   (`?modal=note&id=`), which must mount `NoteModal`: over a record
+ *   (`seed`) it replaces the record's window keys; with no record
+ *   underneath (Today, Meetings) `Done` steps back to the page.
  * - The logged row sits on bone until its toast goes; the toast offers
  *   `Write it up` unless the write-up is already open.
  */
@@ -102,9 +104,10 @@ export function LogInteractionDialog({
   const [error, setError] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
 
+  const openOverPage = useOpenNoteWindow()
   function openNote(noteId: string) {
     if (seed === undefined) {
-      void router.navigate({ to: '/notes/$noteId', params: { noteId } })
+      openOverPage(noteId)
       return
     }
     void router.navigate({

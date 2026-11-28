@@ -299,6 +299,12 @@ export type InboxScope = {
   space?: string | null
   /** The reader: their own Ask threads' cards gather under each thread. */
   viewer?: string | null
+  /**
+   * Whether a write-up's action items (`task` suggestions) are in it: Today
+   * decides them under Tasks and the meeting under its write-up, so Review
+   * leaves them out.
+   */
+  actionItems?: boolean
 }
 
 const ALL: InboxScope = { record: null }
@@ -446,6 +452,7 @@ const listSuggestionLane = Effect.fn('listSuggestionLane')(function* (
               ),
           source === null ? undefined : sourceIs(source),
           spaceId === null ? undefined : spaceIs(spaceId),
+          scope.actionItems === false ? ne(suggestion.kind, 'task') : undefined,
         ),
       )
       .orderBy(desc(suggestion.createdAt), desc(suggestion.id)),

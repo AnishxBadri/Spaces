@@ -13,8 +13,9 @@ import { JobPermanent, JobRetryable } from '../run-job'
 import type { JobDef } from '../run-job'
 
 /**
- * interaction.recorded-note-tasks: a recorded note's action items as `task`
- * suggestions. The program is `recordedNoteTasksProgram`.
+ * interaction.recorded-note-tasks: a shared write-up's action items as
+ * `task` suggestions, sent when a recorder files its note and when a
+ * write-up's window first closes. The program is `recordedNoteTasksProgram`.
  * - A refused or unrouted lane is not a failure: nothing is proposed and the
  *   job completes.
  * - A provider down or an unreadable row is retried; anything else (the
@@ -38,11 +39,12 @@ const failed = (failure: RecordedNoteTasksFailure) => {
     : new JobPermanent({ reason })
 }
 
+/** A typed write-up carries no recorder and no receipt. */
 export const recordedNoteTasksData = Schema.Struct({
   interactionId: uuid,
   noteId: uuid,
-  integrationId: uuid,
-  receiptId: uuid,
+  integrationId: Schema.optionalKey(uuid),
+  receiptId: Schema.optionalKey(uuid),
 })
 
 export type RecordedNoteTasksData = typeof recordedNoteTasksData.Type

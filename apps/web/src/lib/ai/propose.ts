@@ -11,6 +11,7 @@ import {
   spaceWatchDismissal,
   suggestion,
 } from '@spaces/db/schema'
+import { user } from '@spaces/db/schema/auth'
 import { jsonRecord } from '@spaces/core/json'
 import type { Json } from '@spaces/core/json'
 import { toPatch, validateProposal } from '@spaces/core/ai/schema'
@@ -816,10 +817,11 @@ async function acceptSpaceTagInTx(
 // ---------- task ----------
 
 /**
- * Accept a task: one `task` row through the task writer, created by and
- * assigned to the accepter, linked to the payload's record — its survivor
- * when it was merged since. A record gone since refuses, and the row stays
- * open.
+ * Accept a task: one `task` row through the task writer, created by the
+ * accepter and assigned to the payload's assignee (a write-up's author),
+ * else the accepter, linked to the payload's record — its survivor when it
+ * was merged since. A record gone since refuses, and the row stays open.
+ * An assignee who has since left the workspace falls back to the accepter.
  */
 async function acceptTaskInTx(
   tx: Tx,
@@ -839,10 +841,17 @@ async function acceptTaskInTx(
       entityId: payload.entity_id,
       message: 'Record not found',
     })
+  const named = payload.assignee_id
+  const assignee =
+    named === undefined
+      ? undefined
+      : (
+          await tx.select({ id: user.id }).from(user).where(eq(user.id, named))
+        ).at(0)
   const { id } = await insertTaskInTx(tx, {
     content: payload.title,
     dueDate: payload.due,
-    assigneeId: actor.id,
+    assigneeId: assignee?.id ?? actor.id,
     createdBy: actor.id,
     entityIds: [recordId],
   })

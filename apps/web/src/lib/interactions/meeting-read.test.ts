@@ -32,6 +32,7 @@ import {
   pinMeetingRecordProgram,
   unwrittenMeetingsProgram,
 } from './meeting-read'
+import { setNothingToNoteProgram } from './nothing-to-note'
 
 /**
  * The meeting reads: a day's external meetings with RSVP per participant
@@ -357,6 +358,44 @@ describe('unwrittenMeetingsProgram', () => {
     expect(await listed('2027-05-20T11:30:00.000Z')).toBe(false)
     expect(await listed('2027-05-20T12:29:59.999Z')).toBe(false)
     expect(await listed('2027-05-20T12:30:00.000Z')).toBe(true)
+  })
+
+  it('takes a meeting marked nothing to note out of Write-ups and the band, and Undo puts it back', async () => {
+    const now = new Date('2027-06-10T12:00:00.000Z')
+    const marked = await aMeeting({
+      subject: 'Nothing to note',
+      at: '2027-06-09T09:00:00.000Z',
+      meta: invited({ ends_at: '2027-06-09T09:30:00.000Z' }),
+      records: [],
+    })
+    const owed = async () => {
+      const today = await run(unwrittenMeetingsProgram(reader, now))
+      const past = await run(
+        meetingListProgram(reader, {
+          tab: 'past',
+          whose: 'everyone',
+          now: now.toISOString(),
+          until: '2027-06-24T00:00:00.000Z',
+        }),
+      )
+      return {
+        today: today.some((m) => m.id === marked),
+        band: past.rows.find((m) => m.id === marked)?.unwritten,
+      }
+    }
+    expect(await owed()).toEqual({ today: true, band: true })
+    const { was } = await run(setNothingToNoteProgram(marked, true))
+    expect(was).toBe(false)
+    expect(await owed()).toEqual({ today: false, band: false })
+    const sheet = await run(meetingDetailProgram(reader, marked))
+    expect(sheet.nothingToNote).toBe(true)
+    await run(setNothingToNoteProgram(marked, was))
+    expect(await owed()).toEqual({ today: true, band: true })
+    const [row] = await db
+      .select({ meta: interaction.meta })
+      .from(interaction)
+      .where(eq(interaction.id, marked))
+    expect(row.meta).toEqual(invited({ ends_at: '2027-06-09T09:30:00.000Z' }))
   })
 })
 

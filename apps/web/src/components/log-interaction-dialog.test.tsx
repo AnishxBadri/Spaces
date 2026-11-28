@@ -31,6 +31,7 @@ const toasts = vi.hoisted(() => ({
 const nav = vi.hoisted(() => ({
   navigate: vi.fn(() => Promise.resolve()),
   invalidate: vi.fn(() => Promise.resolve()),
+  state: { location: { state: { __TSR_index: 1 } } },
 }))
 
 vi.mock('#/lib/server-fns', () => fns)
@@ -224,7 +225,7 @@ describe('LogInteractionDialog', () => {
     expect(toasts.toast.mock.calls.at(0)?.at(1)).not.toHaveProperty('action')
   })
 
-  it('lands on the note page where no record is underneath', async () => {
+  it('opens the write-up over the page where no record is underneath', async () => {
     host = document.createElement('div')
     document.body.append(host)
     const r = createRoot(host)
@@ -248,9 +249,12 @@ describe('LogInteractionDialog', () => {
     await click(tick)
     await click(footButton('Log meeting'))
     await wait(0)
-    expect(nav.navigate).toHaveBeenCalledWith({
-      to: '/notes/$noteId',
-      params: { noteId: 'note-1' },
+    const call: unknown = nav.navigate.mock.calls.at(0)?.at(0)
+    expect(call).toMatchObject({ to: '.', resetScroll: false })
+    expect(searchOf(call, { tab: 'past' })).toEqual({
+      tab: 'past',
+      modal: 'note',
+      id: 'note-1',
     })
   })
 

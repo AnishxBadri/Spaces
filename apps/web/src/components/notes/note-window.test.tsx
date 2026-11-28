@@ -57,6 +57,7 @@ const fns = vi.hoisted(() => ({
   listTermsForNote: vi.fn(() => Promise.resolve([])),
   saveNote: vi.fn((_: unknown) => Promise.resolve()),
   setNoteKind: vi.fn(() => Promise.resolve()),
+  noteWindowClosed: vi.fn(() => Promise.resolve({ queued: false })),
 }))
 
 const upload = vi.hoisted(() => ({

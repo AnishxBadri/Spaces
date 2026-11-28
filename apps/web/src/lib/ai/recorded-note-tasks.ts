@@ -13,6 +13,7 @@ import { JSON_SCHEMA_DRAFT } from '@spaces/core/ai/schema'
 import type { JsonSchema } from '@spaces/core/ai/schema'
 import { ref } from '@spaces/core/context/ref'
 import type { ContextItem } from '@spaces/core/context/types'
+import { readTaskPayload } from '@spaces/core/ai/task'
 import { proposeProgram } from '@spaces/core/writes/suggestions/propose'
 import { completeMessage, completeProgram } from './complete'
 import type { CompleteFailure, CompleteOutput } from './complete'
@@ -21,14 +22,19 @@ import type { SensitivityReadFailed } from './sensitivity-for'
 import type { SensitivityVia } from './sensitivity'
 
 /**
- * A recorded note's action items: the Extract lane reads the shared
- * note a recorder filed and proposes one `task` suggestion per item, each
- * citing the note, the meeting and the receipt.
+ * A write-up's action items: the Extract lane reads a shared write-up (a
+ * recorder's note, or one a member typed) and proposes one `task`
+ * suggestion per item, each citing the note, the meeting and, for a
+ * recorder's note, the receipt.
  * - Under the sensitivity gate: a meeting whose records or note resolve
  *   sensitive extracts locally, or proposes nothing.
  * - Once per note: a note any task suggestion already cites is skipped, so a
- *   retried job never proposes twice.
- * - The task is about the meeting's company, else its first person.
+ *   retried job or a second close never proposes twice. `again` (Find
+ *   action items) reads it anyway and proposes only the items whose title
+ *   no task suggestion on the note already holds.
+ * - The task is about the meeting's company, else its first person, and is
+ *   the note author's once accepted: the member who typed it, or whose
+ *   recorder filed it.
  */
 
 /** The note's head the model reads; a summary's action items are in it. */
@@ -71,10 +77,14 @@ export type RecordedNoteTasksResult =
 export type RecordedNoteTasksInput = {
   interactionId: string
   noteId: string
-  /** The recorder: the suggestions' proposer. */
-  integrationId: string
+  /** The recorder: the suggestions' proposer. Absent for a typed write-up. */
+  integrationId?: string | undefined
   /** The receipt the note was stored in; removal finds the tasks by it. */
-  receiptId: string
+  receiptId?: string | undefined
+  /** Read the note again, proposing only what is not proposed yet. */
+  again?: boolean
+  /** The member who asked for the read; absent, it runs as the workspace. */
+  askedBy?: string
   /** The test seam: an injected model answers the lane. */
   model?: LanguageModel
   jobRunId?: string
@@ -207,6 +217,7 @@ export const recordedNoteTasksProgram = Effect.fn('recordedNoteTasks')(
           title: note.title,
           body: note.bodyMd,
           visibility: note.visibility,
+          authorId: note.authorId,
           occurredAt: interaction.occurredAt,
         })
         .from(note)
@@ -221,9 +232,11 @@ export const recordedNoteTasksProgram = Effect.fn('recordedNoteTasks')(
     const head = held.body.trim().slice(0, HEAD_CHARS)
     if (head === '') return { status: 'skipped', reason: 'The note is empty' }
 
+    // Every task the note was ever read for, decided or not: a skipped item
+    // is not proposed again either.
     const cited = yield* query(() =>
       db
-        .select({ id: suggestion.id })
+        .select({ payload: suggestion.payload })
         .from(suggestion)
         .where(
           and(
@@ -231,10 +244,16 @@ export const recordedNoteTasksProgram = Effect.fn('recordedNoteTasks')(
             sql`${suggestion.refs} @> array[${ref.note(noteId)}]::text[]`,
           ),
         )
-        .limit(1),
+        .limit(input.again === true ? 1_000 : 1),
     )
-    if (cited.length > 0)
+    if (cited.length > 0 && input.again !== true)
       return { status: 'skipped', reason: 'Its action items were proposed' }
+    const proposedTitles = new Set(
+      cited.flatMap((c) => {
+        const title = readTaskPayload(c.payload)?.title
+        return title === undefined ? [] : [title.toLowerCase()]
+      }),
+    )
 
     const records = yield* query(() =>
       db
@@ -268,9 +287,12 @@ export const recordedNoteTasksProgram = Effect.fn('recordedNoteTasks')(
       },
     ]
     const answered = yield* completeProgram('extract', items, itemsSchema(), {
-      // Nobody pressed anything: the lane runs off the arrival, as the
+      // Off an arrival or a close nobody asked for, the lane runs as the
       // workspace, on the workspace's key.
-      caller: { type: 'system' },
+      caller:
+        input.askedBy === undefined
+          ? { type: 'system' }
+          : { type: 'user', id: input.askedBy },
       sensitivity: gate.sensitive ? 'sensitive' : 'normal',
       ...(gate.via === null ? {} : { via: gate.via }),
       budgetChars: BUDGET_CHARS,
@@ -292,18 +314,30 @@ export const recordedNoteTasksProgram = Effect.fn('recordedNoteTasks')(
     if (picked === null)
       return { status: 'skipped', reason: 'The model named no action items' }
 
+    const fresh = picked.filter(
+      (item) => !proposedTitles.has(item.title.toLowerCase()),
+    )
+    const { integrationId, receiptId } = input
     const suggestionIds: Array<string> = []
-    for (const item of picked) {
+    for (const item of fresh) {
       const proposed = yield* proposeProgram({
         entityId: about.id,
         kind: 'task',
-        payload: { title: item.title, due: item.due, entity_id: about.id },
+        payload: {
+          title: item.title,
+          due: item.due,
+          entity_id: about.id,
+          assignee_id: held.authorId,
+        },
         refs: [
           ref.note(noteId),
           ref.interaction(interactionId),
-          ref.event(input.receiptId),
+          ...(receiptId === undefined ? [] : [ref.event(receiptId)]),
         ],
-        proposedBy: { type: 'integration', id: input.integrationId },
+        proposedBy:
+          integrationId === undefined
+            ? { type: 'system' }
+            : { type: 'integration', id: integrationId },
       }).pipe(
         Effect.mapError(
           (cause) => new RecordedNoteTasksProposeFailed({ cause }),

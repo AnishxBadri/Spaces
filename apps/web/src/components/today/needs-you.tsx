@@ -60,6 +60,15 @@ export type NeedsYouRow =
       late: boolean
     })
   | (RowBase & {
+      kind: 'task'
+      /** An action item a write-up proposed, decided in place; not yet a task. */
+      proposal: ProposalLeaf
+      /** The meeting it was read from, which the row opens; null when none. */
+      meetingId: string | null
+      /** Its age, or its time today; null until the clock is read. */
+      figure: string | null
+    })
+  | (RowBase & {
       kind: 'deal'
       id: string
       name: string
@@ -328,12 +337,15 @@ function LeafLanes({
   lock,
   actions,
   child = false,
+  onBody,
 }: {
   leaf: ProposalLeaf
   figure: string | null
   lock: ReactNode
   actions: ProposalActions
   child?: boolean
+  /** What the body opens in place of Review; null opens nothing. */
+  onBody?: (() => void) | null | undefined
 }) {
   return (
     <>
@@ -344,9 +356,19 @@ function LeafLanes({
       ) : (
         <span className={LANE.mark}>{lock}</span>
       )}
-      <Link to="/review" search={leaf.review} className={rowTarget}>
-        <Body primary={leaf.subject} context={leaf.line} />
-      </Link>
+      {onBody === undefined ? (
+        <Link to="/review" search={leaf.review} className={rowTarget}>
+          <Body primary={leaf.subject} context={leaf.line} />
+        </Link>
+      ) : onBody === null ? (
+        <span className={rowTarget}>
+          <Body primary={leaf.subject} context={leaf.line} />
+        </span>
+      ) : (
+        <button type="button" onClick={onBody} className={rowTarget}>
+          <Body primary={leaf.subject} context={leaf.line} />
+        </button>
+      )}
       <VerbLanes
         who={leaf.who}
         figure={figure}
@@ -465,6 +487,18 @@ function RowLanes({
     row.sensitive === null ? null : <SensitiveMark name={row.sensitive} />
   switch (row.kind) {
     case 'task':
+      // An action item is not a task until someone presses Add task, so
+      // Review never lists it: its body opens the meeting it came from.
+      if ('proposal' in row)
+        return (
+          <LeafLanes
+            leaf={row.proposal}
+            figure={row.figure}
+            lock={lock}
+            actions={actions}
+            onBody={row.meetingId === null ? null : () => onOpen(row)}
+          />
+        )
       return (
         <>
           <span className={LANE.mark}>
@@ -638,7 +672,8 @@ const rowClass =
  * - The caller orders the rows (`byUrgency`) and owns the filter, so a
  *   readout on the page can set it.
  * - A Review row is one proposal, decided in place by its hover verbs, or a
- *   group whose ▸ opens its children under it.
+ *   group whose ▸ opens its children under it. An action item is a Tasks
+ *   row decided the same way, after the tasks due.
  * - `J`/`K` move the reticle; on a focused row `↵` opens it, `X` completes
  *   a task, and on a proposal `A` is its primary and `D` dismisses it.
  */
@@ -663,7 +698,7 @@ export function NeedsYou({
   /** The attention read is still coming: its rows are not in yet. */
   loading: boolean
   onComplete: (taskId: string) => void
-  /** Opens a meeting or a mark row in place; links open the rest. */
+  /** Opens a meeting, a mark or an action item's meeting in place; links open the rest. */
   onOpen: (row: NeedsYouRow) => void
   taskMenu: (task: MenuTask) => Array<MoreMenuEntry>
   onCreated: (id: string) => void
@@ -726,18 +761,24 @@ export function NeedsYou({
   /** What a key does on a row: ↵ opens it the way a click on its body would. */
   function rowKeys(row: NeedsYouRow): Map<string, () => void> {
     switch (row.kind) {
-      case 'task':
-        return new Map([
-          [
-            'Enter',
-            () =>
-              void router.navigate({
-                to: '/tasks',
-                search: { task: row.task.id },
-              }),
-          ],
-          ['x', () => onComplete(row.task.id)],
-        ])
+      case 'task': {
+        if (!('proposal' in row))
+          return new Map([
+            [
+              'Enter',
+              () =>
+                void router.navigate({
+                  to: '/tasks',
+                  search: { task: row.task.id },
+                }),
+            ],
+            ['x', () => onComplete(row.task.id)],
+          ])
+        const keys = leafKeys(row.proposal)
+        keys.delete('Enter')
+        if (row.meetingId !== null) keys.set('Enter', () => onOpen(row))
+        return keys
+      }
       case 'deal':
         return new Map([
           [
@@ -840,8 +881,13 @@ export function NeedsYou({
                   onKeyDown={(e) => onRowKey(e, rowKeys(r))}
                   className={cn(
                     rowClass,
-                    r.kind === 'review' && 'focus-within:bg-bone',
-                    r.kind === 'task' && washes(r.task.id) && 'row-wash',
+                    (r.kind === 'review' ||
+                      (r.kind === 'task' && 'proposal' in r)) &&
+                      'focus-within:bg-bone',
+                    r.kind === 'task' &&
+                      'task' in r &&
+                      washes(r.task.id) &&
+                      'row-wash',
                   )}
                 >
                   <span className={LANE.kind}>{r.kind}</span>
@@ -878,7 +924,8 @@ export function NeedsYou({
               </Fragment>
             )
           })}
-          {loading && (filter === 'all' || filter === 'review') ? (
+          {loading &&
+          (filter === 'all' || filter === 'review' || filter === 'task') ? (
             <li
               data-needs-loading
               className="flex h-ledger-row items-center gap-3 border-b border-rule px-(--inset)"

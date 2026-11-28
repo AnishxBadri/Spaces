@@ -23,6 +23,8 @@ import {
 import { MeetingsLedger } from '#/components/meetings/meetings-ledger'
 import type { LedgerState } from '#/components/meetings/meetings-ledger'
 import { MeetingsTabBar } from '#/components/meetings/meetings-tab-bar'
+import { NoteModal } from '#/components/notes/note-window'
+import { useOpenNoteWindow } from '#/components/notes/note-window-nav'
 import { ListPage, PageBody, PageHeader } from '#/components/page-header'
 import { useNow } from '#/components/today/day-strip'
 import { Button } from '#/components/ui/button'
@@ -58,6 +60,9 @@ import { listMeetings } from '#/lib/server-fns'
  *   the control then reads `Everyone`; picking `Mine` lets the member go.
  *   A change keeps the open meeting while the new list holds it, else the
  *   pane opens the default one.
+ * - A note's or a file's window over the page takes the address's `id`; the
+ *   meeting it was opened from stays in the pane behind it, and closing the
+ *   window steps back to that meeting.
  */
 export const Route = createFileRoute('/_app/meetings')({
   validateSearch: meetingsSearch,
@@ -167,8 +172,14 @@ function MeetingsPage() {
   const on = meetingFiltersOn(filters, tab)
   const narrowed = on > 0 ? 'filter' : q !== '' ? 'search' : 'none'
   const zone = useMemo(() => browserTimeZone(), [])
-  // A file's window over the page takes the `id`; Back gives it back.
-  const open = search.modal === 'file' ? null : (search.id ?? null)
+  // A note's or a file's window over the page takes the `id`, so the
+  // meeting last addressed stays behind it until the window closes.
+  const windowed = search.modal === 'file' || search.modal === 'note'
+  const addressed = windowed ? null : (search.id ?? null)
+  const [behind, setBehind] = useState<string | null>(addressed)
+  if (!windowed && addressed !== behind) setBehind(addressed)
+  const open = windowed ? behind : addressed
+  const openNote = useOpenNoteWindow()
   const split = useSplit()
   const { now: loadedAt, today } = useClock()
   const ticking = useNow()
@@ -264,9 +275,11 @@ function MeetingsPage() {
       : rows.some((m) => m.id === open) ||
         first.later.some((m) => m.id === open)
   useEffect(() => {
+    // A window over the page keeps the pane as it is until it closes.
     if (
       split !== true ||
       first === undefined ||
+      windowed ||
       opened.current?.listed === listed
     )
       return
@@ -275,7 +288,7 @@ function MeetingsPage() {
     if (open === null) {
       if (firstOpen !== null) select(firstOpen, true)
     } else if (narrowedHere && !held) select(firstOpen, true)
-  }, [split, first, firstOpen, listed, scope, open, held, select])
+  }, [split, first, firstOpen, listed, scope, open, held, select, windowed])
 
   const state: LedgerState =
     first !== undefined && last !== undefined
@@ -402,6 +415,7 @@ function MeetingsPage() {
                   next={tab === 'upcoming' && nextToday(rows, now) === open}
                   onClose={() => select(null)}
                   onChanged={reread}
+                  onOpenNote={openNote}
                 />
               </div>
             ) : null}
@@ -409,12 +423,15 @@ function MeetingsPage() {
         </FolderBody>
       </PageBody>
       <MeetingDialog
-        id={split === false ? open : null}
+        // The note window stands in its place; closing it brings it back.
+        id={split === false && !windowed ? open : null}
         onOpenChange={(o) => {
           if (!o) select(null)
         }}
         onChanged={reread}
+        onOpenNote={openNote}
       />
+      <NoteModal />
     </ListPage>
   )
 }

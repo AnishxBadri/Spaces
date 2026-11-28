@@ -7,6 +7,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { LogInteractionDialog } from '#/components/log-interaction-dialog'
 import { MeetingDialog } from '#/components/meeting-dialog'
+import { NoteModal } from '#/components/notes/note-window'
+import { useOpenNoteWindow } from '#/components/notes/note-window-nav'
 import { Card, PageBody, PageHeader } from '#/components/page-header'
 import { ReadoutStrip } from '#/components/record/record-parts'
 import { useTaskMenu } from '#/components/tasks/task-menu'
@@ -50,6 +52,8 @@ import {
 import type { NeedsFilter, ReadoutFilter } from '#/lib/today/needs-you'
 import { stripLabel, whoLine } from '#/lib/meetings/day'
 import { flattenInbox } from '#/lib/today/proposals'
+import type { Proposal, ProposalLeaf } from '#/lib/today/proposals'
+import { parseRef } from '@spaces/core/context/ref'
 import { useSettled } from '#/lib/today/use-settled'
 import { useHeldView } from '#/lib/held-decisions'
 import { withoutHeld } from '#/lib/inbox/held'
@@ -61,6 +65,25 @@ import { GLOBAL_ACTIONS, runBinding, usePageActions } from '#/lib/page-actions'
 import { AddMarkDialog } from '#/routes/_app/portfolio_.$holdingId'
 
 const DAY_MS = 86_400_000
+
+/** An action item a write-up proposed: a task suggestion on its own row. */
+function actionItemOf(p: Proposal): ProposalLeaf | null {
+  return p.kind === 'leaf' &&
+    p.target.kind === 'suggestion' &&
+    p.target.item.kind === 'task'
+    ? p
+    : null
+}
+
+/** The meeting an action item cites, which its row opens. */
+function meetingCited(leaf: ProposalLeaf): string | null {
+  if (leaf.target.kind !== 'suggestion') return null
+  for (const c of leaf.target.item.citations) {
+    const parsed = parseRef(c.ref)
+    if (parsed?.kind === 'interaction') return parsed.id
+  }
+  return null
+}
 
 /**
  * Today: the one surface that gathers what needs the reader — tasks, idle
@@ -192,6 +215,9 @@ function TodayLedger({
       resetScroll: false,
     })
   }
+  // A write-up opens over Today, and over the meeting window it was
+  // written from; Done steps back to either.
+  const openNote = useOpenNoteWindow()
   const closeMeeting = () => {
     void go({
       search: (prev) => ({ ...prev, modal: undefined, id: undefined }),
@@ -326,15 +352,34 @@ function TodayLedger({
         age,
       }
     }),
-    ...proposals.map((p): NeedsYouRow => ({
-      kind: 'review',
-      key: `review:${p.key}`,
-      // Oldest first: what has waited longest leads.
-      weight: -Date.parse(p.at),
-      sensitive: null,
-      proposal: p,
-      figure: since(p.at),
-    })),
+    ...proposals.flatMap((p): Array<NeedsYouRow> => {
+      const item = actionItemOf(p)
+      return item === null
+        ? []
+        : [
+            {
+              kind: 'task',
+              key: `action:${item.key}`,
+              // After every task due (their weight is 0 or more), oldest first.
+              weight: -Date.parse(item.at),
+              sensitive: null,
+              proposal: item,
+              meetingId: meetingCited(item),
+              figure: since(item.at),
+            },
+          ]
+    }),
+    ...proposals
+      .filter((p) => actionItemOf(p) === null)
+      .map((p): NeedsYouRow => ({
+        kind: 'review',
+        key: `review:${p.key}`,
+        // Oldest first: what has waited longest leads.
+        weight: -Date.parse(p.at),
+        sensitive: null,
+        proposal: p,
+        figure: since(p.at),
+      })),
     ...meetings.unwritten.map((m): NeedsYouRow => ({
       kind: 'meeting',
       key: `meeting:${m.id}`,
@@ -464,6 +509,12 @@ function TodayLedger({
               onOpen={(row) => {
                 if (row.kind === 'meeting') openMeeting(row.id)
                 else if (row.kind === 'mark') setMarkFor(row.holdingId)
+                else if (
+                  row.kind === 'task' &&
+                  'proposal' in row &&
+                  row.meetingId !== null
+                )
+                  openMeeting(row.meetingId)
               }}
               taskMenu={taskMenu.menuFor}
               onCreated={bear}
@@ -530,7 +581,9 @@ function TodayLedger({
           setVersion((v) => v + 1)
           void router.invalidate()
         }}
+        onOpenNote={openNote}
       />
+      <NoteModal />
     </div>
   )
 }

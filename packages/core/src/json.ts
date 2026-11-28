@@ -174,6 +174,7 @@ const meetingMeta = Schema.Struct({
   recorder_events: Schema.optionalKey(
     Schema.mutable(Schema.Array(recorderEvent)),
   ),
+  nothing_to_note: Schema.optionalKey(Schema.Literal(true)),
 }).annotate(strict)
 
 const callMeta = Schema.Struct({

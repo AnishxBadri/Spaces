@@ -3,10 +3,15 @@ import { MockLanguageModelV4 } from 'ai/test'
 import { eq } from 'drizzle-orm'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { db } from '@spaces/db'
-import { suggestion } from '@spaces/db/schema'
+import { interactionEntity, note, suggestion } from '@spaces/db/schema'
+import { user } from '@spaces/db/schema/auth'
+import { task } from '@spaces/db/schema/tasks'
 import { ref } from '@spaces/core/context/ref'
+import { readTaskPayload } from '@spaces/core/ai/task'
 import { QUEUES } from '@spaces/core/queue/names'
 import { meetingDetailProgram } from '#/lib/interactions/meeting-read'
+import { writeUpInteractionProgram } from '#/lib/interactions/write-up'
+import { enqueued } from '#/test/queue-stub'
 import { truncateAndReseed } from '#/test/reseed'
 import {
   callTag,
@@ -18,9 +23,11 @@ import {
   sentJobs,
 } from '#/test/recorded-note'
 import { FIXTURE_ACTOR } from '../../../vitest.seed'
+import { acceptProgram } from './propose'
 import { actionItemsOf, recordedNoteTasksProgram } from './recorded-note-tasks'
 import { setAiRouteProgram } from './route'
 import { setEntitySensitiveProgram } from './sensitivity-for'
+import { writeUpClosedProgram } from './write-up-action-items'
 
 vi.mock('#/lib/queue', () => import('#/test/queue-stub'))
 
@@ -37,8 +44,10 @@ const ITEMS = {
   ],
 }
 
-/** Answers the extract lane with `ITEMS`, counting its calls. */
-function mockModel() {
+/** Answers the extract lane with `answer`, counting its calls. */
+function mockModel(
+  answer: { items: Array<{ title: string; due?: string }> } = ITEMS,
+) {
   const calls: Array<string> = []
   const model = new MockLanguageModelV4({
     provider: 'mock',
@@ -46,7 +55,7 @@ function mockModel() {
     doGenerate: (options) => {
       calls.push(JSON.stringify(options.prompt))
       return Promise.resolve({
-        content: [{ type: 'text', text: JSON.stringify(ITEMS) }],
+        content: [{ type: 'text', text: JSON.stringify(answer) }],
         finishReason: { unified: 'stop', raw: 'stop' },
         usage: {
           inputTokens: {
@@ -81,6 +90,7 @@ const route = (
 beforeEach(async () => {
   await truncateAndReseed()
   sentJobs.length = 0
+  enqueued.length = 0
 }, 60_000)
 
 /** A founder call with Granola's note landed; the job the port queued. */
@@ -153,6 +163,7 @@ describe("a recorded note's action items", () => {
           title: 'Send the data room',
           due: '2026-10-30',
           entity_id: f.company,
+          assignee_id: FIXTURE_ACTOR.id,
         },
         refs: cites,
         proposedByType: 'integration',
@@ -164,6 +175,7 @@ describe("a recorded note's action items", () => {
           title: 'Intro Maya to Priya',
           due: null,
           entity_id: f.company,
+          assignee_id: FIXTURE_ACTOR.id,
         },
         refs: cites,
         proposedByType: 'integration',
@@ -233,6 +245,144 @@ describe("a recorded note's action items", () => {
     )
     expect(out.status).toBe('proposed')
     expect(await tasksOn(f.company)).toHaveLength(2)
+  })
+})
+
+/** A meeting written up by the fixture member, two items in its text. */
+async function typed() {
+  const tag = callTag()
+  const company = await flent(tag)
+  const meeting = await founderCall(tag, new Date(Date.now() - 24 * 3_600_000))
+  await db.insert(interactionEntity).values({
+    interactionId: meeting,
+    entityId: company,
+  })
+  const { noteId } = await Effect.runPromise(
+    writeUpInteractionProgram(FIXTURE_ACTOR.id, meeting),
+  )
+  await db
+    .update(note)
+    .set({ bodyMd: '- Send the data room by 30 Oct\n- Intro Maya to Priya' })
+    .where(eq(note.entityId, noteId))
+  return { company, meeting, noteId }
+}
+
+describe("a typed write-up's action items", () => {
+  it('are read once, when its window first closes, and not on a later close', async () => {
+    await route('normal', 'anthropic')
+    const w = await typed()
+    expect(await Effect.runPromise(writeUpClosedProgram(w.noteId))).toEqual({
+      queued: true,
+    })
+    expect(enqueued.filter((e) => e.name === QUEUES.recordedNoteTasks)).toEqual(
+      [
+        {
+          name: QUEUES.recordedNoteTasks,
+          data: { interactionId: w.meeting, noteId: w.noteId },
+          options: { singletonKey: w.noteId },
+        },
+      ],
+    )
+    const { model, calls } = mockModel()
+    const job = { interactionId: w.meeting, noteId: w.noteId, model }
+    const first = await Effect.runPromise(recordedNoteTasksProgram(job))
+    expect(first.status).toBe('proposed')
+    // Proposed by the workspace, citing the note and the meeting only.
+    expect(await tasksOn(w.company)).toEqual(
+      ITEMS.items.map((item) => ({
+        kind: 'task',
+        payload: {
+          title: item.title,
+          due: item.due ?? null,
+          entity_id: w.company,
+          assignee_id: FIXTURE_ACTOR.id,
+        },
+        refs: [ref.note(w.noteId), ref.interaction(w.meeting)],
+        proposedByType: 'system',
+        proposedById: null,
+      })),
+    )
+
+    // Closed again: the read the close queues finds the note read.
+    const second = await Effect.runPromise(recordedNoteTasksProgram(job))
+    expect(second.status).toBe('skipped')
+    expect(calls).toHaveLength(1)
+    expect(await tasksOn(w.company)).toHaveLength(2)
+  })
+
+  it('Find action items proposes only the items not proposed yet', async () => {
+    await route('normal', 'anthropic')
+    const w = await typed()
+    await Effect.runPromise(
+      recordedNoteTasksProgram({
+        interactionId: w.meeting,
+        noteId: w.noteId,
+        model: mockModel().model,
+      }),
+    )
+    const added = mockModel({
+      items: [
+        ...ITEMS.items,
+        { title: 'send the data room' },
+        { title: 'Book the partner meeting' },
+      ],
+    })
+    const found = await Effect.runPromise(
+      recordedNoteTasksProgram({
+        interactionId: w.meeting,
+        noteId: w.noteId,
+        again: true,
+        askedBy: FIXTURE_ACTOR.id,
+        model: added.model,
+      }),
+    )
+    expect(found.status).toBe('proposed')
+    expect(found.status === 'proposed' && found.suggestionIds).toHaveLength(1)
+    expect(added.calls).toHaveLength(1)
+    const titles = (await tasksOn(w.company)).map(
+      (t) => readTaskPayload(t.payload)?.title ?? null,
+    )
+    expect(titles.sort()).toEqual([
+      'Book the partner meeting',
+      'Intro Maya to Priya',
+      'Send the data room',
+    ])
+  })
+
+  it('an accepted item is a task assigned to the write-up’s author, not its accepter', async () => {
+    await route('normal', 'anthropic')
+    const w = await typed()
+    const out = await Effect.runPromise(
+      recordedNoteTasksProgram({
+        interactionId: w.meeting,
+        noteId: w.noteId,
+        model: mockModel().model,
+      }),
+    )
+    if (out.status !== 'proposed') throw new Error('nothing proposed')
+    const [accepter] = await db
+      .insert(user)
+      .values({
+        id: crypto.randomUUID(),
+        name: 'Accepting Partner',
+        email: `${crypto.randomUUID()}@fund.example`,
+        emailVerified: false,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning({ id: user.id })
+    const accepted = await Effect.runPromise(
+      acceptProgram(out.suggestionIds[0], { type: 'user', id: accepter.id }),
+    )
+    if (accepted.kind !== 'task') throw new Error('not a task')
+    const [made] = await db
+      .select({ assigneeId: task.assigneeId, createdBy: task.createdBy })
+      .from(task)
+      .where(eq(task.id, accepted.taskId))
+    expect(made).toEqual({
+      assigneeId: FIXTURE_ACTOR.id,
+      createdBy: accepter.id,
+    })
   })
 })
 

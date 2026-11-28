@@ -6,7 +6,12 @@ import { isUnwritten } from './unwritten'
 const ended = '2026-10-15T10:00:00.000Z'
 const after = (minutes: number) =>
   new Date(Date.parse(ended) + minutes * 60_000)
-const meeting = { noteId: null, cancelled: false, endsAt: ended }
+const meeting = {
+  noteId: null,
+  cancelled: false,
+  endsAt: ended,
+  nothingToNote: false,
+}
 
 describe('isUnwritten', () => {
   it('waits an hour after a recorded meeting ends', () => {
@@ -27,6 +32,16 @@ describe('isUnwritten', () => {
     ).toBe(false)
     expect(
       isUnwritten({ ...meeting, recorded: false, cancelled: true }, late),
+    ).toBe(false)
+  })
+
+  it('owes none once a member marked it nothing to note', () => {
+    const late = after(120)
+    expect(
+      isUnwritten({ ...meeting, recorded: false, nothingToNote: true }, late),
+    ).toBe(false)
+    expect(
+      isUnwritten({ ...meeting, recorded: true, nothingToNote: true }, late),
     ).toBe(false)
   })
 })
